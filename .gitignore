@@ -1,0 +1,8 @@
+# Ignora un file specifico
+secrets.yaml
+
+# Ignora una cartella intera
+/.vscode/
+
+# Ignora tutti i file `.log`
+*.log
