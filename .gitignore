@@ -1,8 +1,8 @@
 # Ignora un file specifico
-secrets.yaml
+appdaemon/conf/secrets.yaml
 
 # Ignora una cartella intera
-/.vscode/
+appdaemon/.vscode/
 
 # Ignora tutti i file `.log`
 *.log
