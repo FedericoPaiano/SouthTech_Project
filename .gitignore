@@ -3,7 +3,7 @@ appdaemon/conf/secrets.yaml
 
 # Ignora una cartella intera
 .vscode
-appdaemon/conf/.vscode/
+appdaemon/conf/.vscode
 
 # Ignora tutti i file `.log`
 *.log
