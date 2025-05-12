@@ -130,6 +130,7 @@ class LightPresenceControl(hass.Hass):
         max_lux_activation = light_config.get("max_lux_activation", int(1000))
         enable_sensor = light_config.get("enable_sensor", "off")
         enable_manual_activation_sensor = light_config.get("enable_manual_activation_sensor", "on")
+        enable_manual_activation_light_sensor = light_config.get("enable_manual_activation_light_sensor", "on")
         enable_illuminance_filter = light_config.get("enable_illuminance_filter", "off")
         enable_illuminance_automation = light_config.get("enable_illuminance_automation", "off")
         enable_automation = light_config.get("enable_automation", "off")
@@ -143,6 +144,31 @@ class LightPresenceControl(hass.Hass):
         turn_on_light_offset = light_config.get("turn_on_light_offset", float(0.0))
         turn_off_light_offset = light_config.get("turn_off_light_offset", int(30))
         illuminance_offset = light_config.get("illuminance_offset", "input_number.default_illuminance_offset")
+
+        light_config.update({
+            "enable_manual_activation_sensor": enable_manual_activation_sensor,
+            "enable_manual_activation_light_sensor": enable_manual_activation_light_sensor,
+            "enable_illuminance_filter": enable_illuminance_filter,
+            "enable_illuminance_automation": enable_illuminance_automation,
+            "enable_automation": enable_automation,
+            "automatic_enable_automation": automatic_enable_automation,
+            "light_sensor_config": light_sensor_config,
+            "timer_minutes_on_push": timer_minutes_on_push,
+            "timer_minutes_on_time": timer_minutes_on_time,
+            "timer_filter_on_push": timer_filter_on_push,
+            "timer_filter_on_time": timer_filter_on_time,
+            "timer_seconds_max_lux": timer_seconds_max_lux,
+            "turn_on_light_offset": turn_on_light_offset,
+            "turn_off_light_offset": turn_off_light_offset,
+            "illuminance_offset": illuminance_offset,
+            "min_lux_activation": min_lux_activation,
+            "max_lux_activation": max_lux_activation,
+            "presence_sensor_on": presence_sensor_on,
+            "presence_sensor_off": presence_sensor_off,
+            "illuminance_sensor": illuminance_sensor,
+            "enable_sensor": enable_sensor,
+            "light_entity": light_entity,
+        })
 
         # Registra i listener per gli eventi di stato
         self.register_listeners(light_config, light_entity, presence_sensor_on, presence_sensor_off,
@@ -163,6 +189,7 @@ class LightPresenceControl(hass.Hass):
                 f"Soglia massima lux per disattivazione luce: {self.formatted_value(max_lux_activation, max_lux_activation == 'input_number.default_max_lux_activation')}",
                 f"Enable Sensor: {self.formatted_value(enable_sensor, enable_sensor == 'off')}",
                 f"Enable Manual Activation Sensor: {self.formatted_value(enable_manual_activation_sensor, enable_manual_activation_sensor == 'on')}",
+                f"Enable Manual Activation Light Sensor: {self.formatted_value(enable_manual_activation_light_sensor, enable_manual_activation_light_sensor == 'on')}",
                 f"Enable Illuminance Filter: {self.formatted_value(enable_illuminance_filter, enable_illuminance_filter == 'off')}",
                 f"Enable Illuminance Automation: {self.formatted_value(enable_illuminance_automation, enable_illuminance_automation == 'off')}",
                 f"Enable Automation: {self.formatted_value(enable_automation, enable_automation == 'off')}",
@@ -518,7 +545,7 @@ class LightPresenceControl(hass.Hass):
         enable_automation = config["enable_automation"]
         automatic_enable_automation = config["automatic_enable_automation"]
         enable_sensor = config["enable_sensor"]
-        enable_manual_activation_sensor = config["enable_manual_activation_sensor"]
+        enable_manual_activation_light_sensor = config["enable_manual_activation_light_sensor"]
 
         timer_push_key = f"{light_entity}_timer_on_push"
 
@@ -546,16 +573,17 @@ class LightPresenceControl(hass.Hass):
             self.log(f"⏭️ Ignorato toggle rapido per {light_entity}: in cooldown")
             return
 
+        auto_enable_mode = self.get_state(automatic_enable_automation)
+
         # Attivazione automatica dell'automazione
         if presence_active and self.get_state(enable_automation) == "off":
-            auto_enable_mode = self.get_state(automatic_enable_automation)
             if auto_enable_mode in ["Push", "All"]:
                 self.turn_on(enable_automation)
                 self.log(f"🔓 Automazione abilitata automaticamente ({auto_enable_mode})")
         else:
             self.log(f"⚠️ Modalità '{auto_enable_mode}' non supportata per {light_entity}", level="WARNING")
 
-        if enable_manual_activation_sensor:
+        if enable_manual_activation_light_sensor:
             # Controllo per toggle rapido per abilitare enable_sensor
             current_time = self.datetime()
             prev_state_info = self.toggle_history.get(light_entity, {})
@@ -582,17 +610,22 @@ class LightPresenceControl(hass.Hass):
                 # Annulla eventuali blink in corso
                 self.cancel_blink_timers(light_entity)
                 
-                # Programma il blink: on → off → on
-                handle1 = self.timer_manager.start_timer(
-                    f"{light_entity}_blink_1",
-                    1,
-                    self.blink_step1,
-                    is_filter=False,
-                    light_entity=light_entity,
-                    target_state='off',
-                    enable_sensor=enable_sensor_entity
-                )
-                self.blink_timers[light_entity] = [handle1]
+                # Prima di avviare il blink, controlla enable_manual_activation_sensor
+                manual_activation = config.get("enable_manual_activation_light_sensor", "on")
+                if self.get_state(manual_activation) == "on":
+                    # Avvia il blink solo se il sensore manuale è attivo
+                    handle1 = self.timer_manager.start_timer(
+                        f"{light_entity}_blink_1",
+                        1,
+                        self.blink_step1,
+                        is_filter=False,
+                        light_entity=light_entity,
+                        target_state='off',
+                        enable_sensor=enable_sensor_entity
+                    )
+                    self.blink_timers[light_entity] = [handle1]
+                else:
+                    self.log(f"⏭️ Blink non avviato: enable_manual_activation_sensor disattivo per {light_entity}")
 
     def light_turned_off(self, entity, attribute, old, new, kwargs):
         """
@@ -604,7 +637,7 @@ class LightPresenceControl(hass.Hass):
         presence_sensor_off = config["presence_sensor_off"]
         timer_minutes_on_push = config["timer_minutes_on_push"]
         timer_key = f"{light_entity}_timer_on_push"
-        enable_manual_activation_sensor = config["enable_manual_activation_sensor"]
+        enable_manual_activation_light_sensor = config["enable_manual_activation_light_sensor"]
 
         # Resetta il flag a False per questa luce
         self.light_illuminance_lock_on[light_entity] = False
@@ -647,7 +680,7 @@ class LightPresenceControl(hass.Hass):
                     )
                     self.log(f"⏳ Timer 'on_push' avviato: {timer_duration} minuti")
 
-        if enable_manual_activation_sensor:
+        if enable_manual_activation_light_sensor:
             # Controllo per toggle rapido per disabilitare enable_sensor
             current_time = self.datetime()
             prev_state_info = self.toggle_history.get(light_entity, {})
@@ -674,17 +707,22 @@ class LightPresenceControl(hass.Hass):
                 # Annulla eventuali blink in corso
                 self.cancel_blink_timers(light_entity)
                 
-                # Programma il blink: off → on → off
-                handle1 = self.timer_manager.start_timer(
-                    f"{light_entity}_blink_1",
-                    1,
-                    self.blink_step1,
-                    is_filter=False,
-                    light_entity=light_entity,
-                    target_state='on',
-                    enable_sensor=enable_sensor_entity
-                )
-                self.blink_timers[light_entity] = [handle1]
+                # Prima di avviare il blink, controlla enable_manual_activation_sensor
+                manual_activation = config.get("enable_manual_activation_light_sensor", "on")
+                if self.get_state(manual_activation) == "on":
+                    # Avvia il blink solo se il sensore manuale è attivo
+                    handle1 = self.timer_manager.start_timer(
+                        f"{light_entity}_blink_1",
+                        1,
+                        self.blink_step1,
+                        is_filter=False,
+                        light_entity=light_entity,
+                        target_state='on',
+                        enable_sensor=enable_sensor_entity
+                    )
+                    self.blink_timers[light_entity] = [handle1]
+                else:
+                    self.log(f"⏭️ Blink non avviato: enable_manual_activation_sensor disattivo per {light_entity}")
 
     def light_state_changed_on(self, entity, attribute, old, new, kwargs):
         config = kwargs["config"]
@@ -1310,9 +1348,16 @@ class LightPresenceControl(hass.Hass):
             self.log(f"ERRORE: {str(e)}", level="ERROR")
 
     def blink_step1(self, kwargs):
+        config = kwargs["config"]
         light_entity = kwargs['light_entity']
         target_state = kwargs['target_state']
         enable_sensor = kwargs['enable_sensor']
+
+        # Verifica se enable_manual_activation_sensor è attivo
+        manual_activation = config.get("enable_manual_activation_light_sensor", "on")
+        if self.get_state(manual_activation) != "on":
+            self.log(f"⏭️ Blink disattivato: enable_manual_activation_sensor non attivo per {light_entity}")
+            return
         
         # Verifica se la luce è ancora nello stato corretto
         current_state = self.get_state(light_entity)
@@ -1352,9 +1397,16 @@ class LightPresenceControl(hass.Hass):
         self.log(f"⏳ Avviato timer per blink step2 su {light_entity}")
 
     def blink_step2(self, kwargs):
+        config = kwargs["config"]
         light_entity = kwargs['light_entity']
         target_state = kwargs['target_state']
         enable_sensor = kwargs['enable_sensor']
+
+        # Verifica se enable_manual_activation_sensor è attivo
+        manual_activation = config.get("enable_manual_activation_light_sensor", "on")
+        if self.get_state(manual_activation) != "on":
+            self.log(f"⏭️ Blink disattivato: enable_manual_activation_sensor non attivo per {light_entity}")
+            return
 
         # +++ Controllo stato luce +++
         current_state = self.get_state(light_entity)
