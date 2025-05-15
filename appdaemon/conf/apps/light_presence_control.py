@@ -104,11 +104,12 @@ class LightPresenceControl(hass.Hass):
         """
         Inizializza le configurazioni per ogni luce specificata nel file YAML.
         """
-        initialization_details = []  # Lista per raccogliere informazioni sui dispositivi per il log finale
+        initialization_details = []  # Lista unica per tutte le configurazioni
         for light_config in config:
-            # Inizializza entità e variabili nel programma
             self.setup_light_configuration(light_config, initialization_details)
-            self.log_initialization_details(initialization_details)
+        
+        # Logga TUTTE le configurazioni insieme alla fine
+        self.log_initialization_details(initialization_details)
 
     def setup_light_configuration(self, light_config, initialization_details):
         """
@@ -178,6 +179,21 @@ class LightPresenceControl(hass.Hass):
                                 automatic_enable_automation, turn_on_light_offset, turn_off_light_offset,
                                 illuminance_offset, enable_illuminance_filter)
 
+        # Costruisci la lista dei listener per il logging
+        listeners = []
+        if illuminance_sensor is not None:
+            listeners.extend([
+                f"Monitoraggio illuminanza: {illuminance_sensor}",
+                f"Automatismi illuminanza: {illuminance_sensor}"
+            ])
+
+        listeners.extend([
+            f"Presenza ON/OFF: {presence_sensor_on}",
+            f"Presenza OFF: {presence_sensor_off}",
+            f"Stato luce: {light_entity}",
+            f"Parametri configurazione: {len(light_config)} impostazioni"
+        ])
+
         # Aggiungi i dettagli di questa configurazione al log finale
         initialization_details.append({
             "entities": [
@@ -204,25 +220,7 @@ class LightPresenceControl(hass.Hass):
                 f"Turn Off Light Offset: {self.formatted_value(turn_off_light_offset, turn_off_light_offset == int(30))}",
                 f"Illuminance Offset: {self.formatted_value(illuminance_offset, illuminance_offset == 'input_number.default_illuminance_offset')}"
             ],
-            "listeners": [
-                f"Listener per {presence_sensor_on} -> check_and_start_timer_on_time",
-                f"Listener per {presence_sensor_off} -> check_and_start_timer_on_time",
-                f"Listener per {illuminance_sensor} -> illuminance_on",
-                f"Listener per {illuminance_sensor} -> illuminance_off",
-                f"Listener per {light_entity} (on) -> light_turned_on",
-                f"Listener per {light_entity} (off) -> light_turned_off",
-                f"Listener per {timer_minutes_on_push} -> value_changed",
-                f"Listener per {timer_minutes_on_time} -> value_changed",
-                f"Listener per {timer_filter_on_push} -> value_changed",
-                f"Listener per {timer_filter_on_time} -> value_changed",
-                f"Listener per {timer_seconds_max_lux} -> value_changed",
-                f"Listener per {min_lux_activation} -> value_changed",
-                f"Listener per {max_lux_activation} -> value_changed",
-                f"Listener per {presence_sensor_on} -> cancel_on_time_if_presence_detected",
-                f"Listener per {presence_sensor_off} -> cancel_on_time_if_presence_detected",
-                f"Listener per {enable_automation} -> check_and_cancel_timers",
-                f"Listener per {automatic_enable_automation} -> check_and_cancel_timers"
-            ]
+            "listeners": listeners
         })
 
     def register_listeners( self, light_config, light_entity, presence_sensor_on, presence_sensor_off,
@@ -266,23 +264,45 @@ class LightPresenceControl(hass.Hass):
 
     def log_initialization_details(self, initialization_details):
         """
-        Crea un log finale dettagliato con le entità e i listener registrati,
-        evitando messaggi consecutivi duplicati.
+        Crea un singolo log strutturato per tutte le configurazioni
         """
-        for details in initialization_details:
-            self.log("**************************************************************")
-            self.log("  - Entita' Registrate:")
+        prev_entities = []
+        prev_listeners = []
+        
+        self.log("\n" + "*" * 80)
+        self.log("*** INIZIALIZZAZIONE CONFIGURAZIONI LUCI ***")
+        
+        for i, details in enumerate(initialization_details, 1):
+            # Intestazione configurazione
+            self.log(f"\n*** Configurazione Luce #{i} ***")
+            
+            # Sezione Entità - Logga solo se diverse dalla precedente
+            self.log("\n  ENTA' CONFIGURATE:")
+            current_entities = [e.split(':')[0].strip() for e in details["entities"]]
+            
             for entity in details["entities"]:
-                self.log(f"    * {entity}")
+                self.log(f"  - {entity}")
+            prev_entities = current_entities
             
-            self.log("  - Listener Registrati:")
-            previous_listener = None  # Tiene traccia del listener precedente
-            for listener in details["listeners"]:
-                if listener != previous_listener:  # Stampa solo se diverso dal precedente
-                    self.log(f"    * {listener}")
-                    previous_listener = listener  # Aggiorna il listener precedente
+            # Sezione Listener - Rimuovi duplicati
+            self.log("\n  LISTENER ATTIVI:")
+            current_listeners = details["listeners"]
             
-        self.log("**************************************************************")
+            if current_listeners != prev_listeners:
+                seen = set()
+                for listener in current_listeners:
+                    clean_listener = listener.split('->')[0].strip()
+                    if clean_listener not in seen:
+                        self.log(f"  - {listener}")
+                        seen.add(clean_listener)
+                prev_listeners = current_listeners
+            else:
+                self.log("  - Listener identici alla configurazione precedente [omessi]")
+            
+            self.log("-" * 60)
+        
+        self.log("\n*** INIZIALIZZAZIONE COMPLETATA ***")
+        self.log("*" * 80 + "\n")
 
     def formatted_value(self, value, is_default):
         """
@@ -303,8 +323,8 @@ class LightPresenceControl(hass.Hass):
         turn_on_light_offset = config["turn_on_light_offset"]
 
         # Controllo della modalità selezionata
-        light_sensor_mode = self.get_state(config["light_sensor_config"])
-        if light_sensor_mode not in ["On", "All"]:
+        light_sensor_mode = self.get_state(config["light_sensor_config"]).lower() if config["light_sensor_config"] else "all"
+        if light_sensor_mode not in ["on", "all"]:
             self.log(f"⏭️ Modalità '{light_sensor_mode}': accensione disabilitata")
             return
 
@@ -393,8 +413,8 @@ class LightPresenceControl(hass.Hass):
         presence_off_state = self.get_state(presence_sensor_off)
 
         # Controllo della modalità selezionata
-        light_sensor_mode = self.get_state(config["light_sensor_config"])
-        if light_sensor_mode not in ["Off", "All"]:
+        light_sensor_mode = self.get_state(config["light_sensor_config"]).lower() if config["light_sensor_config"] else "all"
+        if light_sensor_mode not in ["off", "all"]:
             self.log(f"⏭️ Modalità '{light_sensor_mode}': spegnimento disabilitato")
             return
 
@@ -573,13 +593,11 @@ class LightPresenceControl(hass.Hass):
             self.log(f"⏭️ Ignorato toggle rapido per {light_entity}: in cooldown")
             return
 
-        auto_enable_mode = self.get_state(automatic_enable_automation)
+        auto_enable_mode = self.get_state(automatic_enable_automation).lower()
 
-        # Attivazione automatica dell'automazione
-        if presence_active and self.get_state(enable_automation) == "off":
-            if auto_enable_mode in ["Push", "All"]:
-                self.turn_on(enable_automation)
-                self.log(f"🔓 Automazione abilitata automaticamente ({auto_enable_mode})")
+        if auto_enable_mode in ["push", "all"]:
+            self.turn_on(enable_automation)
+            self.log(f"🔓 Automazione abilitata automaticamente ({auto_enable_mode})")
         else:
             self.log(f"⚠️ Modalità '{auto_enable_mode}' non supportata per {light_entity}", level="WARNING")
 
