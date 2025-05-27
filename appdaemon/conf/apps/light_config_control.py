@@ -145,6 +145,8 @@ class LightConfigControl(hass.Hass):
             return
 
         if new != current_virtual:
-            service = "input_boolean.turn_on" if new == "on" else "input_boolean.turn_off"
-            self.call_service(service, entity_id=template_state)
+            if new == "on":
+                self.call_service("input_boolean/turn_on", entity_id=template_state)
+            else:
+                self.call_service("input_boolean/turn_off", entity_id=template_state)
             self.log(f"[{light_name}] Sincronizzato stato fisico '{source}' -> virtuale: {new}", level="DEBUG")
