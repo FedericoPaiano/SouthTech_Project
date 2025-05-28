@@ -71,7 +71,6 @@ light_presence:
       max_lux_activation: input_number.rgb_03_02_max_lux_activation
       turn_on_light_offset: input_number.rgb_03_02_turn_on_light_offset
       turn_off_light_offset: input_number.rgb_03_02_turn_off_light_offset
-      illuminance_offset: input_number.rgb_03_02_illuminance_offset
       
     # Seconda configurazione - RGB 01 05  
     - light_entity: light.rgb_01_05
@@ -95,7 +94,6 @@ light_presence:
       max_lux_activation: input_number.rgb_01_05_max_lux_activation
       turn_on_light_offset: input_number.rgb_01_05_turn_on_light_offset
       turn_off_light_offset: input_number.rgb_01_05_turn_off_light_offset
-      illuminance_offset: input_number.rgb_01_05_illuminance_offset
       
     # Terza configurazione - Shelly Plus 1PM
     - light_entity: light.shellyplus1pm_80646fe3563c_switch_0
@@ -119,7 +117,6 @@ light_presence:
       max_lux_activation: input_number.shellyplus1pm_80646fe3563c_switch_0_max_lux_activation
       turn_on_light_offset: input_number.shellyplus1pm_80646fe3563c_switch_0_turn_on_light_offset
       turn_off_light_offset: input_number.shellyplus1pm_80646fe3563c_switch_0_turn_off_light_offset
-      illuminance_offset: input_number.shellyplus1pm_80646fe3563c_switch_0_illuminance_offset
 
 ################################################################################
 #                      CONFIGURAZIONE LUCI SMART                              #

@@ -69,8 +69,7 @@ class PresenceEntityGenerator(hass.Hass):
         number_fields = [
             "timer_minutes_on_push", "timer_filter_on_push", "timer_minutes_on_time",
             "timer_filter_on_time", "timer_seconds_max_lux", "min_lux_activation",
-            "max_lux_activation", "turn_on_light_offset", "turn_off_light_offset",
-            "illuminance_offset"
+            "max_lux_activation", "turn_on_light_offset", "turn_off_light_offset"
         ]
         
         for field in number_fields:
@@ -217,10 +216,6 @@ class PresenceEntityGenerator(hass.Hass):
             "turn_off_light_offset": {
                 "name": "Turn Off Light Offset",
                 "min": 0, "max": 600, "step": 1, "unit": "sec"
-            },
-            "illuminance_offset": {
-                "name": "Illuminance Offset",
-                "min": 0, "max": 60, "step": 0.1, "unit": "sec"
             }
         }
         
@@ -328,7 +323,7 @@ class PresenceEntityGenerator(hass.Hass):
                     "timer_minutes_on_push", "timer_filter_on_push", "timer_minutes_on_time",
                     "timer_filter_on_time", "timer_seconds_max_lux", "min_lux_activation",
                     "max_lux_activation", "turn_on_light_offset", "turn_off_light_offset",
-                    "illuminance_offset", "automatic_enable_automation", "light_sensor_config"
+                    "automatic_enable_automation", "light_sensor_config"
                 ]
                 
                 if any(field in entity_id for field in presence_fields):
