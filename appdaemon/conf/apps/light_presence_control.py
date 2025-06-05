@@ -3,22 +3,22 @@ from datetime import datetime, timedelta
 from timer_manager import TimerManager
 
 class LightPresenceControl(hass.Hass):
-  def initialize(self):
-      """
-      Inizializza la configurazione del controllo delle luci.
-      Ottiene le configurazioni dal file YAML e imposta le strutture dati necessarie.
-      """
-      # Sostituzione strutture timer con TimerManager
-      self.timer_manager = TimerManager(self)
-      
-      self.log_timer_status = {}
+    def initialize(self):
+        """
+        Inizializza la configurazione del controllo delle luci.
+        Ottiene le configurazioni dal file YAML e imposta le strutture dati necessarie.
+        """
+        # Sostituzione strutture timer con TimerManager
+        self.timer_manager = TimerManager(self)
+        
+        self.log_timer_status = {}
 
-      # Inizializza il dizionario per i flag
-      self.light_turned_off_by_illuminance = {}
-      self.light_illuminance_lock_on = {}
+        # Inizializza il dizionario per i flag
+        self.light_turned_off_by_illuminance = {}
+        self.light_illuminance_lock_on = {}
 
-      config = self.args["light_presence"]
-      self.initialize_light_configurations(config)
+        config = self.args["light_presence"]
+        self.initialize_light_configurations(config)
 
     def initialize_light_configurations(self, config):
         """
