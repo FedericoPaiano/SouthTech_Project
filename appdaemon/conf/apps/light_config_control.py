@@ -3,6 +3,7 @@ import appdaemon.plugins.hass.hassapi as hass
 class LightConfigControl(hass.Hass):
 
     def initialize(self):
+        self.updating_from_physical = {}  # Flag per evitare loop
         self.log("Inizializzazione LightConfigControl con fallback", level="INFO")
         self.light_configs = self.args.get("light_config", [])
 
@@ -74,6 +75,11 @@ class LightConfigControl(hass.Hass):
         mode_state = self.get_mode_state(mode)
         action = "turn_on" if new == "on" else "turn_off"
 
+        # Evita di comandare la luce se stiamo sincronizzando dal fisico
+        if self.updating_from_physical.get(light_name, False):
+            self.log(f"[{light_name}] Comando template ignorato: sincronizzazione in corso", level="DEBUG")
+            return
+
         if mode_state == "on" and smart and self.entity_exists(smart):
             state = self.get_state(smart)
             if state in ["unavailable", None]:
@@ -144,9 +150,21 @@ class LightConfigControl(hass.Hass):
         if (mode_state == "on" and source != "smart") or (mode_state == "off" and source != "relay"):
             return
 
+        # Evita loop se stiamo già aggiornando dal template
+        if self.updating_from_physical.get(light_name, False):
+            return
+        
         if new != current_virtual:
+            # Setta il flag prima di aggiornare
+            self.updating_from_physical[light_name] = True
+            
             if new == "on":
                 self.call_service("input_boolean/turn_on", entity_id=template_state)
             else:
                 self.call_service("input_boolean/turn_off", entity_id=template_state)
+            
+            # Aggiungi questo log che mancava
             self.log(f"[{light_name}] Sincronizzato stato fisico '{source}' -> virtuale: {new}", level="DEBUG")
+            
+            # Reset flag dopo un breve delay
+            self.run_in(lambda *args: self.updating_from_physical.pop(light_name, None), 1)
