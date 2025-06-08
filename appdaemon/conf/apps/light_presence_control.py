@@ -62,7 +62,6 @@ class LightPresenceControl(hass.Hass):
         timer_seconds_max_lux = light_config.get("timer_seconds_max_lux", int(5))
         turn_on_light_offset = light_config.get("turn_on_light_offset", float(0.0))
         turn_off_light_offset = light_config.get("turn_off_light_offset", int(30))
-        illuminance_offset = light_config.get("illuminance_offset", "input_number.default_illuminance_offset")
 
         light_config.update({
             "enable_illuminance_filter": enable_illuminance_filter,
@@ -77,7 +76,6 @@ class LightPresenceControl(hass.Hass):
             "timer_seconds_max_lux": timer_seconds_max_lux,
             "turn_on_light_offset": turn_on_light_offset,
             "turn_off_light_offset": turn_off_light_offset,
-            "illuminance_offset": illuminance_offset,
             "min_lux_activation": min_lux_activation,
             "max_lux_activation": max_lux_activation,
             "presence_sensor_on": presence_sensor_on,
@@ -93,7 +91,7 @@ class LightPresenceControl(hass.Hass):
                                 timer_minutes_on_push, timer_minutes_on_time, timer_filter_on_push,
                                 timer_filter_on_time, timer_seconds_max_lux, enable_automation,
                                 automatic_enable_automation, turn_on_light_offset, turn_off_light_offset,
-                                illuminance_offset, enable_illuminance_filter)
+                                enable_illuminance_filter)
 
         # Costruisci la lista dei listener per il logging
         listeners = []
@@ -131,18 +129,17 @@ class LightPresenceControl(hass.Hass):
                 f"Timer Filter On Time: {self.formatted_value(timer_filter_on_time, timer_filter_on_time == int(5))}",
                 f"Timer Seconds Max Lux: {self.formatted_value(timer_seconds_max_lux, timer_seconds_max_lux == int(5))}",
                 f"Turn On Light Offset: {self.formatted_value(turn_on_light_offset, turn_on_light_offset == float(0.0))}",
-                f"Turn Off Light Offset: {self.formatted_value(turn_off_light_offset, turn_off_light_offset == int(30))}",
-                f"Illuminance Offset: {self.formatted_value(illuminance_offset, illuminance_offset == 'input_number.default_illuminance_offset')}"
+                f"Turn Off Light Offset: {self.formatted_value(turn_off_light_offset, turn_off_light_offset == int(30))}"
             ],
             "listeners": listeners
         })
 
-    def register_listeners( self, light_config, light_entity, presence_sensor_on, presence_sensor_off,
+    def register_listeners(self, light_config, light_entity, presence_sensor_on, presence_sensor_off,
                             illuminance_sensor, min_lux_activation, max_lux_activation,
                             timer_minutes_on_push, timer_minutes_on_time, timer_filter_on_push,
                             timer_filter_on_time, timer_seconds_max_lux, enable_automation,
                             automatic_enable_automation, turn_on_light_offset, turn_off_light_offset,
-                            illuminance_offset, enable_illuminance_filter ):
+                            enable_illuminance_filter):
         """
         Registra i listener per gli eventi di stato delle entità.
         """
@@ -168,7 +165,6 @@ class LightPresenceControl(hass.Hass):
         self.listen_state(self.value_changed, timer_seconds_max_lux, config=light_config)
         self.listen_state(self.value_changed, turn_on_light_offset, config=light_config)
         self.listen_state(self.value_changed, turn_off_light_offset, config=light_config)
-        self.listen_state(self.value_changed, illuminance_offset, config=light_config)
         self.listen_state(self.cancel_timer_on_no_presence, presence_sensor_on, config=light_config)
         self.listen_state(self.cancel_timer_on_no_presence, presence_sensor_off, config=light_config)
         self.listen_state(self.cancel_on_time_if_presence_detected, presence_sensor_on, new="on", config=light_config)
@@ -562,7 +558,6 @@ class LightPresenceControl(hass.Hass):
         config = kwargs["config"]
         light_entity = config["light_entity"]
         timer_seconds_max_lux_entity = config["timer_seconds_max_lux"]
-        illuminance_offset = config.get("illuminance_offset") 
 
         # Ottieni il valore numerico dall'entità
         try:
@@ -581,7 +576,6 @@ class LightPresenceControl(hass.Hass):
             timer_illuminance_key=f"{entity}_illuminance_timer",
             illuminance_sensor=config["illuminance_sensor"],
             max_lux_activation=config["max_lux_activation"],
-            illuminance_offset=illuminance_offset,
             config=config
         )
 
@@ -787,9 +781,6 @@ class LightPresenceControl(hass.Hass):
             self.log(f"Impossibile avviare timer: sensore di illuminazione non configurato per {light_entity}", level="ERROR")
             return
 
-        # Ottieni illuminance_offset dalla configurazione
-        illuminance_offset = config.get("illuminance_offset")
-
         # Avvia il timer (gestisce cancellazione e generazioni automaticamente)
         self.timer_manager.start_timer(
             key=timer_key,
@@ -800,7 +791,6 @@ class LightPresenceControl(hass.Hass):
             timer_illuminance_key=timer_key,
             illuminance_sensor=illuminance_sensor,
             max_lux_activation=max_lux_activation,
-            illuminance_offset=illuminance_offset,
             config=config
         )
         self.log(f"⏳ Timer controllo luminosità avviato per {light_entity}: {timer_seconds_value}s")
@@ -818,7 +808,6 @@ class LightPresenceControl(hass.Hass):
             enable_automation = config["enable_automation"]
             illuminance_sensor = kwargs["illuminance_sensor"]
             max_lux_activation = kwargs["max_lux_activation"]
-            illuminance_offset = kwargs["illuminance_offset"]
             timer_illuminance_key = kwargs.get("timer_illuminance_key")
 
             # Verifica automazione (mantenuta come logica di business)
@@ -838,28 +827,38 @@ class LightPresenceControl(hass.Hass):
                 self.timer_manager.cancel_timer(timer_illuminance_key, is_filter=True)
                 return
 
-            # Conversione parametri con gestione errori
+            # Conversione parametri con gestione errori e None
             try:
-                max_lux = float(self.get_state(max_lux_activation))
-                offset = float(self.get_state(illuminance_offset))
-                current_lux = float(self.get_state(illuminance_sensor))
+                # Ottieni i valori grezzi
+                max_lux_value = self.get_state(max_lux_activation)
+                current_lux_value = self.get_state(illuminance_sensor)
+                
+                # Log di debug per valori None
+                if max_lux_value is None:
+                    self.log(f"⚠️ max_lux_activation è None per {light_entity}, uso default: 1000", level="WARNING")
+                if current_lux_value is None:
+                    self.log(f"⚠️ illuminance_sensor è None per {light_entity}, uso default: 0", level="WARNING")
+                
+                # Conversione con valori di default se None
+                max_lux = float(max_lux_value) if max_lux_value is not None else 1000.0
+                current_lux = float(current_lux_value) if current_lux_value is not None else 0.0
+                
             except (TypeError, ValueError) as e:
-                self.log(f"Errore conversione valori: {e}. Annullato controllo lux per {light_entity}", level="WARNING")
+                self.log(f"Errore conversione valori: {e}. max_lux={max_lux_value}, current_lux={current_lux_value}", level="WARNING")
                 self.timer_manager.cancel_timer(timer_illuminance_key, is_filter=True)
                 return
 
-            # Modifica il valore del sensore di illuminazione aggiungendo il valore di offset
-            current_lux_plus = current_lux + offset
-            if current_lux_plus < max_lux:
+            # Logica di controllo senza offset
+            if current_lux < max_lux:
                 # Disattiva il blocco perché non c'è rischio di spegnimento
                 self.light_illuminance_lock_on[light_entity] = False
-                self.log(f"🔓 Sblocco sicuro per {light_entity} (illuminanza + offset = {current_lux_plus} < {max_lux} lux)")
-            elif current_lux_plus > max_lux and self.light_turned_off_by_illuminance.get(light_entity, False):
+                self.log(f"🔓 Sblocco sicuro per {light_entity} (illuminanza = {current_lux} < {max_lux} lux)")
+            elif current_lux > max_lux and self.light_turned_off_by_illuminance.get(light_entity, False):
                 self.light_illuminance_lock_on[light_entity] = False
-                self.log(f"🔓 Sblocco sicuro per {light_entity} (illuminanza + offset = {current_lux_plus} > {max_lux} lux)")
+                self.log(f"🔓 Sblocco sicuro per {light_entity} (illuminanza = {current_lux} > {max_lux} lux)")
             else:
                 # Mantieni il blocco attivo e logga
-                self.log(f"🔒 Blocco mantenuto per {light_entity} (illuminanza + offset = {current_lux_plus} ≥ {max_lux} lux)")
+                self.log(f"🔒 Blocco mantenuto per {light_entity} (illuminanza = {current_lux} ≥ {max_lux} lux)")
 
         except KeyError as e:
             self.log(f"Parametro mancante: {e}", level="ERROR")
@@ -894,7 +893,6 @@ class LightPresenceControl(hass.Hass):
         timer_seconds_max_lux = config["timer_seconds_max_lux"]
         min_lux_activation = config["min_lux_activation"]
         max_lux_activation = config["max_lux_activation"]
-        illuminance_offset = config["illuminance_offset"]
         turn_on_light_offset = config["turn_on_light_offset"]
         turn_off_light_offset = config["turn_off_light_offset"]
 
@@ -927,8 +925,6 @@ class LightPresenceControl(hass.Hass):
             self.log(f"Min Lux Activation Light modificato per {light_entity}: da {float_old} lux a {float_new} lux")
         elif entity == max_lux_activation:
             self.log(f"Max Lux Activation Light modificato per {light_entity}: da {float_old} lux a {float_new} lux")
-        elif entity == illuminance_offset:
-            self.log(f"Illuminance Offset modificato per {light_entity}: da {float_old} lux a {float_new} lux")
         elif entity == turn_on_light_offset:
             self.log(f"Turn On Offset modificato per {light_entity}: da {float_old} a {float_new} secondi")
         elif entity == turn_off_light_offset:
