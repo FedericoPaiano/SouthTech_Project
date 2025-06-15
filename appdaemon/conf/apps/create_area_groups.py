@@ -146,7 +146,7 @@ class CreateAreaGroups(hass.Hass):
                 area_group_name = f"area_{area_name.lower().replace(' ', '_')}_entities"
                 area_service_data = {
                     'object_id': area_group_name,
-                    'name': f"Entità {area_name.title()}",
+                    'name': f"{area_name.title()} - Entities",
                     'entities': all_area_entities
                 }
                 
