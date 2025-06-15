@@ -145,14 +145,24 @@ class CreateEnvironmentSensors(hass.Hass):
 
         if len(states) == 1:
             # Sensore singolo: crea solo la media (che è il valore stesso)
-            avg_value = states[0]
+            if sensor_type == 'temperature':
+                avg_value = round(states[0], 1)  # Temperatura: 1 decimale
+            else:
+                avg_value = round(states[0])     # Umidità e illuminanza: nessun decimale
             self.create_sensor(f"{clean_area}_{sensor_type}", f"{sensor_type.title()} in {area}", avg_value, sensor_type)
             self.log(f"Creato sensore singolo per {area} - {sensor_type}: {avg_value}", level="INFO")
         else:
             # Sensori multipli: crea min, max e media
-            min_value = min(states)
-            max_value = max(states)
-            avg_value = round(sum(states) / len(states), 1)
+            if sensor_type == 'temperature':
+                # Temperatura: 1 decimale
+                min_value = round(min(states), 1)
+                max_value = round(max(states), 1)
+                avg_value = round(sum(states) / len(states), 1)
+            else:
+                # Umidità e illuminanza: nessun decimale
+                min_value = round(min(states))
+                max_value = round(max(states))
+                avg_value = round(sum(states) / len(states))
 
             self.create_sensor(f"{clean_area}_{sensor_type}_min", f"Min {sensor_type.title()} in {area}", min_value, sensor_type)
             self.create_sensor(f"{clean_area}_{sensor_type}_max", f"Max {sensor_type.title()} in {area}", max_value, sensor_type)
