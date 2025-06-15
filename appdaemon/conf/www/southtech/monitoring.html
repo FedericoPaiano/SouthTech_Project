@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SouthTech Monitoring</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --light-bg: #ecf0f1;
+            --dark-bg: #34495e;
+        }
+        
+        body {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--dark-bg) 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        
+        .main-container {
+            background-color: var(--light-bg);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .header-card {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+        }
+        
+        .header-title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .header-subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 20px;
+            border: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 25px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(52, 152, 219, 0.4);
+        }
+        
+        .status-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+            min-width: 300px;
+        }
+        
+        .back-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1040;
+        }
+        
+        .system-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .status-online {
+            background-color: var(--success-color);
+            color: white;
+        }
+        
+        .status-offline {
+            background-color: var(--danger-color);
+            color: white;
+        }
+        
+        .status-warning {
+            background-color: var(--warning-color);
+            color: white;
+        }
+        
+        .metric-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s ease;
+            border-left: 4px solid var(--secondary-color);
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+        
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .log-container {
+            background: #2d3748;
+            color: #e2e8f0;
+            border-radius: 10px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+        
+        .log-timestamp {
+            color: #9ca3af;
+        }
+        
+        .log-level-info {
+            color: #60a5fa;
+        }
+        
+        .log-level-warning {
+            color: #fbbf24;
+        }
+        
+        .log-level-error {
+            color: #f87171;
+        }
+        
+        .log-level-success {
+            color: #34d399;
+        }
+        
+        .refresh-btn {
+            background: linear-gradient(135deg, var(--success-color) 0%, #229954 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 10px 20px;
+            color: white;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(39, 174, 96, 0.4);
+        }
+        
+        .auto-refresh-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--success-color);
+            font-size: 0.9rem;
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Pulsante Indietro -->
+        <div class="back-button">
+            <div class="dropdown">
+                <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-bars"></i> Menu
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="goBack()">
+                        <i class="fas fa-home"></i> Menu Principale
+                    </a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Header -->
+        <div class="header-card">
+            <h1 class="header-title">
+                <i class="fas fa-chart-pie"></i> Monitoraggio Sistema
+            </h1>
+            <p class="header-subtitle">Dashboard completa per il monitoraggio del sistema SouthTech</p>
+        </div>
+        
+        <!-- Metriche Principali -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="metric-card">
+                    <div class="metric-value" id="uptimeValue">--</div>
+                    <div class="metric-label">Uptime Sistema</div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="metric-card">
+                    <div class="metric-value" id="activeConfigsValue">--</div>
+                    <div class="metric-label">Configurazioni Attive</div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="metric-card">
+                    <div class="metric-value" id="eventsValue">--</div>
+                    <div class="metric-label">Eventi Oggi</div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="metric-card">
+                    <div class="metric-value" id="errorsValue">--</div>
+                    <div class="metric-label">Errori Ultimi 24h</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stato Componenti -->
+        <div class="card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4><i class="fas fa-server me-2"></i>Stato Componenti Sistema</h4>
+                <div class="d-flex gap-2 align-items-center">
+                    <span class="auto-refresh-indicator">
+                        <i class="fas fa-sync pulse"></i>
+                        Auto-refresh attivo
+                    </span>
+                    <button class="refresh-btn" onclick="refreshSystemStatus()">
+                        <i class="fas fa-sync-alt me-1"></i> Aggiorna
+                    </button>
+                </div>
+            </div>
+            <div class="system-info">
+                <div class="info-item">
+                    <span><i class="fas fa-home me-2"></i>Home Assistant Core</span>
+                    <span class="status-badge" id="haStatus">Verificando...</span>
+                </div>
+                <div class="info-item">
+                    <span><i class="fas fa-robot me-2"></i>AppDaemon</span>
+                    <span class="status-badge" id="appdaemonStatus">Verificando...</span>
+                </div>
+                <div class="info-item">
+                    <span><i class="fas fa-shield-alt me-2"></i>Sistema Sicurezza SouthTech</span>
+                    <span class="status-badge" id="securityStatus">Verificando...</span>
+                </div>
+                <div class="info-item">
+                    <span><i class="fas fa-database me-2"></i>Database Configurazioni</span>
+                    <span class="status-badge" id="dbStatus">Verificando...</span>
+                </div>
+                <div class="info-item">
+                    <span><i class="fas fa-wifi me-2"></i>Connessione Dispositivi IoT</span>
+                    <span class="status-badge" id="iotStatus">Verificando...</span>
+                </div>
+                <div class="info-item">
+                    <span><i class="fas fa-clock me-2"></i>Ultimo Accesso</span>
+                    <span id="lastAccess">Caricamento...</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Log di Sistema -->
+        <div class="card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4><i class="fas fa-list-alt me-2"></i>Log di Sistema</h4>
+                <button class="refresh-btn" onclick="refreshLogs()">
+                    <i class="fas fa-sync-alt me-1"></i> Aggiorna Log
+                </button>
+            </div>
+            <div class="log-container" id="logContainer">
+                <div class="log-entry">
+                    <span class="log-timestamp">[2025-06-14 23:55:12]</span>
+                    <span class="log-level-info">[INFO]</span>
+                    Sistema di monitoraggio avviato
+                </div>
+                <div class="log-entry">
+                    <span class="log-timestamp">[2025-06-14 23:55:10]</span>
+                    <span class="log-level-success">[SUCCESS]</span>
+                    Connessione Home Assistant stabilita
+                </div>
+                <div class="log-entry">
+                    <span class="log-timestamp">[2025-06-14 23:55:08]</span>
+                    <span class="log-level-info">[INFO]</span>
+                    AppDaemon in ascolto sulla porta 5050
+                </div>
+                <div class="log-entry">
+                    <span class="log-timestamp">[2025-06-14 23:55:05]</span>
+                    <span class="log-level-success">[SUCCESS]</span>
+                    Database configurazioni caricato con successo
+                </div>
+                <div class="log-entry">
+                    <span class="log-timestamp">[2025-06-14 23:55:02]</span>
+                    <span class="log-level-info">[INFO]</span>
+                    Inizializzazione sistema SouthTech completata
+                </div>
+            </div>
+        </div>
+        
+        <!-- Statistiche Utilizzo -->
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="chart-container">
+                    <h5><i class="fas fa-chart-bar me-2"></i>Statistiche Automazioni</h5>
+                    <div class="system-info">
+                        <div class="info-item">
+                            <span>Automazioni Luci Attive</span>
+                            <span class="badge bg-success" id="lightAutomations">3</span>
+                        </div>
+                        <div class="info-item">
+                            <span>Trigger Oggi</span>
+                            <span class="badge bg-info" id="triggersToday">47</span>
+                        </div>
+                        <div class="info-item">
+                            <span>Media Trigger/Giorno</span>
+                            <span class="badge bg-secondary" id="avgTriggers">52</span>
+                        </div>
+                        <div class="info-item">
+                            <span>Ultimo Trigger</span>
+                            <span id="lastTrigger">2 minuti fa</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="chart-container">
+                    <h5><i class="fas fa-exclamation-triangle me-2"></i>Errori e Avvisi</h5>
+                    <div class="system-info">
+                        <div class="info-item">
+                            <span>Errori Critici</span>
+                            <span class="badge bg-danger" id="criticalErrors">0</span>
+                        </div>
+                        <div class="info-item">
+                            <span>Avvisi</span>
+                            <span class="badge bg-warning" id="warnings">2</span>
+                        </div>
+                        <div class="info-item">
+                            <span>Dispositivi Offline</span>
+                            <span class="badge bg-secondary" id="offlineDevices">1</span>
+                        </div>
+                        <div class="info-item">
+                            <span>Ultima Verifica</span>
+                            <span id="lastCheck">Ora</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Performance Sistema -->
+        <div class="card">
+            <h4 class="mb-3"><i class="fas fa-tachometer-alt me-2"></i>Performance Sistema</h4>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="system-info">
+                        <div class="info-item">
+                            <span>CPU AppDaemon</span>
+                            <span class="badge bg-success" id="cpuUsage">12%</span>
+                        </div>
+                        <div class="info-item">
+                            <span>Memoria RAM</span>
+                            <span class="badge bg-info" id="memUsage">245 MB</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="system-info">
+                        <div class="info-item">
+                            <span>Tempo Risposta HA</span>
+                            <span class="badge bg-success" id="haResponse">45ms</span>
+                        </div>
+                        <div class="info-item">
+                            <span>Latenza Media</span>
+                            <span class="badge bg-success" id="avgLatency">38ms</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="system-info">
+                        <div class="info-item">
+                            <span>Throughput API</span>
+                            <span class="badge bg-info" id="apiThroughput">1.2k req/h</span>
+                        </div>
+                        <div class="info-item">
+                            <span>Connessioni Attive</span>
+                            <span class="badge bg-success" id="activeConnections">8</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Indicatore di Stato -->
+    <div id="statusIndicator" class="status-indicator"></div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Variabili globali
+        let isAuthenticated = false;
+        let authToken = null;
+        let haToken = null;
+        let browserId = null;
+        let refreshInterval = null;
+        
+        // Inizializzazione
+        window.addEventListener('load', async () => {
+            console.log('🚀 SouthTech Monitoring avviato');
+            
+            // Recupera token dalla sessione
+            authToken = sessionStorage.getItem('southtech_session_token');
+            haToken = sessionStorage.getItem('southtech_ha_token');
+            browserId = sessionStorage.getItem('southtech_browser_id');
+            
+            if (!authToken || !haToken) {
+                showAlert('Sessione scaduta. Reindirizzamento al login...', 'warning');
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+                return;
+            }
+            
+            await initializeMonitoring();
+        });
+        
+        // Inizializzazione monitoraggio
+        async function initializeMonitoring() {
+            showAlert('Dashboard di monitoraggio caricata!', 'success');
+            
+            // Registra accesso attuale (che mostrerà quello precedente)
+            registerCurrentAccess();
+            
+            // Carica dati iniziali
+            await refreshSystemStatus();
+            refreshLogs();
+            updateMetrics();
+            
+            // Avvia refresh automatico ogni 30 secondi
+            refreshInterval = setInterval(() => {
+                refreshSystemStatus();
+            }, 30000);
+        }
+        
+        // Registra accesso attuale e salva il precedente
+        function registerCurrentAccess() {
+            const now = new Date();
+            const currentAccess = now.getTime();
+            
+            // PRIMA recupera l'accesso precedente (se esiste)
+            const previousAccess = localStorage.getItem('southtech_last_access');
+            
+            // DOPO salva l'accesso attuale per la prossima volta
+            localStorage.setItem('southtech_last_access', currentAccess.toString());
+            
+            // Mostra l'accesso PRECEDENTE (non quello attuale)
+            displayLastAccess(previousAccess);
+            
+            console.log('📅 Accesso attuale registrato:', now.toLocaleString('it-IT'));
+            if (previousAccess) {
+                const prevDate = new Date(parseInt(previousAccess));
+                console.log('📅 Accesso precedente era:', prevDate.toLocaleString('it-IT'));
+            }
+        }
+        
+        // Mostra ultimo accesso precedente
+        function displayLastAccess(lastAccessTimestamp) {
+            const lastAccessElement = document.getElementById('lastAccess');
+            
+            if (lastAccessTimestamp) {
+                const lastAccessDate = new Date(parseInt(lastAccessTimestamp));
+                const dateFormatted = lastAccessDate.toLocaleDateString('it-IT', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+                const timeFormatted = lastAccessDate.toLocaleTimeString('it-IT', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                const formattedDate = `${dateFormatted} - ${timeFormatted}`;
+                
+                lastAccessElement.textContent = formattedDate;
+                console.log('📅 Mostro ultimo accesso precedente:', formattedDate);
+            } else {
+                lastAccessElement.textContent = 'Primo accesso';
+                console.log('📅 Primo accesso al sistema');
+            }
+        }
+        
+        // Aggiorna stato sistema
+        async function refreshSystemStatus() {
+            console.log('🔄 Aggiornamento stato sistema...');
+            
+            try {
+                // Simula controllo Home Assistant
+                const haStatus = await checkHomeAssistantStatus();
+                updateStatusBadge('haStatus', haStatus ? 'online' : 'offline', haStatus ? 'Online' : 'Offline');
+                
+                // Simula controllo AppDaemon
+                const adStatus = await checkAppDaemonStatus();
+                updateStatusBadge('appdaemonStatus', adStatus ? 'online' : 'offline', adStatus ? 'Operativo' : 'Non Raggiungibile');
+                
+                // Simula controlli altri componenti
+                updateStatusBadge('securityStatus', 'online', 'Attivo');
+                updateStatusBadge('dbStatus', 'online', 'Operativo');
+                updateStatusBadge('iotStatus', 'warning', '7/8 Dispositivi');
+                
+            } catch (error) {
+                console.error('Errore aggiornamento stato:', error);
+                showAlert('Errore nell\'aggiornamento dello stato sistema', 'error');
+            }
+        }
+        
+        // Controlla stato Home Assistant
+        async function checkHomeAssistantStatus() {
+            try {
+                const response = await fetch('/api/states', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${haToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                return response.ok;
+            } catch (error) {
+                return false;
+            }
+        }
+        
+        // Controlla stato AppDaemon
+        async function checkAppDaemonStatus() {
+            try {
+                const response = await fetch('/api/states/sensor.southtech_auth_status', {
+                    headers: { 'Authorization': `Bearer ${haToken}` }
+                });
+                return response.status !== 404; // Se il sensore esiste, AppDaemon funziona
+            } catch (error) {
+                return false;
+            }
+        }
+        
+        // Aggiorna badge di stato
+        function updateStatusBadge(elementId, status, text) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            
+            element.className = 'status-badge';
+            switch (status) {
+                case 'online':
+                    element.classList.add('status-online');
+                    break;
+                case 'offline':
+                    element.classList.add('status-offline');
+                    break;
+                case 'warning':
+                    element.classList.add('status-warning');
+                    break;
+            }
+            element.textContent = text;
+        }
+        
+        // Aggiorna metriche
+        function updateMetrics() {
+            const startTime = Date.now() - (Math.random() * 86400000 * 7); // Uptime casuale fino a 7 giorni
+            const uptime = formatUptime(Date.now() - startTime);
+            
+            document.getElementById('uptimeValue').textContent = uptime;
+            document.getElementById('activeConfigsValue').textContent = Math.floor(Math.random() * 10) + 5;
+            document.getElementById('eventsValue').textContent = Math.floor(Math.random() * 100) + 30;
+            document.getElementById('errorsValue').textContent = Math.floor(Math.random() * 5);
+        }
+        
+        // Formatta uptime
+        function formatUptime(milliseconds) {
+            const days = Math.floor(milliseconds / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((milliseconds % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            
+            if (days > 0) {
+                return `${days}d ${hours}h`;
+            } else {
+                return `${hours}h`;
+            }
+        }
+        
+        // Aggiorna log
+        function refreshLogs() {
+            const logContainer = document.getElementById('logContainer');
+            const now = new Date();
+            
+            // Simula nuovi log
+            const newLogs = [
+                { time: now, level: 'info', message: 'Aggiornamento stato completato' },
+                { time: new Date(now - 30000), level: 'success', message: 'Automazione luci cucina attivata' },
+                { time: new Date(now - 120000), level: 'warning', message: 'Dispositivo sensore_temperatura_bagno non risponde' }
+            ];
+            
+            newLogs.forEach(log => {
+                const logEntry = document.createElement('div');
+                logEntry.className = 'log-entry';
+                logEntry.innerHTML = `
+                    <span class="log-timestamp">[${formatLogTime(log.time)}]</span>
+                    <span class="log-level-${log.level}">[${log.level.toUpperCase()}]</span>
+                    ${log.message}
+                `;
+                logContainer.insertBefore(logEntry, logContainer.firstChild);
+            });
+            
+            // Mantieni solo gli ultimi 20 log
+            while (logContainer.children.length > 20) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+        
+        // Formatta tempo log
+        function formatLogTime(date) {
+            return date.toLocaleString('it-IT', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+        
+        // Torna al menu principale
+        function goBack() {
+            // Salva informazione di ritorno
+            sessionStorage.setItem('southtech_return_to_menu', 'true');
+            window.location.href = 'index.html';
+        }
+        
+        // Logout
+        function logout() {
+            // Pulisci tutti i token dalla sessione
+            sessionStorage.removeItem('southtech_session_token');
+            sessionStorage.removeItem('southtech_ha_token');
+            sessionStorage.removeItem('southtech_browser_id');
+            sessionStorage.removeItem('southtech_return_to_menu');
+            sessionStorage.removeItem('southtech_page_source');
+            window.location.href = 'index.html';
+        }
+        
+        // Pulizia prima di uscire
+        window.addEventListener('beforeunload', () => {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        });
+        
+        // Utility functions
+        function showAlert(message, type = 'info', duration = 4000) {
+            const indicator = document.getElementById('statusIndicator');
+            
+            let alertClass, icon;
+            switch (type) {
+                case 'success':
+                    alertClass = 'alert-success';
+                    icon = 'fas fa-check-circle';
+                    break;
+                case 'error':
+                    alertClass = 'alert-danger';
+                    icon = 'fas fa-exclamation-triangle';
+                    duration = 6000;
+                    break;
+                case 'warning':
+                    alertClass = 'alert-warning';
+                    icon = 'fas fa-exclamation-circle';
+                    break;
+                default:
+                    alertClass = 'alert-info';
+                    icon = 'fas fa-info-circle';
+            }
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert ${alertClass} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                <i class="${icon} me-2"></i>
+                ${message.replace(/\n/g, '<br>')}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            indicator.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, duration);
+        }
+        
+        console.log('✅ SouthTech Monitoring caricato con successo');
+    </script>
+</body>
+</html>

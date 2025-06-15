@@ -1,0 +1,1845 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SouthTech - Automatismo Luci</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --light-bg: #ecf0f1;
+            --dark-bg: #34495e;
+        }
+        
+        body {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--dark-bg) 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background-color: var(--light-bg);
+            padding: 20px;
+        }
+        
+        .header-card {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+        }
+        
+        .header-title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .header-subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 20px;
+            border: none;
+        }
+        
+        .config-section {
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 2px solid #e9ecef;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .config-section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        
+        .config-header {
+            background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 25px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(52, 152, 219, 0.4);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, var(--success-color) 0%, #229954 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 15px 30px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(39, 174, 96, 0.4);
+        }
+        
+        .add-button {
+            background: linear-gradient(135deg, var(--success-color) 0%, #229954 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(39, 174, 96, 0.3);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .add-button:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 12px 30px rgba(39, 174, 96, 0.4);
+        }
+        
+        .remove-button {
+            background: linear-gradient(135deg, var(--danger-color) 0%, #c0392b 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .remove-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+        }
+        
+        .form-select, .form-control {
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            padding: 12px 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .form-select:focus, .form-control:focus {
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+        }
+        
+        .status-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+            min-width: 300px;
+        }
+        
+        .yaml-output {
+            background: #2d3748;
+            color: #e2e8f0;
+            border-radius: 15px;
+            padding: 25px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .navigation-menu {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1040;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .status-api { background-color: #d4edda; color: #155724; }
+        .status-file { background-color: #fff3cd; color: #856404; }
+        .status-error { background-color: #f8d7da; color: #721c24; }
+        
+        .auth-error {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .auth-error-icon {
+            font-size: 4rem;
+            color: var(--danger-color);
+            margin-bottom: 20px;
+        }
+
+        .filter-status {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border: 2px solid #2196f3;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .filter-status.disabled {
+            background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+            border-color: #9e9e9e;
+            color: #616161;
+        }
+
+        /* Stile per le aree nelle dropdown */
+        .entity-area {
+            color: #6c757d;
+            font-style: italic;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <!-- Errore Autenticazione -->
+    <div id="authError" class="container auth-error" style="display: none;">
+        <div class="auth-error-icon">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h2>Accesso Negato</h2>
+        <p class="text-muted mb-4">Non sei autorizzato ad accedere a questa pagina. Effettua il login dal menu principale.</p>
+        <button class="btn btn-primary" onclick="redirectToMain()">
+            <i class="fas fa-home"></i> Torna al Menu Principale
+        </button>
+    </div>
+    
+    <!-- Contenuto Principale -->
+    <div id="mainContent" style="display: none;">
+        <!-- Menu Navigazione -->
+        <div class="navigation-menu">
+          <div class="dropdown">
+              <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                  <i class="fas fa-bars"></i> Menu
+              </button>
+              <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="#" onclick="goToMainMenu()">
+                      <i class="fas fa-home"></i> Menu Principale
+                  </a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="#" onclick="syncConfigurations()">
+                      <i class="fas fa-sync"></i> Ricarica Configurazioni
+                  </a></li>
+                  <li><a class="dropdown-item" href="#" onclick="validateConfiguration()">
+                      <i class="fas fa-check-circle"></i> Valida
+                  </a></li>
+                  <!-- 🎯 FILTRO AREA -->
+                  <li><a class="dropdown-item" href="#" onclick="toggleAreaFilter()" id="filterMenuToggle">
+                      <i class="fas fa-filter"></i> Disattiva Filtro Area
+                  </a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="#" onclick="logout()">
+                      <i class="fas fa-sign-out-alt"></i> Logout
+                  </a></li>
+              </ul>
+          </div>
+        </div>
+        
+        <!-- Header -->
+        <div class="header-card">
+            <h1 class="header-title">
+                <i class="fas fa-lightbulb"></i> Automatismo Luci
+            </h1>
+            <p class="header-subtitle">Configurazione avanzata accensione/spegnimento automatico</p>
+        </div>
+        
+        <!-- Stato Connessione e Filtro -->
+        <div id="connectionStatus" class="card">
+            <div class="d-flex align-items-center">
+                <div class="loading-spinner me-3"></div>
+                <span>Connessione in corso...</span>
+            </div>
+        </div>
+
+        <!-- Stato Sistema e Filtro Unificato -->
+        <div id="systemFilterStatus" class="filter-status" style="display: none;">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <div id="systemStatusContent">
+                        <i class="fas fa-spinner fa-spin me-2"></i>
+                        <strong>Sistema: Caricamento...</strong>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div id="filterStatusContent">
+                        <i class="fas fa-spinner fa-spin me-2"></i>
+                        <strong>Filtro Area: Inizializzazione...</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="small mt-2 text-center" id="filterStatusDetails">Inizializzazione in corso...</div>
+        </div>
+        
+        <!-- Configurazioni -->
+        <div id="configurationsContainer" class="card" style="display: none;">
+            <h3 class="mb-4">
+                <i class="fas fa-cog"></i> Configurazione Automatismi
+            </h3>
+            
+            <div id="configsList"></div>
+            
+            <div class="text-center mt-4">
+                <button class="add-button" onclick="addConfiguration()" title="Aggiungi configurazione">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+            
+            <div class="text-center mt-4">
+                <button class="btn btn-success btn-lg" onclick="generateYAML()">
+                    <i class="fas fa-code"></i> Genera e Salva Configurazione YAML
+                </button>
+            </div>
+        </div>
+        
+        <!-- Output YAML -->
+        <div id="yamlOutput" class="card" style="display: none;">
+            <h4 class="mb-3">
+                <i class="fas fa-file-code"></i> Configurazione YAML Generata
+            </h4>
+            <div class="yaml-output" id="yamlCode"></div>
+            <div class="mt-3">
+                <button class="btn btn-primary me-2" onclick="copyYAML()">
+                    <i class="fas fa-copy"></i> Copia negli Appunti
+                </button>
+                <button class="btn btn-success" onclick="saveConfiguration()">
+                    <i class="fas fa-save"></i> Salva in apps.yaml
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Indicatore di Stato -->
+    <div id="statusIndicator" class="status-indicator"></div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Configurazione API
+        const APPDAEMON_API_URL = `${window.location.protocol}//${window.location.hostname}:5050/api/appdaemon`;
+        
+        // Variabili globali
+        let entities = { lights: [], binary_sensors: [], sensors: [] };
+        let configurations = [];
+        let configCounter = 0;
+        let isAuthenticated = false;
+        let isConnected = false;
+        let authToken = null;
+        let haToken = null;
+        let browserId = null;
+        let currentCommunicationMode = 'api';
+        
+        // 🎯 SISTEMA DI FILTRO CORRETTO
+        let areaFilterEnabled = true; // Attivo di default
+        let templateSensorsCache = null; // Cache per evitare ricaricamenti
+        let lastFilterCheck = null; // Timestamp ultimo controllo template
+        
+        // 🏠 CACHE AREE - NUOVA VARIABILE
+        let entityAreasMap = new Map(); // Mappa entity_id -> area
+        
+        // Inizializzazione
+        window.addEventListener('load', async () => {
+            console.log('🚀 SouthTech Automatismo Luci avviato');
+            await initializeAuthentication();
+        });
+        
+        // Verifica autenticazione dalla sessione
+        async function initializeAuthentication() {
+            authToken = sessionStorage.getItem('southtech_session_token');
+            haToken = sessionStorage.getItem('southtech_ha_token');
+            browserId = sessionStorage.getItem('southtech_browser_id');
+            
+            console.log('🔍 Verifica autenticazione...');
+            console.log('Auth Token:', authToken ? 'Presente' : 'Mancante');
+            console.log('HA Token:', haToken ? 'Presente' : 'Mancante');
+            
+            if (!authToken || !haToken) {
+                console.log('❌ Token mancanti, reindirizzo al menu principale');
+                showAuthError();
+                return;
+            }
+            
+            const tokenValid = await validateHAToken(haToken);
+            if (!tokenValid) {
+                console.log('❌ Token HA non valido, reindirizzo al menu principale');
+                showAuthError();
+                return;
+            }
+            
+            console.log('✅ Autenticazione valida, inizializzo dashboard');
+            isAuthenticated = true;
+            showMainContent();
+            await initializeDashboard();
+        }
+        
+        async function validateHAToken(token) {
+            try {
+                const response = await fetch('/api/states', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                return response.ok;
+            } catch (error) {
+                console.error('🔍 Errore validazione token:', error);
+                return false;
+            }
+        }
+        
+        function showAuthError() {
+            document.getElementById('authError').style.display = 'block';
+            document.getElementById('mainContent').style.display = 'none';
+        }
+        
+        function showMainContent() {
+            document.getElementById('authError').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+        }
+        
+        function redirectToMain() {
+            window.location.href = 'index.html';
+        }
+        
+        function goToMainMenu() {
+            sessionStorage.setItem('southtech_session_token', authToken);
+            sessionStorage.setItem('southtech_ha_token', haToken);
+            sessionStorage.setItem('southtech_browser_id', browserId);
+            sessionStorage.setItem('southtech_return_to_menu', 'true');
+            window.location.href = 'index.html';
+        }
+        
+        function logout() {
+            sessionStorage.removeItem('southtech_session_token');
+            sessionStorage.removeItem('southtech_ha_token');
+            sessionStorage.removeItem('southtech_browser_id');
+            sessionStorage.removeItem('southtech_return_to_menu');
+            sessionStorage.removeItem('southtech_page_source');
+            window.location.href = 'index.html';
+        }
+        
+        // ✅ INIZIALIZZAZIONE DASHBOARD CORRETTA (ORDINE FISSO)
+        async function initializeDashboard() {
+            console.log('🔍 Inizializzazione dashboard automatismo luci...');
+            updateConnectionStatus('Caricamento entità...', 'loading');
+            
+            try {
+                // 1. Aggiorna menu filtro
+                updateFilterMenuIcon();
+                
+                // 2. Mostra stato filtro (assicura che l'elemento sia presente)
+                showFilterStatus();
+                
+                // 3. ⚠️ IMPORTANTE: CARICA PRIMA LE CONFIGURAZIONI
+                console.log('📋 Caricamento configurazioni prima delle entità...');
+                loadConfigurationsFromYourFile();
+                
+                // 4. Poi carica entità (che ora può vedere le configurazioni esistenti)
+                await loadEntities();
+                
+                // 5. Infine aggiorna l'interfaccia
+                updateConfigurationsList();
+                
+                // 6. Mostra interfaccia
+                document.getElementById('configurationsContainer').style.display = 'block';
+                
+                // Nascondi il pannello di connessione iniziale
+                document.getElementById('connectionStatus').style.display = 'none';
+                
+                const filterInfo = areaFilterEnabled ? 
+                    (templateSensorsCache ? 'CON filtro area (template attivi)' : 'CON filtro area (template NON disponibili - fallback)') :
+                    'SENZA filtro area';
+                    
+                showAlert(`Dashboard caricata: ${filterInfo}`, 'success');
+                
+            } catch (error) {
+                console.error('Errore inizializzazione:', error);
+                updateConnectionStatus('Errore di connessione', 'error');
+                showAlert(`Errore inizializzazione: ${error.message}`, 'error');
+            }
+        }
+        
+        // ✅ CARICAMENTO ENTITÀ COMPLETAMENTE RISCRITTO
+        async function loadEntities() {
+            console.log('📋 === INIZIO CARICAMENTO ENTITÀ ===');
+            console.log(`🎯 Filtro area: ${areaFilterEnabled ? 'ATTIVO' : 'DISATTIVO'}`);
+            
+            try {
+                // 1. Carica tutte le entità da Home Assistant
+                const response = await fetch('/api/states', {
+                    headers: { 'Authorization': `Bearer ${haToken}` }
+                });
+                
+                if (!response.ok) throw new Error('Errore accesso HA API');
+                
+                const allStates = await response.json();
+                console.log(`📊 Totale entità HA: ${allStates.length}`);
+                
+                // 2. Se filtro DISATTIVATO, controlla comunque i template per mostrare lo stato
+                if (!areaFilterEnabled) {
+                    console.log('🔴 Filtro DISATTIVATO - carico tutte le entità');
+                    
+                    // Controlla i template per mostrare lo stato e popolare le aree
+                    const templateSensors = await loadTemplateSensors();
+                    const templatesAvailable = templateSensors && templateSensors.success;
+                    
+                    if (templatesAvailable) {
+                        templateSensorsCache = templateSensors.data;
+                        // 🏠 POPOLA MAPPA AREE ANCHE SE FILTRO DISATTIVATO
+                        populateEntityAreasMap(templateSensors.data);
+                    }
+                    
+                    await loadAllEntities(allStates);
+                    setTimeout(() => {
+                        if (templatesAvailable) {
+                            updateFilterStatusDisplay('disabled_with_templates', allStates.length, entities);
+                        } else {
+                            updateFilterStatusDisplay('disabled', allStates.length, entities);
+                        }
+                    }, 100);
+                    return;
+                }
+                
+                // 3. Se filtro ATTIVATO, prova prima con template
+                console.log('🟢 Filtro ATTIVATO - controllo template...');
+                const templateSensors = await loadTemplateSensors();
+                
+                if (templateSensors && templateSensors.success) {
+                    console.log('✅ Template disponibili, uso filtro avanzato');
+                    templateSensorsCache = templateSensors.data;
+                    // 🏠 POPOLA MAPPA AREE
+                    populateEntityAreasMap(templateSensors.data);
+                    await loadEntitiesWithFilter(allStates, templateSensors.data);
+                    setTimeout(() => {
+                        updateFilterStatusDisplay('active_with_templates', allStates.length, entities);
+                    }, 100);
+                } else {
+                    console.log('⚠️ Template NON disponibili, fallback senza filtro');
+                    templateSensorsCache = null;
+                    await loadAllEntities(allStates);
+                    setTimeout(() => {
+                        updateFilterStatusDisplay('active_no_templates', allStates.length, entities);
+                    }, 100);
+                }
+                
+            } catch (error) {
+                console.error('❌ Errore caricamento entità:', error);
+                throw error;
+            }
+            
+            console.log('✅ === FINE CARICAMENTO ENTITÀ ===');
+        }
+        
+        // 🏠 NUOVA FUNZIONE: Popola mappa aree dalle template
+        function populateEntityAreasMap(templateData) {
+            console.log('🏠 Popolamento mappa aree dalle template...');
+            
+            entityAreasMap.clear();
+            let totalMapped = 0;
+            
+            Object.entries(templateData).forEach(([templateKey, sensor]) => {
+                if (sensor.attributes && sensor.attributes.areas_entity) {
+                    const areasEntity = sensor.attributes.areas_entity;
+                    const lines = areasEntity.split('\n');
+                    
+                    lines.forEach(line => {
+                        if (line.trim()) {
+                            const parts = line.split(' | ');
+                            if (parts.length >= 2) {
+                                const entityId = parts[0].trim();
+                                const areaName = parts[1].trim();
+                                
+                                if (entityId && entityId.includes('.') && areaName) {
+                                    entityAreasMap.set(entityId, areaName);
+                                    totalMapped++;
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+            
+            console.log(`✅ Mappate ${totalMapped} entità con le loro aree`);
+        }
+        
+        // 🏠 NUOVA FUNZIONE: Formatta nome area (CORRETTA)
+        function formatAreaName(areaName) {
+            if (!areaName) return '';
+            
+            // Sostituisci "_" con spazi e converti solo la prima lettera in maiuscolo
+            return areaName
+                .replace(/_/g, ' ')                    // Sostituisce "_" con spazi
+                .charAt(0).toUpperCase() +             // Prima lettera maiuscola
+                areaName.replace(/_/g, ' ').slice(1).toLowerCase();  // Resto minuscolo
+        }
+        
+        // 🏠 NUOVA FUNZIONE: Ottieni area di un'entità
+        function getEntityArea(entityId) {
+            const rawArea = entityAreasMap.get(entityId);
+            return rawArea ? formatAreaName(rawArea) : null;
+        }
+        
+        // 🏠 NUOVA FUNZIONE: Crea nome con area (AGGIORNATA)
+        function createEntityDisplayName(entityId, friendlyName) {
+            const area = getEntityArea(entityId);
+            if (area) {
+                return `${friendlyName} (${area})`;
+            } else {
+                return `${friendlyName} (Area non assegnata)`;
+            }
+        }
+        
+        // 🏠 NUOVA FUNZIONE: Conta aree uniche nelle entità filtrate
+        function countUniqueAreasInEntities(filteredEntities) {
+            const uniqueAreas = new Set();
+            
+            // Aggiungi aree da tutte le categorie di entità filtrate
+            [...filteredEntities.lights, ...filteredEntities.binary_sensors, ...filteredEntities.sensors].forEach(entity => {
+                const area = getEntityArea(entity.entity_id);
+                if (area) {
+                    uniqueAreas.add(area);
+                }
+            });
+            
+            return uniqueAreas.size;
+        }
+        // 🏠 NUOVA FUNZIONE: Estrai tutte le aree uniche dalle entità caricate
+        function extractUniqueAreas() {
+            const areas = new Set();
+            
+            // Aggiungi aree da tutte le categorie di entità
+            [...entities.lights, ...entities.binary_sensors, ...entities.sensors].forEach(entity => {
+                const area = getEntityArea(entity.entity_id);
+                if (area) {
+                    areas.add(area);
+                }
+            });
+            
+            // Converti in array ordinato alfabeticamente
+            const sortedAreas = Array.from(areas).sort();
+            console.log(`🏠 Aree uniche estratte: ${sortedAreas.length} -> ${sortedAreas.join(', ')}`);
+            return sortedAreas;
+        }
+        
+        // 🏠 NUOVA FUNZIONE: Rileva area automatica di una configurazione (CORRETTA)
+        function detectConfigurationArea(config) {
+            const configAreas = new Set();
+            let hasEntitiesWithoutArea = false;
+            
+            // Controlla tutti i campi compilati
+            const fieldsToCheck = [
+                config.light_entity,
+                config.presence_sensor_on,
+                config.presence_sensor_off,
+                config.illuminance_sensor
+            ];
+            
+            fieldsToCheck.forEach(entityId => {
+                if (entityId) {
+                    const area = getEntityArea(entityId);
+                    if (area) {
+                        configAreas.add(area);
+                    } else {
+                        // Entità senza area
+                        hasEntitiesWithoutArea = true;
+                    }
+                }
+            });
+            
+            // Se ci sono entità senza area, non c'è area comune
+            if (hasEntitiesWithoutArea) {
+                console.log(`🏠 Config con entità senza area - nessuna area comune`);
+                return null;
+            }
+            
+            // Se tutte le entità con area appartengono alla stessa area
+            if (configAreas.size === 1) {
+                const detectedArea = Array.from(configAreas)[0];
+                console.log(`🏠 Config area rilevata: ${detectedArea}`);
+                return detectedArea;
+            }
+            
+            // Aree multiple o nessuna entità con area
+            if (configAreas.size > 1) {
+                console.log(`🏠 Config con aree multiple: ${Array.from(configAreas).join(', ')}`);
+            }
+            return null;
+        }
+        
+        // 🏠 NUOVA FUNZIONE: Filtra entità per area + entità esistenti
+        function filterEntitiesWithExisting(entityList, selectedArea, configIndex) {
+            if (!selectedArea) {
+                // Nessuna area selezionata → mostra tutte le entità
+                return entityList;
+            }
+            
+            // Ottieni entità della configurazione corrente
+            const currentConfig = configurations[configIndex] || {};
+            const currentConfigEntities = new Set([
+                currentConfig.light_entity,
+                currentConfig.presence_sensor_on,
+                currentConfig.presence_sensor_off,
+                currentConfig.illuminance_sensor
+            ].filter(Boolean)); // Rimuovi valori vuoti
+            
+            return entityList.filter(entity => {
+                const entityArea = getEntityArea(entity.entity_id);
+                
+                // Include se:
+                // 1. Appartiene all'area selezionata, OPPURE
+                // 2. È già presente nella configurazione corrente (anche se senza area)
+                return entityArea === selectedArea || currentConfigEntities.has(entity.entity_id);
+            });
+        }
+        
+        // 🏠 NUOVA FUNZIONE: Trova campi incompatibili con l'area selezionata
+        function findIncompatibleFields(config, selectedArea) {
+            const incompatible = [];
+            
+            const fieldMapping = {
+                light_entity: 'Luce da controllare',
+                presence_sensor_on: 'Sensore accensione',
+                presence_sensor_off: 'Sensore spegnimento',
+                illuminance_sensor: 'Sensore luminosità'
+            };
+            
+            Object.entries(fieldMapping).forEach(([field, label]) => {
+                const entityId = config[field];
+                if (entityId) {
+                    const entityArea = getEntityArea(entityId);
+                    if (entityArea && entityArea !== selectedArea) {
+                        // Trova il nome friendly dell'entità
+                        const allEntities = [...entities.lights, ...entities.binary_sensors, ...entities.sensors];
+                        const entityData = allEntities.find(e => e.entity_id === entityId);
+                        const displayName = entityData ? entityData.display_name : entityId;
+                        
+                        incompatible.push({
+                            field: field,
+                            label: label,
+                            entityName: displayName
+                        });
+                    }
+                }
+            });
+            
+            return incompatible;
+        }
+        
+        // 🏠 NUOVA FUNZIONE: Gestisci cambio area configurazione
+        async function handleAreaChange(configIndex, selectedArea) {
+            const config = configurations[configIndex];
+            if (!config) return;
+            
+            console.log(`🏠 Cambio area configurazione ${configIndex + 1}: ${selectedArea}`);
+            
+            // Trova campi incompatibili
+            const incompatibleFields = findIncompatibleFields(config, selectedArea);
+            
+            if (incompatibleFields.length > 0) {
+                // Mostra avviso di conferma
+                const fieldsList = incompatibleFields.map(field => 
+                    `- ${field.label}: ${field.entityName}`
+                ).join('\n');
+                
+                const message = `I seguenti campi non appartengono all'area "${selectedArea}":\n\n${fieldsList}\n\nConfermi il reset di questi campi?`;
+                
+                if (confirm(message)) {
+                    // Reset campi incompatibili
+                    incompatibleFields.forEach(field => {
+                        config[field.field] = '';
+                    });
+                    
+                    console.log(`✅ Reset ${incompatibleFields.length} campi incompatibili`);
+                    showAlert(`Reset ${incompatibleFields.length} campi incompatibili con l'area "${selectedArea}"`, 'info');
+                } else {
+                    // Annulla cambio area - ripristina valore precedente
+                    const areaSelect = document.querySelector(`#areaSelect_${configIndex}`);
+                    if (areaSelect) {
+                        const detectedArea = detectConfigurationArea(config);
+                        areaSelect.value = detectedArea || '';
+                    }
+                    return;
+                }
+            }
+            
+            // Aggiorna configurazione con area selezionata
+            config.selected_area = selectedArea;
+            
+            // Ricarica interfaccia configurazione
+            updateConfigurationsList();
+        }
+        
+        // 📋 Carica TUTTE le entità (senza filtro) - AGGIORNATA
+        async function loadAllEntities(allStates) {
+            console.log('📋 Caricamento TUTTE le entità (senza filtro)...');
+            
+            entities = { lights: [], binary_sensors: [], sensors: [] };
+            
+            allStates.forEach(state => {
+                const baseEntityData = {
+                    entity_id: state.entity_id,
+                    friendly_name: state.attributes.friendly_name || state.entity_id
+                };
+                
+                // 🏠 AGGIUNGI AREA AL NOME SE DISPONIBILE
+                const entityData = {
+                    ...baseEntityData,
+                    display_name: createEntityDisplayName(state.entity_id, baseEntityData.friendly_name)
+                };
+                
+                if (state.entity_id.startsWith('light.')) {
+                    entities.lights.push(entityData);
+                } else if (state.entity_id.startsWith('binary_sensor.')) {
+                    entities.binary_sensors.push(entityData);
+                } else if (state.entity_id.startsWith('sensor.')) {
+                    // Filtro generico per sensori (quando non usiamo template)
+                    const isIlluminanceSensor = 
+                        state.attributes.device_class === 'illuminance' ||
+                        state.entity_id.toLowerCase().includes('illuminance') || 
+                        state.entity_id.toLowerCase().includes('lux') ||
+                        state.entity_id.toLowerCase().includes('illuminamento') ||
+                        state.entity_id.toLowerCase().includes('light') ||
+                        state.entity_id.toLowerCase().includes('luce');
+                    
+                    if (isIlluminanceSensor) {
+                        entities.sensors.push(entityData);
+                    }
+                }
+            });
+            
+            // Ordina alfabeticamente PER DISPLAY NAME
+            Object.values(entities).forEach(category => {
+                category.sort((a, b) => a.display_name.localeCompare(b.display_name));
+            });
+            
+            console.log(`✅ Caricate SENZA FILTRO: ${entities.lights.length} luci, ${entities.binary_sensors.length} sensori binari, ${entities.sensors.length} sensori lux`);
+            currentCommunicationMode = 'ha_direct_unfiltered';
+        }
+        
+        // 🎯 Carica entità CON filtro template (AGGIORNATA CON ENTITÀ ESISTENTI)
+        async function loadEntitiesWithFilter(allStates, templateData) {
+            console.log('🎯 Caricamento entità CON FILTRO template...');
+            
+            // ✅ ESTRAI ENTITÀ SEPARATE PER CATEGORIA DAI TEMPLATE
+            const templateEntities = extractEntitiesByTypeFromTemplates(templateData);
+            
+            // 📋 OTTIENI ENTITÀ DA CONFIGURAZIONI ESISTENTI
+            const existingEntities = getEntitiesFromExistingConfigurations();
+            
+            console.log(`📝 Template Luci: ${templateEntities.lights.size} entità`);
+            console.log(`📝 Template Presenza: ${templateEntities.binary_sensors.size} entità`);
+            console.log(`📝 Template Luminosità: ${templateEntities.sensors.size} entità`);
+            console.log(`📋 Configurazioni esistenti: ${existingEntities.size} entità`);
+            
+            entities = { lights: [], binary_sensors: [], sensors: [] };
+            let stats = { 
+                lights: {kept: 0, filtered: 0, existing: 0}, 
+                binary_sensors: {kept: 0, filtered: 0, existing: 0}, 
+                sensors: {kept: 0, filtered: 0, existing: 0} 
+            };
+            
+            allStates.forEach(state => {
+                const baseEntityData = {
+                    entity_id: state.entity_id,
+                    friendly_name: state.attributes.friendly_name || state.entity_id
+                };
+                
+                // 🏠 AGGIUNGI AREA AL NOME (ora sempre con indicazione area o "Area non assegnata")
+                const entityData = {
+                    ...baseEntityData,
+                    display_name: createEntityDisplayName(state.entity_id, baseEntityData.friendly_name)
+                };
+                
+                if (state.entity_id.startsWith('light.')) {
+                    // ✅ FILTRO LUCI: Template + Entità già configurate
+                    const inTemplate = templateEntities.lights.has(state.entity_id);
+                    const inExisting = existingEntities.has(state.entity_id);
+                    
+                    if (inTemplate || inExisting) {
+                        entities.lights.push(entityData);
+                        if (inTemplate) stats.lights.kept++;
+                        if (inExisting && !inTemplate) stats.lights.existing++;
+                    } else {
+                        stats.lights.filtered++;
+                    }
+                    
+                } else if (state.entity_id.startsWith('binary_sensor.')) {
+                    // ✅ FILTRO SENSORI PRESENZA: Template + Entità già configurate
+                    const inTemplate = templateEntities.binary_sensors.has(state.entity_id);
+                    const inExisting = existingEntities.has(state.entity_id);
+                    
+                    if (inTemplate || inExisting) {
+                        entities.binary_sensors.push(entityData);
+                        if (inTemplate) stats.binary_sensors.kept++;
+                        if (inExisting && !inTemplate) stats.binary_sensors.existing++;
+                    } else {
+                        stats.binary_sensors.filtered++;
+                    }
+                    
+                } else if (state.entity_id.startsWith('sensor.')) {
+                    // ✅ FILTRO SENSORI LUMINOSITÀ: Template + Entità già configurate
+                    const inTemplate = templateEntities.sensors.has(state.entity_id);
+                    const inExisting = existingEntities.has(state.entity_id);
+                    
+                    if (inTemplate || inExisting) {
+                        entities.sensors.push(entityData);
+                        if (inTemplate) stats.sensors.kept++;
+                        if (inExisting && !inTemplate) stats.sensors.existing++;
+                    } else {
+                        stats.sensors.filtered++;
+                    }
+                }
+            });
+            
+            // Ordina alfabeticamente PER DISPLAY NAME
+            Object.values(entities).forEach(category => {
+                category.sort((a, b) => a.display_name.localeCompare(b.display_name));
+            });
+            
+            console.log(`✅ Caricate CON FILTRO TEMPLATE + ESISTENTI:`);
+            console.log(`   💡 Luci: ${entities.lights.length} (${stats.lights.kept} da template, ${stats.lights.existing} da config, ${stats.lights.filtered} filtrate)`);
+            console.log(`   🚶 Sensori presenza: ${entities.binary_sensors.length} (${stats.binary_sensors.kept} da template, ${stats.binary_sensors.existing} da config, ${stats.binary_sensors.filtered} filtrati)`);
+            console.log(`   ☀️ Sensori luminosità: ${entities.sensors.length} (${stats.sensors.kept} da template, ${stats.sensors.existing} da config, ${stats.sensors.filtered} filtrati)`);
+            
+            const totalKept = stats.lights.kept + stats.binary_sensors.kept + stats.sensors.kept;
+            const totalExisting = stats.lights.existing + stats.binary_sensors.existing + stats.sensors.existing;
+            const totalFiltered = stats.lights.filtered + stats.binary_sensors.filtered + stats.sensors.filtered;
+            const totalShown = totalKept + totalExisting;
+            
+            console.log(`📊 Statistiche: ${totalShown} mostrate (${totalKept} template + ${totalExisting} esistenti), ${totalFiltered} filtrate`);
+            
+            currentCommunicationMode = 'ha_direct_filtered';
+        }
+        
+        // 📝 Estrai entità dai template divise per tipo (NUOVA FUNZIONE)
+        function extractEntitiesByTypeFromTemplates(templateData) {
+            console.log('📝 Estrazione entità dai template per tipo...');
+            
+            const result = {
+                lights: new Set(),
+                binary_sensors: new Set(), 
+                sensors: new Set()
+            };
+            
+            // Template mapping
+            const templateMapping = {
+                'light': 'lights',           // sensor.area_light_list -> lights
+                'presence': 'binary_sensors', // sensor.area_presence_list -> binary_sensors  
+                'illuminance': 'sensors'      // sensor.area_illuminance_list -> sensors
+            };
+            
+            Object.entries(templateData).forEach(([templateKey, sensor]) => {
+                const entityType = templateMapping[templateKey];
+                if (!entityType) {
+                    console.warn(`⚠️ Tipo template non riconosciuto: ${templateKey}`);
+                    return;
+                }
+                
+                if (sensor.attributes && sensor.attributes.areas_entity) {
+                    const areasEntity = sensor.attributes.areas_entity;
+                    const lines = areasEntity.split('\n');
+                    
+                    lines.forEach(line => {
+                        if (line.trim()) {
+                            const parts = line.split(' | ');
+                            if (parts.length >= 1) {
+                                const entityId = parts[0].trim();
+                                if (entityId && entityId.includes('.')) {
+                                    result[entityType].add(entityId);
+                                }
+                            }
+                        }
+                    });
+                    
+                    console.log(`✅ ${templateKey}: ${result[entityType].size} entità estratte`);
+                } else {
+                    console.warn(`⚠️ Template ${templateKey} senza areas_entity`);
+                }
+            });
+            
+            return result;
+        }
+
+        // 🔍 Carica template sensors (versione migliorata)
+        async function loadTemplateSensors() {
+            try {
+                console.log('🔍 Caricamento template sensors...');
+                
+                const templateSensorNames = [
+                    'sensor.area_light_list',
+                    'sensor.area_presence_list', 
+                    'sensor.area_illuminance_list'
+                ];
+                
+                const results = {};
+                let successCount = 0;
+                
+                for (const sensorName of templateSensorNames) {
+                    try {
+                        const response = await fetch(`/api/states/${sensorName}`, {
+                            headers: { 'Authorization': `Bearer ${haToken}` }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            const sensorKey = sensorName.replace('sensor.area_', '').replace('_list', '');
+                            results[sensorKey] = data;
+                            successCount++;
+                            console.log(`✅ Template ${sensorKey}: ${data.state || 'OK'}`);
+                        } else {
+                            console.log(`❌ Template ${sensorName}: ${response.status}`);
+                        }
+                    } catch (error) {
+                        console.log(`❌ Template ${sensorName}: ${error.message}`);
+                    }
+                }
+                
+                if (successCount === templateSensorNames.length) {
+                    console.log('✅ Tutti i template caricati con successo');
+                    return { success: true, data: results };
+                } else {
+                    console.log(`⚠️ Solo ${successCount}/${templateSensorNames.length} template disponibili`);
+                    return { success: false, data: null };
+                }
+                
+            } catch (error) {
+                console.error('❌ Errore generale caricamento template:', error);
+                return { success: false, data: null };
+            }
+        }
+        
+        // ✅ TOGGLE FILTRO CORRETTO
+        async function toggleAreaFilter() {
+            console.log('🔄 Toggle filtro area...');
+            
+            // Cambia stato
+            areaFilterEnabled = !areaFilterEnabled;
+            const status = areaFilterEnabled ? 'ATTIVATO' : 'DISATTIVATO';
+            
+            console.log(`🎯 Filtro area ${status}`);
+            
+            // Aggiorna interfaccia
+            updateFilterMenuIcon();
+            showAlert(`🔄 Filtro area ${status} - ricaricamento entità...`, 'info');
+            
+            // Ricarica entità
+            updateConnectionStatus('Ricaricamento entità...', 'loading');
+            
+            try {
+                await loadEntities();
+                updateConfigurationsList(); // Aggiorna le dropdown
+                
+                const newStatus = areaFilterEnabled ? 
+                    (templateSensorsCache ? 'CON filtro (template OK)' : 'CON filtro (fallback)') :
+                    'SENZA filtro';
+                    
+                showAlert(`✅ Entità ricaricate ${newStatus}`, 'success');
+                
+            } catch (error) {
+                console.error('Errore toggle filtro:', error);
+                showAlert(`Errore toggle filtro: ${error.message}`, 'error');
+            }
+        }
+        
+        // 🎯 AGGIORNA ICONA MENU FILTRO
+        function updateFilterMenuIcon() {
+            const menuItem = document.getElementById('filterMenuToggle');
+            if (menuItem) {
+                const icon = areaFilterEnabled ? 'fa-filter' : 'fa-filter-slash';
+                const text = areaFilterEnabled ? 'Disattiva Filtro Area' : 'Attiva Filtro Area';
+                menuItem.innerHTML = `<i class="fas ${icon}"></i> ${text}`;
+            }
+        }
+        
+        // 📊 MOSTRA STATO FILTRO (VERSIONE SICURA)
+        function showFilterStatus() {
+            const systemFilterStatusDiv = document.getElementById('systemFilterStatus');
+            if (systemFilterStatusDiv) {
+                systemFilterStatusDiv.style.display = 'block';
+                console.log('✅ Pannello sistema e filtro attivato');
+            } else {
+                console.warn('⚠️ Elemento systemFilterStatus non trovato');
+            }
+        }
+        
+        // 📊 AGGIORNA DISPLAY STATO FILTRO (AGGIORNATO CON CONTEGGIO AREE)
+        function updateFilterStatusDisplay(mode, totalEntities, filteredEntities) {
+            const systemFilterStatusDiv = document.getElementById('systemFilterStatus');
+            const systemStatusContent = document.getElementById('systemStatusContent');
+            const filterStatusContent = document.getElementById('filterStatusContent');
+            const detailsDiv = document.getElementById('filterStatusDetails');
+            
+            // ✅ CONTROLLO SICUREZZA: Verifica che gli elementi esistano
+            if (!systemFilterStatusDiv || !systemStatusContent || !filterStatusContent || !detailsDiv) {
+                console.warn('⚠️ Elementi stato sistema/filtro non trovati, skip aggiornamento');
+                return;
+            }
+            
+            const totalFiltered = filteredEntities.lights.length + filteredEntities.binary_sensors.length + filteredEntities.sensors.length;
+            
+            // Crea il dettaglio per tipo di entità
+            const entityBreakdown = `${filteredEntities.lights.length} luci, ${filteredEntities.binary_sensors.length} sensori presenza, ${filteredEntities.sensors.length} sensori luminosità`;
+            
+            // 🏠 CONTA AREE UNICHE NELLE ENTITÀ MOSTRATE
+            const uniqueAreasCount = countUniqueAreasInEntities(filteredEntities);
+            const areasText = uniqueAreasCount > 0 ? `in ${uniqueAreasCount} aree` : 'senza aree';
+            
+            // Assicurati che il div sia visibile
+            systemFilterStatusDiv.style.display = 'block';
+            
+            // Aggiorna stato sistema (sempre connesso)
+            systemStatusContent.innerHTML = `
+                <i class="fas fa-check-circle text-success me-2"></i>
+                <strong>Sistema: Connesso</strong>
+                <span class="badge bg-primary ms-2">API</span>
+            `;
+            
+            switch (mode) {
+                case 'disabled':
+                    systemFilterStatusDiv.className = 'filter-status disabled';
+                    filterStatusContent.innerHTML = `
+                        <i class="fas fa-filter-slash me-2"></i>
+                        <strong>Filtro Area: DISATTIVATO</strong>
+                    `;
+                    detailsDiv.innerHTML = `Tutte le ${totalEntities} entità disponibili (${entityBreakdown}) ${areasText}`;
+                    break;
+                    
+                case 'disabled_with_templates':
+                    systemFilterStatusDiv.className = 'filter-status disabled';
+                    filterStatusContent.innerHTML = `
+                        <i class="fas fa-filter-slash me-2"></i>
+                        <strong>Filtro Area: DISATTIVATO</strong>
+                        <span class="badge bg-success ms-2">Template OK</span>
+                    `;
+                    detailsDiv.innerHTML = `Tutte le ${totalEntities} entità disponibili (${entityBreakdown}) ${areasText}`;
+                    break;
+                    
+                case 'active_with_templates':
+                    systemFilterStatusDiv.className = 'filter-status';
+                    filterStatusContent.innerHTML = `
+                        <i class="fas fa-filter me-2"></i>
+                        <strong>Filtro Area: ATTIVATO</strong>
+                        <span class="badge bg-success ms-2">Template OK</span>
+                    `;
+                    const excluded = totalEntities - totalFiltered;
+                    const percentage = Math.round((excluded / totalEntities) * 100);
+                    detailsDiv.innerHTML = `${totalFiltered} entità mostrate (${entityBreakdown}) ${areasText} - ${excluded} entità filtrate (${percentage}% escluse)`;
+                    break;
+                    
+                case 'active_no_templates':
+                    systemFilterStatusDiv.className = 'filter-status';
+                    filterStatusContent.innerHTML = `
+                        <i class="fas fa-filter me-2"></i>
+                        <strong>Filtro Area: ATTIVATO</strong>
+                        <span class="badge bg-warning ms-2">Fallback</span>
+                    `;
+                    detailsDiv.innerHTML = `Template non disponibili - mostrate tutte le ${totalEntities} entità (${entityBreakdown}) ${areasText}`;
+                    break;
+                    
+                default:
+                    console.warn('⚠️ Modalità filtro non riconosciuta:', mode);
+                    break;
+            }
+            
+            console.log(`📊 Stato filtro aggiornato: ${mode}, ${totalFiltered}/${totalEntities} entità in ${uniqueAreasCount} aree`);
+        }
+        
+        // ✅ SINCRONIZZA CONFIGURAZIONI (CORRETTA - CARICA PRIMA CONFIGURAZIONI)
+        async function syncConfigurations() {
+            console.log('🔄 Ricaricamento configurazioni...');
+            
+            // ⚠️ IMPORTANTE: Carica PRIMA le configurazioni, poi aggiorna la lista
+            loadConfigurationsFromYourFile();
+            
+            // Ora aggiorna la lista con le nuove configurazioni
+            updateConfigurationsList();
+            showAlert(`✅ ${configurations.length} configurazioni ricaricate`, 'success');
+        }
+        
+        // 📋 CARICA CONFIGURAZIONI DAL TUO FILE
+        function loadConfigurationsFromYourFile() {
+            console.log('📋 Caricamento configurazioni dal tuo apps.yaml...');
+            
+            const yourConfigurations = [
+                {
+                    light_entity: 'light.rgb_03_02',
+                    presence_sensor_on: 'binary_sensor.presenza_01_presence',
+                    presence_sensor_off: '',
+                    illuminance_sensor: 'sensor.presenza_01_illuminance'
+                },
+                {
+                    light_entity: 'light.rgb_01_05',
+                    presence_sensor_on: 'binary_sensor.presenza_02_movimento',
+                    presence_sensor_off: '',
+                    illuminance_sensor: ''
+                },
+                {
+                    light_entity: 'light.shellyplus1pm_80646fe3563c_switch_0',
+                    presence_sensor_on: 'binary_sensor.presenza_03_zone_1_occupancy',
+                    presence_sensor_off: 'binary_sensor.presenza_03_zone_4_occupancy',
+                    illuminance_sensor: 'sensor.presenza_03_illuminance'
+                }
+            ];
+            
+            configurations = yourConfigurations;
+            console.log(`✅ Caricate ${configurations.length} configurazioni`);
+        }
+        
+        // 📋 AGGIORNA LISTA CONFIGURAZIONI - AGGIORNATA CON DISPLAY_NAME
+        function updateConfigurationsList() {
+            const container = document.getElementById('configsList');
+            container.innerHTML = '';
+            
+            if (configurations.length === 0) {
+                container.innerHTML = `
+                    <div class="alert alert-info text-center">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Nessuna configurazione presente. Clicca il pulsante + per aggiungerne una.
+                    </div>
+                `;
+                return;
+            }
+            
+            configurations.forEach((config, index) => {
+                const configElement = createConfigurationElement(config, index);
+                container.appendChild(configElement);
+            });
+        }
+        
+        // 📋 NUOVA FUNZIONE: Ottieni entità da configurazioni esistenti
+        function getEntitiesFromExistingConfigurations() {
+            const existingEntities = new Set();
+            
+            configurations.forEach(config => {
+                if (config.light_entity) existingEntities.add(config.light_entity);
+                if (config.presence_sensor_on) existingEntities.add(config.presence_sensor_on);
+                if (config.presence_sensor_off) existingEntities.add(config.presence_sensor_off);
+                if (config.illuminance_sensor) existingEntities.add(config.illuminance_sensor);
+            });
+            
+            console.log(`📋 Entità da configurazioni esistenti: ${existingEntities.size}`);
+            return existingEntities;
+        }
+        
+        // 🔨 CREA ELEMENTO CONFIGURAZIONE - AGGIORNATO CON CAMPO AREA
+        function createConfigurationElement(config, index) {
+            const div = document.createElement('div');
+            div.className = 'config-section fade-in';
+            
+            // Rileva area automatica della configurazione
+            const detectedArea = detectConfigurationArea(config);
+            const selectedArea = config.selected_area || detectedArea || '';
+            
+            // Ottieni lista aree disponibili
+            const availableAreas = extractUniqueAreas();
+            
+            // Filtra entità per area selezionata + mantieni entità già configurate
+            const filteredLights = filterEntitiesWithExisting(entities.lights, selectedArea, index);
+            const filteredBinarySensors = filterEntitiesWithExisting(entities.binary_sensors, selectedArea, index);
+            const filteredSensors = filterEntitiesWithExisting(entities.sensors, selectedArea, index);
+            
+            div.innerHTML = `
+                <div class="config-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        Configurazione ${index + 1}
+                    </h5>
+                    <button class="remove-button" onclick="removeConfiguration(${index})" title="Rimuovi configurazione">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                
+                <!-- 🏠 CAMPO AREA NUOVO -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <label class="form-label">
+                            <i class="fas fa-map-marker-alt me-1"></i> Area
+                        </label>
+                        <select class="form-select" id="areaSelect_${index}" onchange="handleAreaChange(${index}, this.value)">
+                            <option value="">Seleziona area</option>
+                            ${availableAreas.map(area => 
+                                `<option value="${area}" ${selectedArea === area ? 'selected' : ''}>
+                                    ${area}
+                                </option>`
+                            ).join('')}
+                        </select>
+                        ${selectedArea && !detectedArea ? '<small class="text-info">Area selezionata manualmente</small>' : ''}
+                        ${detectedArea ? '<small class="text-success">Area rilevata automaticamente</small>' : ''}
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-lightbulb me-1"></i> Luce da controllare
+                        </label>
+                        <select class="form-select" onchange="updateConfiguration(${index}, 'light_entity', this.value)">
+                            <option value="">Seleziona una luce...</option>
+                            ${filteredLights.map(light => 
+                                `<option value="${light.entity_id}" ${config.light_entity === light.entity_id ? 'selected' : ''}>
+                                    ${light.display_name}
+                                </option>`
+                            ).join('')}
+                        </select>
+                        ${selectedArea && filteredLights.length === 0 ? '<small class="text-danger">Nessuna luce disponibile per questa area</small>' : ''}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-walking me-1"></i> Sensore accensione
+                        </label>
+                        <select class="form-select" onchange="updateConfiguration(${index}, 'presence_sensor_on', this.value)">
+                            <option value="">Seleziona sensore presenza...</option>
+                            ${filteredBinarySensors.map(sensor => 
+                                `<option value="${sensor.entity_id}" ${config.presence_sensor_on === sensor.entity_id ? 'selected' : ''}>
+                                    ${sensor.display_name}
+                                </option>`
+                            ).join('')}
+                        </select>
+                        ${selectedArea && filteredBinarySensors.length === 0 ? '<small class="text-danger">Nessun sensore presenza disponibile per questa area</small>' : ''}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-power-off me-1"></i> Sensore spegnimento (opzionale)
+                        </label>
+                        <select class="form-select" onchange="updateConfiguration(${index}, 'presence_sensor_off', this.value)">
+                            <option value="">Seleziona sensore spegnimento...</option>
+                            ${filteredBinarySensors.map(sensor => 
+                                `<option value="${sensor.entity_id}" ${config.presence_sensor_off === sensor.entity_id ? 'selected' : ''}>
+                                    ${sensor.display_name}
+                                </option>`
+                            ).join('')}
+                        </select>
+                        ${selectedArea && filteredBinarySensors.length === 0 ? '<small class="text-warning">Nessun sensore spegnimento disponibile per questa area</small>' : ''}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-sun me-1"></i> Sensore luminosità (opzionale)
+                        </label>
+                        <select class="form-select" onchange="updateConfiguration(${index}, 'illuminance_sensor', this.value)">
+                            <option value="">Nessun sensore luminosità</option>
+                            ${filteredSensors.map(sensor => 
+                                `<option value="${sensor.entity_id}" ${config.illuminance_sensor === sensor.entity_id ? 'selected' : ''}>
+                                    ${sensor.display_name}
+                                </option>`
+                            ).join('')}
+                        </select>
+                        ${selectedArea && filteredSensors.length === 0 ? '<small class="text-warning">Nessun sensore luminosità disponibile per questa area</small>' : ''}
+                    </div>
+                </div>
+                
+                <div class="mt-3 p-3 bg-light rounded">
+                    <h6><i class="fas fa-info-circle me-2"></i>Riepilogo Configurazione:</h6>
+                    <div class="small text-muted">
+                        ${selectedArea ? `🏠 Area: ${selectedArea}` : '🏠 Area: Non specificata'}<br>
+                        ${config.light_entity ? `✅ Luce: ${entities.lights.find(l => l.entity_id === config.light_entity)?.display_name || config.light_entity}` : '❌ Luce non selezionata'}<br>
+                        ${config.presence_sensor_on ? `✅ Accensione: ${entities.binary_sensors.find(s => s.entity_id === config.presence_sensor_on)?.display_name || config.presence_sensor_on}` : '❌ Sensore accensione non selezionato'}<br>
+                        ${config.presence_sensor_off ? `✅ Spegnimento: ${entities.binary_sensors.find(s => s.entity_id === config.presence_sensor_off)?.display_name || config.presence_sensor_off}` : '❌ Sensore spegnimento non selezionato'}<br>
+                        ${config.illuminance_sensor ? `✅ Luminosità: ${entities.sensors.find(s => s.entity_id === config.illuminance_sensor)?.display_name || config.illuminance_sensor}` : 'ℹ️ Nessun controllo luminosità'}
+                    </div>
+                </div>
+            `;
+            
+            return div;
+        }
+        
+        // ➕ AGGIUNGI CONFIGURAZIONE - AGGIORNATO PER SUPPORTARE AREE
+        function addConfiguration() {
+            configurations.push({
+                light_entity: '',
+                presence_sensor_on: '',
+                presence_sensor_off: '',
+                illuminance_sensor: '',
+                selected_area: '' // Nuovo campo per area selezionata manualmente
+            });
+            
+            updateConfigurationsList();
+            showAlert('Nuova configurazione aggiunta', 'success');
+            
+            // Scroll verso la nuova configurazione
+            setTimeout(() => {
+                const newConfig = document.querySelector('.config-section:last-child');
+                if (newConfig) {
+                    newConfig.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100);
+        }
+        
+        // ❌ RIMUOVI CONFIGURAZIONE
+        function removeConfiguration(index) {
+            if (confirm('Sei sicuro di voler rimuovere questa configurazione?')) {
+                configurations.splice(index, 1);
+                updateConfigurationsList();
+                showAlert('Configurazione rimossa', 'info');
+            }
+        }
+        
+        // 🔄 AGGIORNA CONFIGURAZIONE - AGGIORNATO PER GESTIRE CAMBIO AREA
+        function updateConfiguration(index, field, value) {
+            if (configurations[index]) {
+                configurations[index][field] = value;
+                console.log(`Aggiornata configurazione ${index}:`, field, '=', value);
+                
+                // Se ho cambiato un'entità, aggiorna l'area automatica
+                if (['light_entity', 'presence_sensor_on', 'presence_sensor_off', 'illuminance_sensor'].includes(field)) {
+                    const config = configurations[index];
+                    const detectedArea = detectConfigurationArea(config);
+                    
+                    // Se c'è un'area rilevata automaticamente e non c'è area selezionata manualmente
+                    if (detectedArea && !config.selected_area) {
+                        const areaSelect = document.querySelector(`#areaSelect_${index}`);
+                        if (areaSelect) {
+                            areaSelect.value = detectedArea;
+                        }
+                    }
+                    
+                    // Se l'area selezionata manualmente non è compatibile, resettala
+                    if (config.selected_area) {
+                        const entityArea = getEntityArea(value);
+                        if (entityArea && entityArea !== config.selected_area) {
+                            // L'entità appartiene a un'area diversa da quella selezionata
+                            console.log(`⚠️ Entità ${value} (${entityArea}) non compatibile con area selezionata ${config.selected_area}`);
+                        }
+                    }
+                }
+                
+                // Aggiorna interfaccia
+                setTimeout(() => {
+                    updateConfigurationsList();
+                    updateGenerateButtonState();
+                }, 100);
+            }
+        }
+        
+        // 🎯 AGGIORNA STATO PULSANTE GENERA YAML
+        function updateGenerateButtonState() {
+            const generateButton = document.querySelector('button[onclick="generateYAML()"]');
+            const hasErrors = !validateConfigurationSilent();
+            
+            if (hasErrors) {
+                generateButton.disabled = true;
+                generateButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Correggi errori per generare YAML';
+                generateButton.className = generateButton.className.replace('btn-success', 'btn-warning');
+            } else {
+                generateButton.disabled = false;
+                generateButton.innerHTML = '<i class="fas fa-code"></i> Genera e Salva Configurazione YAML';
+                generateButton.className = generateButton.className.replace('btn-warning', 'btn-success');
+            }
+        }
+        
+        // 🔍 VALIDAZIONE SILENZIOSA
+        function validateConfigurationSilent() {
+            let errors = [];
+            
+            configurations.forEach((config, index) => {
+                if (!config.light_entity) errors.push(`Config ${index + 1}: No light`);
+                if (!config.presence_sensor_on) errors.push(`Config ${index + 1}: No sensor`);
+            });
+            
+            return errors.length === 0;
+        }
+        
+        // ✅ VALIDAZIONE CONFIGURAZIONE
+        function validateConfiguration() {
+            let errors = [];
+            let warnings = [];
+            
+            if (configurations.length === 0) {
+                errors.push('Nessuna configurazione presente');
+            }
+            
+            configurations.forEach((config, index) => {
+                const num = index + 1;
+                
+                // Errori obbligatori
+                if (!config.light_entity) {
+                    errors.push(`Configurazione ${num}: Luce non selezionata`);
+                }
+                
+                if (!config.presence_sensor_on) {
+                    errors.push(`Configurazione ${num}: Sensore accensione non selezionato`);
+                }
+                
+                // Avvisi opzionali
+                if (!config.presence_sensor_off) {
+                    warnings.push(`Configurazione ${num}: Nessun sensore spegnimento configurato`);
+                }
+                
+                if (!config.illuminance_sensor) {
+                    warnings.push(`Configurazione ${num}: Nessun controllo luminosità configurato`);
+                }
+                
+                // Controllo duplicati
+                if (config.light_entity) {
+                    const duplicates = configurations.filter((c, i) => 
+                        i !== index && c.light_entity === config.light_entity
+                    );
+                    if (duplicates.length > 0) {
+                        errors.push(`Configurazione ${num}: Luce già configurata in un'altra regola`);
+                    }
+                }
+            });
+            
+            // Mostra risultati
+            let message = '';
+            if (errors.length > 0) {
+                message += `❌ ERRORI:\n${errors.join('\n')}\n\n`;
+            }
+            if (warnings.length > 0) {
+                message += `⚠️ AVVISI:\n${warnings.join('\n')}\n\n`;
+            }
+            if (errors.length === 0 && warnings.length === 0) {
+                message += '✅ Tutte le configurazioni sono perfette!';
+            } else if (errors.length === 0) {
+                message += '✅ Configurazioni valide (con alcuni avvisi opzionali)';
+            }
+            
+            const alertType = errors.length > 0 ? 'error' : (warnings.length > 0 ? 'warning' : 'success');
+            showAlert(message, alertType);
+            
+            return errors.length === 0;
+        }
+        
+        // 📝 GENERA YAML
+        function generateYAML() {
+            if (!validateConfiguration()) {
+                showAlert('Correggi gli errori prima di generare il YAML', 'error');
+                return;
+            }
+            
+            const yamlContent = generateYAMLContent();
+            
+            document.getElementById('yamlCode').textContent = yamlContent;
+            document.getElementById('yamlOutput').style.display = 'block';
+            
+            // Scroll verso l'output
+            document.getElementById('yamlOutput').scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start' 
+            });
+            
+            showAlert('YAML generato con successo!', 'success');
+        }
+        
+        // 📝 GENERA CONTENUTO YAML
+        function generateYAMLContent() {
+            const timestamp = new Date().toISOString();
+            
+            let yaml = `################################################################################\n`;
+            yaml += `#                      START CONTROLLO LUCI AUTOMATICHE                        #\n`;
+            yaml += `################################################################################\n`;
+            yaml += `light_presence:\n`;
+            yaml += `  module: light_presence_control\n`;
+            yaml += `  class: LightPresenceControl\n`;
+            yaml += `  log_level: DEBUG\n`;
+            yaml += `  light_presence:\n`;
+            
+            configurations.forEach((config, index) => {
+                const lightEntity = config.light_entity;
+                const baseId = lightEntity.replace('light.', '');
+                
+                yaml += `    # Configurazione ${index + 1} - ${baseId}\n`;
+                yaml += `    - light_entity: ${lightEntity}\n`;
+                yaml += `      presence_sensor_on: ${config.presence_sensor_on || ''}\n`;
+                yaml += `      presence_sensor_off: ${config.presence_sensor_off || ''}\n`;
+                yaml += `      illuminance_sensor: ${config.illuminance_sensor || ''}\n`;
+                
+                // Parametri aggiuntivi auto-generati
+                yaml += `      enable_sensor: input_boolean.${baseId}_enable_sensor\n`;
+                yaml += `      enable_manual_activation_sensor: input_boolean.${baseId}_enable_manual_activation_sensor\n`;
+                yaml += `      enable_manual_activation_light_sensor: input_boolean.${baseId}_enable_manual_activation_light_sensor\n`;
+                yaml += `      enable_automation: input_boolean.${baseId}_enable_automation\n`;
+                yaml += `      enable_illuminance_filter: input_boolean.${baseId}_enable_illuminance_filter\n`;
+                yaml += `      enable_illuminance_automation: input_boolean.${baseId}_enable_illuminance_automation\n`;
+                yaml += `      automatic_enable_automation: input_select.${baseId}_automatic_enable_automation\n`;
+                yaml += `      light_sensor_config: input_select.${baseId}_light_sensor_config\n`;
+                yaml += `      timer_minutes_on_push: input_number.${baseId}_timer_minutes_on_push\n`;
+                yaml += `      timer_filter_on_push: input_number.${baseId}_timer_filter_on_push\n`;
+                yaml += `      timer_minutes_on_time: input_number.${baseId}_timer_minutes_on_time\n`;
+                yaml += `      timer_filter_on_time: input_number.${baseId}_timer_filter_on_time\n`;
+                yaml += `      timer_seconds_max_lux: input_number.${baseId}_timer_seconds_max_lux\n`;
+                yaml += `      min_lux_activation: input_number.${baseId}_min_lux_activation\n`;
+                yaml += `      max_lux_activation: input_number.${baseId}_max_lux_activation\n`;
+                yaml += `      turn_on_light_offset: input_number.${baseId}_turn_on_light_offset\n`;
+                yaml += `      turn_off_light_offset: input_number.${baseId}_turn_off_light_offset\n`;
+                
+                if (index < configurations.length - 1) {
+                    yaml += `\n`;
+                }
+            });
+            
+            yaml += `################################################################################\n`;
+            yaml += `#                      END CONTROLLO LUCI AUTOMATICHE                          #\n`;
+            yaml += `################################################################################\n`;
+            
+            return yaml;
+        }
+        
+        // 📋 COPIA YAML
+        async function copyYAML() {
+            const yamlContent = document.getElementById('yamlCode').textContent;
+            
+            try {
+                await navigator.clipboard.writeText(yamlContent);
+                showAlert('YAML copiato negli appunti!', 'success');
+            } catch (error) {
+                // Fallback
+                const textArea = document.createElement('textarea');
+                textArea.value = yamlContent;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showAlert('YAML copiato negli appunti!', 'success');
+            }
+        }
+        
+        // 💾 SALVA CONFIGURAZIONE
+        async function saveConfiguration() {
+            if (!validateConfiguration()) {
+                showAlert('Correggi gli errori prima di salvare', 'error');
+                return;
+            }
+            
+            const yamlContent = generateYAMLContent();
+            
+            try {
+                showAlert('Salvataggio configurazione in corso...', 'info');
+                
+                const response = await fetch(`${APPDAEMON_API_URL}/southtech_save`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        yaml_content: yamlContent,
+                        configurations: configurations,
+                        ha_token: haToken,
+                        browser_id: browserId
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showAlert('Configurazione salvata con successo in apps.yaml!', 'success');
+                    console.log('✅ Salvato via API:', data);
+                } else {
+                    throw new Error('Errore salvataggio via API');
+                }
+                
+            } catch (error) {
+                console.error('Errore salvataggio:', error);
+                showAlert(`Errore durante il salvataggio: ${error.message}`, 'error');
+            }
+        }
+        
+        // 📊 AGGIORNA STATO CONNESSIONE
+        function updateConnectionStatus(message, type) {
+            const statusDiv = document.getElementById('connectionStatus');
+            
+            let statusClass, icon;
+            switch (type) {
+                case 'success':
+                    statusClass = 'status-api';
+                    icon = 'fas fa-check-circle';
+                    break;
+                case 'error':
+                    statusClass = 'status-error';
+                    icon = 'fas fa-exclamation-triangle';
+                    break;
+                case 'loading':
+                    statusClass = 'status-file';
+                    icon = 'fas fa-spinner fa-spin';
+                    break;
+                default:
+                    statusClass = 'status-file';
+                    icon = 'fas fa-info-circle';
+            }
+            
+            statusDiv.innerHTML = `
+                <div class="connection-status ${statusClass}">
+                    <i class="${icon}"></i>
+                    <span>${message}</span>
+                    ${currentCommunicationMode !== 'api' ? '<small class="ms-2">(Modalità Fallback)</small>' : ''}
+                </div>
+            `;
+        }
+        
+        // 🧪 DEBUG TEMPLATES
+        async function debugTemplates() {
+            console.log('🧪 === DEBUG TEMPLATE ===');
+            
+            const result = await loadTemplateSensors();
+            if (result.success) {
+                console.log('✅ Template caricati con successo');
+                Object.entries(result.data).forEach(([key, sensor]) => {
+                    console.log(`📊 ${key.toUpperCase()}:`);
+                    console.log(`   State: ${sensor.state}`);
+                    console.log(`   Areas Entity: ${sensor.attributes.areas_entity ? 'Presente' : 'Mancante'}`);
+                    
+                    if (sensor.attributes.areas_entity) {
+                        const lines = sensor.attributes.areas_entity.split('\n').filter(l => l.trim());
+                        console.log(`   Entità trovate: ${lines.length}`);
+                        console.log(`   Prime 3 entità:`, lines.slice(0, 3));
+                    }
+                });
+                
+                const entityIds = extractEntitiesFromTemplates(result.data);
+                console.log(`🎯 Totale entità uniche: ${entityIds.size}`);
+                
+                showAlert(`✅ Debug template OK - ${entityIds.size} entità trovate`, 'success');
+            } else {
+                console.log('❌ Template non disponibili');
+                showAlert('❌ Template non disponibili - controlla console', 'error');
+            }
+        }
+        
+        // 🐛 DEBUG ENTITÀ - AGGIORNATO CON INFO AREE
+        function debugEntities() {
+            console.log('🐛 === DEBUG ENTITÀ ===');
+            console.log(`🎯 Filtro attivo: ${areaFilterEnabled}`);
+            console.log(`🏠 Template cache: ${templateSensorsCache ? 'Presente' : 'Vuota'}`);
+            console.log(`📊 Modalità: ${currentCommunicationMode}`);
+            console.log(`💡 Luci: ${entities.lights.length}`);
+            console.log(`🚶 Sensori binari: ${entities.binary_sensors.length}`);
+            console.log(`☀️ Sensori lux: ${entities.sensors.length}`);
+            console.log(`🗺️ Aree mappate: ${entityAreasMap.size}`);
+            
+            const uniqueAreas = extractUniqueAreas();
+            console.log(`🏠 Aree uniche: ${uniqueAreas.length} -> ${uniqueAreas.join(', ')}`);
+            
+            if (entities.lights.length > 0) {
+                console.log('Prime 5 luci:', entities.lights.slice(0, 5).map(l => `${l.entity_id} -> ${l.display_name}`));
+            }
+            
+            if (entityAreasMap.size > 0) {
+                const firstFiveAreas = Array.from(entityAreasMap.entries()).slice(0, 5);
+                console.log('Prime 5 aree mappate:', firstFiveAreas);
+            }
+            
+            // Debug configurazioni con aree
+            configurations.forEach((config, index) => {
+                const detectedArea = detectConfigurationArea(config);
+                console.log(`Config ${index + 1}: area rilevata="${detectedArea}", area selezionata="${config.selected_area}"`);
+            });
+            
+            showAlert(`Debug entità: ${entities.lights.length + entities.binary_sensors.length + entities.sensors.length} totali, ${entityAreasMap.size} con area, ${uniqueAreas.length} aree uniche`, 'info');
+        }
+        
+        // 🚨 MOSTRA ALERT
+        function showAlert(message, type = 'info', duration = 4000) {
+            const indicator = document.getElementById('statusIndicator');
+            
+            let alertClass, icon;
+            switch (type) {
+                case 'success':
+                    alertClass = 'alert-success';
+                    icon = 'fas fa-check-circle';
+                    break;
+                case 'error':
+                    alertClass = 'alert-danger';
+                    icon = 'fas fa-exclamation-triangle';
+                    duration = 8000;
+                    break;
+                case 'warning':
+                    alertClass = 'alert-warning';
+                    icon = 'fas fa-exclamation-circle';
+                    duration = 6000;
+                    break;
+                default:
+                    alertClass = 'alert-info';
+                    icon = 'fas fa-info-circle';
+            }
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert ${alertClass} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                <i class="${icon} me-2"></i>
+                ${message.replace(/\n/g, '<br>')}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            indicator.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, duration);
+        }
+        
+        console.log('✅ SouthTech Automatismo Luci JavaScript caricato');
+    </script>
+</body>
+</html>
