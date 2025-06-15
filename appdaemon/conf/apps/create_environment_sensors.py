@@ -126,7 +126,7 @@ class CreateEnvironmentSensors(hass.Hass):
                     self.create_min_max_avg_sensors(area_name, sensor_type, valid_entities)
 
     def create_min_max_avg_sensors(self, area: str, sensor_type: str, entities: List[str]):
-        """Crea sensori min, max e media per un'area e tipo di sensore"""
+        """Crea sensori per un'area e tipo di sensore - solo media per sensore singolo, min/max/media per sensori multipli"""
         states = []
         
         for entity in entities:
@@ -140,19 +140,25 @@ class CreateEnvironmentSensors(hass.Hass):
             self.log(f"Nessuno stato valido trovato per {area} - {sensor_type}", level="WARNING")
             return
 
-        min_value = min(states)
-        max_value = max(states)
-        avg_value = round(sum(states) / len(states), 1)
-
         # Pulisci il nome dell'area per gli ID dei sensori
         clean_area = area.lower().replace(' ', '_').replace('-', '_')
 
-        # Crea i tre sensori aggregati
-        self.create_sensor(f"{clean_area}_{sensor_type}_min", f"Min {sensor_type.title()} in {area}", min_value, sensor_type)
-        self.create_sensor(f"{clean_area}_{sensor_type}_max", f"Max {sensor_type.title()} in {area}", max_value, sensor_type)
-        self.create_sensor(f"{clean_area}_{sensor_type}", f"{sensor_type.title()} in {area}", avg_value, sensor_type)
+        if len(states) == 1:
+            # Sensore singolo: crea solo la media (che è il valore stesso)
+            avg_value = states[0]
+            self.create_sensor(f"{clean_area}_{sensor_type}", f"{sensor_type.title()} in {area}", avg_value, sensor_type)
+            self.log(f"Creato sensore singolo per {area} - {sensor_type}: {avg_value}", level="INFO")
+        else:
+            # Sensori multipli: crea min, max e media
+            min_value = min(states)
+            max_value = max(states)
+            avg_value = round(sum(states) / len(states), 1)
 
-        self.log(f"Creati sensori per {area} - {sensor_type}: min={min_value}, max={max_value}, avg={avg_value}", level="INFO")
+            self.create_sensor(f"{clean_area}_{sensor_type}_min", f"Min {sensor_type.title()} in {area}", min_value, sensor_type)
+            self.create_sensor(f"{clean_area}_{sensor_type}_max", f"Max {sensor_type.title()} in {area}", max_value, sensor_type)
+            self.create_sensor(f"{clean_area}_{sensor_type}", f"{sensor_type.title()} in {area}", avg_value, sensor_type)
+
+            self.log(f"Creati sensori multipli per {area} - {sensor_type}: min={min_value}, max={max_value}, avg={avg_value}", level="INFO")
 
     def create_sensor(self, object_id: str, name: str, state: float, sensor_type: str):
         """Crea o aggiorna un sensore aggregato"""
