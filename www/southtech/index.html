@@ -374,8 +374,8 @@
             
             <!-- Token Renewal -->
             <div id="tokenRenewalScreen" style="display: none;">
-                <h4 class="mb-4">Token Scaduto</h4>
-                <p class="text-muted mb-4">Il token di Home Assistant è scaduto. Inserisci un nuovo token per continuare.</p>
+                <h4 class="mb-4">Rinnova Token</h4>
+                <p class="text-muted mb-4">Inserisci un nuovo token di Home Assistant per aggiornare quello attuale.</p>
                 <div class="mb-3">
                     <input type="password" id="renewalToken" class="form-control" placeholder="Nuovo token Home Assistant" required>
                 </div>
@@ -383,8 +383,8 @@
                     <button class="btn btn-success" onclick="renewToken()">
                         <i class="fas fa-sync"></i> Aggiorna Token
                     </button>
-                    <button class="btn btn-secondary" onclick="logout()">
-                        <i class="fas fa-sign-out-alt"></i> Logout
+                    <button class="btn btn-secondary" onclick="cancelTokenRenewal()">
+                        <i class="fas fa-arrow-left"></i> Annulla
                     </button>
                 </div>
             </div>
@@ -573,7 +573,15 @@
         
         // Funzione per nascondere tutte le schermate
         function hideAllScreens() {
-            const screens = ['tokenScreen', 'setupScreen', 'loginScreen', 'changePasswordScreen', 'tokenRenewalScreen', 'resetConfirmationScreen'];
+            const screens = [
+                'tokenScreen', 
+                'setupScreen', 
+                'loginScreen', 
+                'changePasswordScreen', 
+                'tokenRenewalScreen', 
+                'resetConfirmationScreen',
+                'loadingScreen'
+            ];
             screens.forEach(screen => {
                 const element = document.getElementById(screen);
                 if (element) {
@@ -608,7 +616,7 @@
             // Controlla se si sta tornando da un'altra pagina
             const returnToMenu = sessionStorage.getItem('southtech_return_to_menu');
             if (returnToMenu === 'true') {
-                console.log('🔍 Ritorno da altra pagina, controllo sessione...');
+                console.log('🔍 Ritorno da altra pagina, accesso diretto al menu...');
                 sessionStorage.removeItem('southtech_return_to_menu');
                 
                 // Recupera token dalla sessione
@@ -616,16 +624,17 @@
                 haToken = sessionStorage.getItem('southtech_ha_token');
                 browserId = sessionStorage.getItem('southtech_browser_id');
                 
-                if (authToken && haToken) {
-                    console.log('🔍 Token di sessione validi, mostro menu direttamente');
-                    const tokenValid = await validateHAToken(haToken);
-                    if (tokenValid) {
-                        showMainDashboard();
-                        return;
-                    }
+                // Se abbiamo i token di sessione, accesso DIRETTO al menu
+                if (authToken && haToken && browserId) {
+                    console.log('🔍 Token di sessione presenti, accesso DIRETTO al menu');
+                    showMainDashboard();
+                    return; // ✅ NESSUNA VALIDAZIONE - ACCESSO IMMEDIATO
+                } else {
+                    console.log('🔍 Token di sessione mancanti, procedo con validazione normale');
                 }
             }
             
+            // Resto del codice INVARIATO per accessi diretti...
             haToken = localStorage.getItem('ha_token');
             
             if (!haToken) {
@@ -635,6 +644,8 @@
             }
             
             console.log('🔍 Validazione token esistente...');
+            showLoadingIndicator();
+            
             const tokenValid = await validateHAToken(haToken);
             
             if (!tokenValid) {
@@ -646,10 +657,41 @@
             console.log('🔍 Token HA valido, controllo auth app...');
             await checkAuthStatus();
         }
+
+        // NUOVA FUNZIONE: Mostra indicatore di caricamento
+        function showLoadingIndicator() {
+            hideAllScreens();
+            
+            // Crea o mostra schermata di caricamento
+            let loadingScreen = document.getElementById('loadingScreen');
+            if (!loadingScreen) {
+                // Crea la schermata di caricamento se non esiste
+                const authCard = document.querySelector('.auth-card');
+                loadingScreen = document.createElement('div');
+                loadingScreen.id = 'loadingScreen';
+                loadingScreen.style.display = 'none';
+                loadingScreen.innerHTML = `
+                    <div class="text-center">
+                        <div class="auth-logo">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h4 class="auth-title">SouthTech Configurator</h4>
+                        <div class="mb-4">
+                            <div class="loading-spinner mx-auto mb-3"></div>
+                            <p class="text-muted">Verifica autenticazione in corso...</p>
+                        </div>
+                    </div>
+                `;
+                authCard.appendChild(loadingScreen);
+            }
+            
+            loadingScreen.style.display = 'block';
+        }
         
         // Valida token HA
         async function validateHAToken(token) {
             try {
+                console.log('🔍 Validazione token HA in corso...');
                 const response = await fetch('/api/states', {
                     method: 'GET',
                     headers: {
@@ -659,9 +701,10 @@
                 });
                 
                 if (response.ok) {
-                    await checkAuthStatus();
+                    console.log('🔍 Token HA valido');
                     return true;
                 } else {
+                    console.log('🔍 Token HA non valido, status:', response.status);
                     return false;
                 }
             } catch (error) {
@@ -1110,7 +1153,74 @@
                 return;
             }
             
-            showAlert('Cambio password non implementato in questa versione', 'warning');
+            try {
+                showAlert('Cambio password in corso...', 'info');
+                
+                // Invia richiesta di cambio password
+                const requestResponse = await fetch('/api/states/sensor.southtech_change_password_request', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${haToken}`
+                    },
+                    body: JSON.stringify({
+                        state: 'pending',
+                        attributes: {
+                            action: 'change_password',
+                            old_password: oldPassword,
+                            new_password: newPassword,
+                            new_password_confirm: confirmPassword,
+                            browser_id: browserId,
+                            timestamp: new Date().toISOString()
+                        }
+                    })
+                });
+                
+                if (!requestResponse.ok) {
+                    throw new Error('Errore comunicazione con Home Assistant');
+                }
+                
+                // Attendi risposta
+                const result = await pollForResponse('sensor.southtech_change_password_response', 10);
+                
+                if (result.success && result.data.success) {
+                    showAlert('Password cambiata con successo!', 'success');
+                    
+                    // Pulisci i campi
+                    document.getElementById('oldPassword').value = '';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('newPasswordConfirm').value = '';
+                    
+                    // Nota: I token vengono invalidati dal backend, quindi manteniamo la sessione corrente
+                    setTimeout(() => showMainDashboard(), 1500);
+                } else {
+                    // Gestisci errori specifici
+                    const errorMsg = result.data?.error || 'Errore sconosciuto';
+                    
+                    if (errorMsg.includes('password attuale') || errorMsg.includes('Password attuale non corretta')) {
+                        showAlert('Password attuale non corretta', 'error');
+                        document.getElementById('oldPassword').value = '';
+                        document.getElementById('oldPassword').focus();
+                    } else if (errorMsg.includes('password troppo corta') || errorMsg.includes('almeno 6 caratteri')) {
+                        showAlert('La nuova password deve essere di almeno 6 caratteri', 'error');
+                    } else if (errorMsg.includes('non coincidono')) {
+                        showAlert('Le nuove password non coincidono', 'error');
+                    } else {
+                        showAlert(`Errore cambio password: ${errorMsg}`, 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('Errore cambio password:', error);
+                
+                // Gestione specifica degli errori
+                if (error.message.includes('Timeout') || error.message.includes('nessuna risposta')) {
+                    showAlert('Sistema di autenticazione non disponibile. Controlla che AppDaemon sia in esecuzione.', 'error');
+                } else if (error.message.includes('comunicazione')) {
+                    showAlert('Errore di comunicazione con Home Assistant', 'error');
+                } else {
+                    showAlert('Errore durante il cambio password. Riprova più tardi.', 'error');
+                }
+            }
         }
         
         function showChangePassword() {
@@ -1127,25 +1237,62 @@
             document.getElementById('tokenRenewalScreen').style.display = 'block';
         }
         
+        function cancelTokenRenewal() {
+            document.getElementById('authContainer').style.display = 'none';
+            document.getElementById('mainContainer').style.display = 'block';
+        }
+        
         async function renewToken() {
-            const token = document.getElementById('renewalToken').value.trim();
+            const newToken = document.getElementById('renewalToken').value.trim();
             
-            if (!token) {
+            if (!newToken) {
                 showAlert('Inserisci il nuovo token di Home Assistant', 'error');
                 return;
             }
             
+            // Salva il token precedente per eventuale ripristino
+            const previousToken = haToken;
+            
             showAlert('Validazione nuovo token...', 'info');
             
-            const isValid = await validateHAToken(token);
-            
-            if (isValid) {
-                localStorage.setItem('ha_token', token);
-                haToken = token;
-                showAlert('Token aggiornato con successo!', 'success');
-                setTimeout(() => showMainDashboard(), 1000);
-            } else {
-                showAlert('Nuovo token non valido', 'error');
+            try {
+                // Testa la connessione con il nuovo token
+                const response = await fetch('/api/states', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${newToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    // Token valido - salva e aggiorna
+                    localStorage.setItem('ha_token', newToken);
+                    haToken = newToken;
+                    sessionStorage.setItem('southtech_ha_token', haToken);
+                    
+                    showAlert('Token aggiornato con successo!', 'success');
+                    setTimeout(() => {
+                        document.getElementById('authContainer').style.display = 'none';
+                        document.getElementById('mainContainer').style.display = 'block';
+                    }, 1500);
+                } else {
+                    // Token non valido
+                    showAlert('Nuovo token non valido', 'error');
+                    document.getElementById('renewalToken').value = '';
+                }
+            } catch (error) {
+                console.error('Errore validazione nuovo token:', error);
+                
+                // Distingui tra errori di connessione e token invalidi
+                if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch')) {
+                    showAlert('Impossibile raggiungere Home Assistant. Verifica la connessione.', 'error');
+                } else {
+                    showAlert('Nuovo token non valido', 'error');
+                }
+                
+                // Mantieni il token precedente
+                document.getElementById('renewalToken').value = '';
             }
         }
         

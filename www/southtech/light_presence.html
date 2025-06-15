@@ -381,7 +381,73 @@
     <div id="statusIndicator" class="status-indicator"></div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
+        async function validateDirectPageAccess() {
+            console.log('🔐 Controllo accesso diretto alla pagina...');
+            
+            try {
+                // Recupera token di sessione
+                const authToken = sessionStorage.getItem('southtech_session_token');
+                const haToken = sessionStorage.getItem('southtech_ha_token');
+                const browserId = sessionStorage.getItem('southtech_browser_id');
+                
+                // Controllo presenza token
+                if (!authToken || !haToken || !browserId) {
+                    console.log('🔐 Token mancanti - reindirizzo a index');
+                    redirectToIndex('Token di sessione mancanti');
+                    return false;
+                }
+                
+                console.log('🔐 Token di sessione presenti, validazione HA...');
+                
+                // Verifica SOLO il token HA (più affidabile e veloce)
+                const response = await fetch('/api/states', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${haToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    console.log('🔐 Token HA non valido');
+                    redirectToIndex('Token Home Assistant scaduto');
+                    return false;
+                }
+                
+                console.log('✅ Accesso autorizzato - token HA valido');
+                return true;
+                
+            } catch (error) {
+                console.error('🔐 Errore durante validazione:', error);
+                redirectToIndex('Errore di validazione');
+                return false;
+            }
+        }
+
+        function redirectToIndex(reason) {
+            console.log(`🔐 Reindirizzamento: ${reason}`);
+            
+            // Pulisci la sessione
+            sessionStorage.removeItem('southtech_session_token');
+            sessionStorage.removeItem('southtech_ha_token');
+            sessionStorage.removeItem('southtech_browser_id');
+            sessionStorage.removeItem('southtech_return_to_menu');
+            sessionStorage.removeItem('southtech_page_source');
+            
+            // Mostra messaggio e reindirizza
+            if (typeof showAlert === 'function') {
+                showAlert(`Accesso non autorizzato: ${reason}. Reindirizzamento in corso...`, 'warning');
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+            } else {
+                alert(`Accesso non autorizzato: ${reason}`);
+                window.location.href = 'index.html';
+            }
+        }
+
         // Configurazione API
         const APPDAEMON_API_URL = `${window.location.protocol}//${window.location.hostname}:5050/api/appdaemon`;
         
@@ -407,6 +473,19 @@
         // Inizializzazione
         window.addEventListener('load', async () => {
             console.log('🚀 SouthTech Automatismo Luci avviato');
+            
+            // ✅ CONTROLLO SICUREZZA OBBLIGATORIO
+            const accessGranted = await validateDirectPageAccess();
+            
+            if (!accessGranted) {
+                console.log('🔐 Accesso negato - interruzione caricamento pagina');
+                return; // Ferma l'esecuzione se l'accesso non è autorizzato
+            }
+            
+            // ✅ Se arriviamo qui, l'accesso è autorizzato
+            console.log('✅ Accesso autorizzato - continuazione inizializzazione...');
+            
+            // Il resto del tuo codice esistente...
             await initializeAuthentication();
         });
         
@@ -438,7 +517,7 @@
             showMainContent();
             await initializeDashboard();
         }
-        
+
         async function validateHAToken(token) {
             try {
                 const response = await fetch('/api/states', {
