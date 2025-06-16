@@ -738,6 +738,97 @@ class SouthTechConfigurator(hass.Hass):
             self.error(f"Errore processing sensor reset: {e}")
             self.create_response_sensor("sensor.southtech_reset_response", 
                                        {"success": False, "error": str(e)})
+
+    def process_sensor_change_password_request(self):
+        """Processa richiesta cambio password via sensore"""
+        try:
+            attrs = self.get_state("sensor.southtech_change_password_request", attribute="all")
+            if not attrs or "attributes" not in attrs:
+                return
+                
+            request_data = attrs["attributes"]
+            if request_data.get("action") != "change_password":
+                return
+                
+            user_id = f"browser_{request_data.get('browser_id', 'unknown')}"
+            old_password = request_data.get("old_password")
+            new_password = request_data.get("new_password")
+            new_password_confirm = request_data.get("new_password_confirm")
+            
+            self.log(f"🔍 SENSOR CHANGE PASSWORD: Processando cambio password da {user_id[:20]}")
+            
+            # Controlla se bloccato
+            is_blocked, block_until = self.is_user_blocked(user_id)
+            if is_blocked:
+                result = {
+                    "success": False, 
+                    "blocked": True,
+                    "remaining_seconds": int(block_until - time.time())
+                }
+            elif not os.path.exists(self.auth_file):
+                self.record_attempt(user_id, "password_change", False)
+                result = {"success": False, "error": "Password non configurata"}
+            elif not old_password or not new_password or not new_password_confirm:
+                self.record_attempt(user_id, "password_change", False)
+                result = {"success": False, "error": "Tutti i campi sono richiesti"}
+            elif new_password != new_password_confirm:
+                self.record_attempt(user_id, "password_change", False)
+                result = {"success": False, "error": "Le nuove password non coincidono"}
+            elif len(new_password) < 6:
+                self.record_attempt(user_id, "password_change", False)
+                result = {"success": False, "error": "La nuova password deve essere di almeno 6 caratteri"}
+            else:
+                # Carica i dati di autenticazione esistenti
+                with open(self.auth_file, 'r') as f:
+                    auth_data = json.load(f)
+                
+                # Verifica password attuale
+                salt = auth_data["salt"]
+                stored_hash = auth_data["password_hash"]
+                old_hash = hashlib.sha256((old_password + salt).encode()).hexdigest()
+                
+                if old_hash != stored_hash:
+                    self.record_attempt(user_id, "password_change", False)
+                    result = {"success": False, "error": "Password attuale non corretta"}
+                    self.log(f"🔒 CHANGE PASSWORD: Password attuale errata per {user_id[:20]}")
+                else:
+                    # Genera nuovo salt e hash per la nuova password
+                    new_salt = secrets.token_hex(32)
+                    new_hash = hashlib.sha256((new_password + new_salt).encode()).hexdigest()
+                    
+                    # Aggiorna i dati di autenticazione
+                    auth_data.update({
+                        "password_hash": new_hash,
+                        "salt": new_salt,
+                        "last_changed": datetime.now().isoformat(),
+                        "changed_by": user_id[:20]
+                    })
+                    
+                    with open(self.auth_file, 'w') as f:
+                        json.dump(auth_data, f, indent=2)
+                    
+                    # Invalida tutti i token esistenti per sicurezza
+                    old_token_count = len(self.active_tokens)
+                    self.active_tokens.clear()
+                    
+                    # Registra successo
+                    self.record_attempt(user_id, "password_change", True)
+                    self.log_security_event(user_id, "PASSWORD_CHANGE", "INFO", 
+                                          f"Password cambiata con successo, {old_token_count} token invalidati")
+                    
+                    result = {"success": True, "message": "Password cambiata con successo"}
+                    self.log("✅ Cambio password completato via sensore")
+            
+            # Crea il sensore di risposta
+            self.create_response_sensor("sensor.southtech_change_password_response", result)
+            
+            # Rimuovi richiesta
+            self.set_state("sensor.southtech_change_password_request", state="unavailable")
+            
+        except Exception as e:
+            self.error(f"Errore processing sensor change password: {e}")
+            self.create_response_sensor("sensor.southtech_change_password_response", 
+                                      {"success": False, "error": str(e)})
     
     def create_response_sensor(self, sensor_name, result):
         """Crea un sensore di risposta per il sistema file-based"""
@@ -1685,6 +1776,11 @@ class SouthTechConfigurator(hass.Hass):
             reset_sensor = self.get_state("sensor.southtech_reset_request")
             if reset_sensor and reset_sensor == "pending":
                 self.process_sensor_reset_request()
+                
+            # Change Password Request
+            change_password_sensor = self.get_state("sensor.southtech_change_password_request")
+            if change_password_sensor and change_password_sensor == "pending":
+                self.process_sensor_change_password_request()
                 
         except Exception as e:
             self.error(f"Errore monitoraggio sensor requests: {e}")
