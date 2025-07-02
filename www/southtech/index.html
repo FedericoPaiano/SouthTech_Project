@@ -395,23 +395,23 @@
     <div id="mainContainer" class="main-container">
         <!-- Menu Impostazioni -->
         <div class="settings-menu">
-            <div class="dropdown">
-                <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                    <i class="fas fa-cog"></i>
-                </button>
-                <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="#" onclick="showChangePassword()">
-                        <i class="fas fa-key"></i> Cambia Password
-                    </a></li>
-                    <li><a class="dropdown-item" href="#" onclick="showTokenRenewal()">
-                        <i class="fas fa-sync"></i> Rinnova Token
-                    </a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="#" onclick="logout()">
-                        <i class="fas fa-sign-out-alt"></i> Logout
-                    </a></li>
-                </ul>
-            </div>
+          <div class="dropdown">
+              <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                  <i class="fas fa-cog"></i>
+              </button>
+              <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="#" onclick="showChangePassword()">
+                      <i class="fas fa-key"></i> Cambia Password
+                  </a></li>
+                  <li><a class="dropdown-item" href="#" onclick="showTokenRenewal()">
+                      <i class="fas fa-sync"></i> Rinnova Token
+                  </a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="#" onclick="performLogout()">
+                      <i class="fas fa-sign-out-alt"></i> Logout
+                  </a></li>
+              </ul>
+          </div>
         </div>
         
         <!-- Header -->
@@ -528,7 +528,7 @@
         <!-- Footer Info -->
         <div class="card mt-4">
             <div class="text-center">
-                <h5><i class="fas fa-info-circle me-2"></i>SouthTech Configurator v3.0.0</h5>
+                <h5><i class="fas fa-info-circle me-2"></i>SouthTech Configurator v3.0.1</h5>
                 <p class="text-muted mb-0">
                     Sistema di configurazione avanzato per Home Assistant<br>
                     Sviluppato con sicurezza e modularità
@@ -541,7 +541,16 @@
     <div id="statusIndicator" class="status-indicator"></div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="southtech_secure.js"></script>         <!-- 1° -->
+    <script src="southtech_core.js"></script>          <!-- 2° -->
+    <script src="southtech_ui.js"></script>            <!-- 3° -->
+    <script src="southtech_timeout.js"></script>       <!-- 4° -->
+    <script src="southtech_session_guard.js"></script> <!-- 5° ULTIMO -->
     <script>
+        // ====================================================================
+        // CONFIGURAZIONE SISTEMA PRINCIPALE
+        // ====================================================================
+        
         // Configurazione API
         const APPDAEMON_API_URL = `${window.location.protocol}//${window.location.hostname}:5050/api/appdaemon`;
         
@@ -550,28 +559,184 @@
         let authToken = null;
         let haToken = null;
         let browserId = null;
+        let systemInitialized = false;
+
+        // ====================================================================
+        // SISTEMA INIZIALIZZAZIONE PRINCIPALE CORRETTO
+        // ====================================================================
         
-        // Genera Browser ID univoco
-        function generateBrowserId() {
-            let id = localStorage.getItem('southtech_browser_id');
-            if (!id) {
-                id = 'browser_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                localStorage.setItem('southtech_browser_id', id);
+        // Inizializzazione al caricamento pagina
+        window.addEventListener('load', async () => {
+            console.log('🚀 [SouthTech] Avvio sistema configuratore v3.0.1 - CORRETTO');
+            
+            try {
+                // ✅ STEP 1: Inizializza browser ID SEMPRE per primo
+                SouthTechCore.initializeBrowserId();
+                browserId = sessionStorage.getItem('southtech_browser_id');
+                console.log('🔍 [SouthTech] Browser ID inizializzato:', browserId);
+                
+                // ✅ STEP 2: Controlla se si sta tornando da altre pagine CON SESSIONE ATTIVA
+                const sessionToken = sessionStorage.getItem('southtech_session_token');
+                const sessionHaToken = sessionStorage.getItem('southtech_ha_token');
+                const pageSource = sessionStorage.getItem('southtech_page_source');
+                
+                if (sessionToken && sessionHaToken && pageSource) {
+                    console.log(`🔄 [SouthTech] Ritorno da ${pageSource} con sessione attiva`);
+                    
+                    // ✅ CORREZIONE: Controllo timeout SOLO per sessioni attive
+                    console.log('🛡️ [SouthTech] Controllo timeout per sessione attiva...');
+                    
+                    if (typeof SouthTechSessionGuard !== 'undefined') {
+                        const sessionValid = await SouthTechSessionGuard.init();
+                        if (!sessionValid) {
+                            console.log('🛡️ [SouthTech] Sessione scaduta - restart process');
+                            return;
+                        }
+                    }
+                    
+                    // Ripristina variabili globali
+                    authToken = sessionToken;
+                    haToken = sessionHaToken;
+                    
+                    // Verifica token HA ancora valido
+                    const tokenValid = await validateHATokenQuick(haToken);
+                    if (tokenValid) {
+                        console.log('✅ [SouthTech] Sessione valida - redirect al dashboard');
+                        sessionStorage.removeItem('southtech_page_source');
+                        showMainDashboard();
+                        systemInitialized = true;
+                        return;
+                    } else {
+                        console.log('❌ [SouthTech] Token HA non più valido - pulizia sessione');
+                        SouthTechSessionGuard.cleanup();
+                    }
+                }
+                
+                // ✅ STEP 3: Processo normale per utenti non autenticati
+                // SENZA INIZIALIZZARE SESSION GUARD
+                console.log('🔐 [SouthTech] Avvio processo autenticazione normale (SENZA Session Guard)');
+                await initializeAuthenticationSystem();
+                systemInitialized = true;
+                
+            } catch (error) {
+                console.error('❌ [SouthTech] Errore critico inizializzazione:', error);
+                
+                // Fallback sicuro
+                showTokenScreen();
+                systemInitialized = true;
             }
-            return id;
+        });
+
+        // ====================================================================
+        // SISTEMA AUTENTICAZIONE CORRETTO
+        // ====================================================================
+        
+        /**
+         * 🔐 Inizializzazione sistema autenticazione (SENZA Session Guard interferenze)
+         */
+        async function initializeAuthenticationSystem() {
+            console.log('🔐 [Auth] Inizializzazione sistema autenticazione (modalità SICURA)');
+            
+            // Controlla token HA salvato
+            haToken = localStorage.getItem('ha_token');
+            
+            if (!haToken) {
+                console.log('🔍 [Auth] Token HA non trovato - richiesta inserimento');
+                showTokenScreen();
+                return;
+            }
+            
+            console.log('🔍 [Auth] Validazione token HA esistente...');
+            showLoadingIndicator();
+            
+            const tokenValid = await validateHATokenQuick(haToken);
+            
+            if (!tokenValid) {
+                console.log('❌ [Auth] Token HA non valido - richiesta rinnovo');
+                localStorage.removeItem('ha_token'); // Rimuovi token invalido
+                showTokenScreen();
+                return;
+            }
+            
+            console.log('✅ [Auth] Token HA valido - controllo stato autenticazione app (SICURO)');
+            await checkApplicationAuthStatus();
         }
         
-        // Inizializzazione
-        window.addEventListener('load', async () => {
-            console.log('🚀 SouthTech Configurator Menu Principale avviato');
+        /**
+         * 🔍 Validazione rapida token HA
+         */
+        async function validateHATokenQuick(token) {
+            if (!token || token.length < 50) {
+                return false;
+            }
             
-            browserId = generateBrowserId();
-            console.log('🔍 Browser ID:', browserId);
-            
-            await initializeAuthentication();
-        });
+            try {
+                const response = await fetch('/api/states', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                return response.ok;
+                
+            } catch (error) {
+                console.error('❌ [Auth] Errore validazione token HA:', error);
+                return false;
+            }
+        }
         
-        // Funzione per nascondere tutte le schermate
+        /**
+         * 🔍 Controllo stato autenticazione applicazione (SICURO)
+         */
+        async function checkApplicationAuthStatus() {
+            try {
+                // Prima controlla file locale
+                const response = await fetch('/local/southtech/auth_status.json?t=' + Date.now());
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('🔍 [Auth] Stato da file:', data);
+                    
+                    if (data.has_password === true) {
+                        showLogin();
+                    } else {
+                        showSetup();
+                    }
+                    return;
+                }
+                
+                // Fallback su sensore HA
+                console.log('🔍 [Auth] File non trovato, controllo sensore HA');
+                const sensorResponse = await fetch('/api/states/sensor.southtech_auth_status', {
+                    headers: { 'Authorization': `Bearer ${haToken}` }
+                });
+                
+                if (sensorResponse.ok) {
+                    const sensorData = await sensorResponse.json();
+                    console.log('🔍 [Auth] Stato da sensore:', sensorData);
+                    
+                    if (sensorData.attributes && sensorData.attributes.has_password === true) {
+                        showLogin();
+                    } else {
+                        showSetup();
+                    }
+                } else {
+                    console.log('🔍 [Auth] Sensore non trovato - primo setup');
+                    showSetup();
+                }
+                
+            } catch (error) {
+                console.error('❌ [Auth] Errore controllo stato:', error);
+                // In caso di errore, vai al setup per sicurezza
+                showSetup();
+            }
+        }
+
+        // ====================================================================
+        // GESTIONE SCHERMATE UI (mantenute uguali)
+        // ====================================================================
+        
         function hideAllScreens() {
             const screens = [
                 'tokenScreen', 
@@ -590,82 +755,27 @@
             });
         }
         
-        // Mostra schermata token
         function showTokenScreen() {
             hideAllScreens();
             document.getElementById('tokenScreen').style.display = 'block';
         }
         
-        // Mostra schermata setup
         function showSetup() {
             hideAllScreens();
             document.getElementById('setupScreen').style.display = 'block';
             setupPasswordValidation();
         }
         
-        // Mostra schermata login
         function showLogin() {
             hideAllScreens();
             document.getElementById('loginScreen').style.display = 'block';
         }
         
-        // Inizializzazione autenticazione
-        async function initializeAuthentication() {
-            console.log('🔍 Inizializzazione autenticazione...');
-            
-            // Controlla se si sta tornando da un'altra pagina
-            const returnToMenu = sessionStorage.getItem('southtech_return_to_menu');
-            if (returnToMenu === 'true') {
-                console.log('🔍 Ritorno da altra pagina, accesso diretto al menu...');
-                sessionStorage.removeItem('southtech_return_to_menu');
-                
-                // Recupera token dalla sessione
-                authToken = sessionStorage.getItem('southtech_session_token');
-                haToken = sessionStorage.getItem('southtech_ha_token');
-                browserId = sessionStorage.getItem('southtech_browser_id');
-                
-                // Se abbiamo i token di sessione, accesso DIRETTO al menu
-                if (authToken && haToken && browserId) {
-                    console.log('🔍 Token di sessione presenti, accesso DIRETTO al menu');
-                    showMainDashboard();
-                    return; // ✅ NESSUNA VALIDAZIONE - ACCESSO IMMEDIATO
-                } else {
-                    console.log('🔍 Token di sessione mancanti, procedo con validazione normale');
-                }
-            }
-            
-            // Resto del codice INVARIATO per accessi diretti...
-            haToken = localStorage.getItem('ha_token');
-            
-            if (!haToken) {
-                console.log('🔍 Token HA non trovato, richiedo inserimento');
-                showTokenScreen();
-                return;
-            }
-            
-            console.log('🔍 Validazione token esistente...');
-            showLoadingIndicator();
-            
-            const tokenValid = await validateHAToken(haToken);
-            
-            if (!tokenValid) {
-                console.log('🔍 Token HA non valido, richiedo rinnovo');
-                showTokenScreen();
-                return;
-            }
-            
-            console.log('🔍 Token HA valido, controllo auth app...');
-            await checkAuthStatus();
-        }
-
-        // NUOVA FUNZIONE: Mostra indicatore di caricamento
         function showLoadingIndicator() {
             hideAllScreens();
             
-            // Crea o mostra schermata di caricamento
             let loadingScreen = document.getElementById('loadingScreen');
             if (!loadingScreen) {
-                // Crea la schermata di caricamento se non esiste
                 const authCard = document.querySelector('.auth-card');
                 loadingScreen = document.createElement('div');
                 loadingScreen.id = 'loadingScreen';
@@ -687,102 +797,57 @@
             
             loadingScreen.style.display = 'block';
         }
+
+        // ====================================================================
+        // OPERAZIONI TOKEN HA (mantenute uguali)
+        // ====================================================================
         
-        // Valida token HA
-        async function validateHAToken(token) {
-            try {
-                console.log('🔍 Validazione token HA in corso...');
-                const response = await fetch('/api/states', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                if (response.ok) {
-                    console.log('🔍 Token HA valido');
-                    return true;
-                } else {
-                    console.log('🔍 Token HA non valido, status:', response.status);
-                    return false;
-                }
-            } catch (error) {
-                console.error('🔍 Errore validazione token:', error);
-                return false;
-            }
-        }
-        
-        // Controlla stato autenticazione
-        async function checkAuthStatus() {
-            try {
-                const response = await fetch('/local/southtech/auth_status.json?t=' + Date.now());
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.has_password) {
-                        showLogin();
-                    } else {
-                        showSetup();
-                    }
-                } else {
-                    showSetup();
-                }
-            } catch (error) {
-                console.log('🔍 File status non trovato, controllo sensore HA');
-                try {
-                    const response = await fetch('/api/states/sensor.southtech_auth_status', {
-                        headers: { 'Authorization': `Bearer ${haToken}` }
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.attributes && data.attributes.has_password) {
-                            showLogin();
-                        } else {
-                            showSetup();
-                        }
-                    } else {
-                        showSetup();
-                    }
-                } catch (error) {
-                    showSetup();
-                }
-            }
-        }
-        
-        // Valida e salva token
         async function validateAndSaveToken() {
             const token = document.getElementById('haToken').value.trim();
             
             if (!token) {
-                showAlert('Inserisci il token di Home Assistant', 'error');
+                SouthTechUI.showAlert('Inserisci il token di Home Assistant', 'error');
                 return;
             }
             
-            showAlert('Validazione token in corso...', 'info');
+            if (token.length < 50) {
+                SouthTechUI.showAlert('Token troppo corto. Verifica di averlo copiato completamente.', 'error');
+                return;
+            }
             
-            const isValid = await validateHAToken(token);
+            SouthTechUI.showAlert('Validazione token in corso...', 'info');
+            
+            const isValid = await validateHATokenQuick(token);
             
             if (isValid) {
                 localStorage.setItem('ha_token', token);
                 haToken = token;
-                showAlert('Token validato con successo!', 'success');
+                SouthTechUI.showAlert('Token validato con successo!', 'success');
+                
+                setTimeout(() => {
+                    checkApplicationAuthStatus();
+                }, 1000);
             } else {
-                showAlert('Token non valido. Verifica di averlo copiato correttamente.', 'error');
+                SouthTechUI.showAlert('Token non valido. Verifica di averlo copiato correttamente.', 'error');
+                document.getElementById('haToken').focus();
             }
         }
+
+        // ====================================================================
+        // SETUP PASSWORD CON SICUREZZA MIGLIORATA
+        // ====================================================================
         
-        // Setup validazione password
         function setupPasswordValidation() {
             const passwordInput = document.getElementById('setupPassword');
             const confirmInput = document.getElementById('setupPasswordConfirm');
             
-            passwordInput.addEventListener('input', updatePasswordStrength);
-            confirmInput.addEventListener('input', validatePasswordMatch);
-            passwordInput.addEventListener('input', validatePasswordMatch);
+            if (passwordInput && confirmInput) {
+                passwordInput.addEventListener('input', updatePasswordStrength);
+                confirmInput.addEventListener('input', validatePasswordMatch);
+                passwordInput.addEventListener('input', validatePasswordMatch);
+            }
         }
         
-        // Aggiorna indicatore forza password
         function updatePasswordStrength() {
             const password = document.getElementById('setupPassword').value;
             const strengthBar = document.getElementById('passwordStrength');
@@ -799,429 +864,320 @@
             else strengthBar.classList.add('strength-strong');
         }
         
-        // Valida corrispondenza password
         function validatePasswordMatch() {
             const password = document.getElementById('setupPassword').value;
             const confirm = document.getElementById('setupPasswordConfirm').value;
             const passwordField = document.getElementById('setupPassword');
             const confirmField = document.getElementById('setupPasswordConfirm');
             
+            // Reset classi precedenti
             passwordField.classList.remove('password-match', 'password-mismatch');
             confirmField.classList.remove('password-match', 'password-mismatch');
             
+            // ✅ CORREZIONE: Validazione più precisa
             if (password && confirm) {
-                if (password === confirm) {
+                if (password === confirm && password.length >= 6) {
                     passwordField.classList.add('password-match');
                     confirmField.classList.add('password-match');
-                } else {
+                    console.log('✅ [Validation] Password coincidono e sono valide');
+                } else if (password !== confirm) {
                     passwordField.classList.add('password-mismatch');
                     confirmField.classList.add('password-mismatch');
+                    console.log('❌ [Validation] Password NON coincidono');
+                } else if (password.length < 6) {
+                    passwordField.classList.add('password-mismatch');
+                    console.log('⚠️ [Validation] Password troppo corta');
                 }
             }
         }
         
-        // Setup password
         async function setupPassword() {
-            console.log('🔍 SETUP: Setup password iniziato');
-            
             const password = document.getElementById('setupPassword').value;
-            const confirm = document.getElementById('setupPasswordConfirm').value;
+            const passwordConfirm = document.getElementById('setupPasswordConfirm').value;
             
-            if (!password || password.length < 6) {
-                showAlert('La password deve essere di almeno 6 caratteri', 'error');
+            if (!password || !passwordConfirm) {
+                SouthTechUI.showAlert('Inserisci entrambe le password', 'error');
                 return;
             }
             
-            if (!confirm) {
-                showAlert('Inserisci la conferma password', 'error');
+            if (password !== passwordConfirm) {
+                SouthTechUI.showAlert('Le password non coincidono', 'error');
                 return;
             }
             
-            if (password !== confirm) {
-                showAlert('Le password non coincidono', 'error');
+            if (password.length < 6) {
+                SouthTechUI.showAlert('Password troppo corta (minimo 6 caratteri)', 'error');
                 return;
             }
             
             try {
-                showAlert('Configurazione password in corso...', 'info');
+                SouthTechUI.showAlert('Configurazione password in corso...', 'info');
                 
-                await fetch('/api/states/sensor.southtech_setup_request', {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${haToken}`
-                    },
-                    body: JSON.stringify({
-                        state: 'pending',
-                        attributes: {
-                            action: 'setup',
-                            password: password,
-                            password_confirm: confirm,
-                            browser_id: browserId,
-                            timestamp: new Date().toISOString()
-                        }
-                    })
-                });
+                const timestamp = new Date().toISOString();
+                let passwordHash = null;
+                let passwordConfirmHash = null;
                 
-                const result = await pollForResponse('sensor.southtech_setup_response');
-                
-                if (result.success && result.data.success) {
-                    authToken = result.data.token;
-                    showAlert('Password configurata con successo!', 'success');
-                    setTimeout(() => showMainDashboard(), 1500);
+                // ✅ CORREZIONE: Hash ENTRAMBE le password se disponibile sistema sicuro
+                if (window.southTechSecure && typeof window.southTechSecure.hashPassword === 'function') {
+                    passwordHash = await window.southTechSecure.hashPassword(password, browserId, timestamp);
+                    passwordConfirmHash = await window.southTechSecure.hashPassword(passwordConfirm, browserId, timestamp);
+                    console.log('🔐 [Setup] Utilizzo hash sicuro per entrambe le password');
                 } else {
-                    throw new Error(result.data.error || 'Errore configurazione password');
+                    console.log('⚠️ [Setup] Sistema sicuro non disponibile - uso password dirette');
                 }
-            } catch (error) {
-                showAlert(`Errore: ${error.message}`, 'error');
-                console.error('Errore setup password:', error);
-            }
-        }
-        
-        // Login con gestione migliorata degli errori
-        async function login() {
-            const password = document.getElementById('loginPassword').value;
-            
-            if (!password) {
-                showAlert('Inserisci la password', 'error');
-                return;
-            }
-            
-            try {
-                showAlert('Accesso in corso...', 'info');
                 
-                // Invia richiesta di login
-                const requestResponse = await fetch('/api/states/sensor.southtech_login_request', {
+                // ✅ CORREZIONE: Attendi un po' prima di inviare la richiesta per evitare conflitti
+                console.log('⏳ [Setup] Attesa sicurezza prima di inviare richiesta...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // ✅ CORREZIONE: Invia ENTRAMBE le password (o hash)
+                const requestData = {
+                    state: 'pending',
+                    attributes: {
+                        action: 'setup',
+                        browser_id: browserId,
+                        timestamp: timestamp
+                    }
+                };
+                
+                if (passwordHash && passwordConfirmHash) {
+                    // Metodo sicuro con hash
+                    requestData.attributes.password_hash = passwordHash;
+                    requestData.attributes.password_confirm_hash = passwordConfirmHash;
+                    requestData.attributes.security_method = 'client_hash_sha256';
+                    console.log('🔐 [Setup] Invio con hash sicuri');
+                } else {
+                    // Metodo legacy con password in chiaro
+                    requestData.attributes.password = password;
+                    requestData.attributes.password_confirm = passwordConfirm;
+                    requestData.attributes.security_method = 'legacy';
+                    console.log('⚠️ [Setup] Invio con password legacy');
+                }
+                
+                // Invia richiesta di setup
+                const requestResponse = await fetch('/api/states/sensor.southtech_setup_request', {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${haToken}`
                     },
-                    body: JSON.stringify({
-                        state: 'pending',
-                        attributes: {
-                            action: 'login',
-                            password: password,
-                            browser_id: browserId,
-                            timestamp: new Date().toISOString()
-                        }
-                    })
+                    body: JSON.stringify(requestData)
                 });
                 
                 if (!requestResponse.ok) {
-                    throw new Error('Errore comunicazione con Home Assistant');
+                    throw new Error(`Errore richiesta setup: HTTP ${requestResponse.status}`);
                 }
                 
-                // Attendi risposta con timeout più gestibile
-                const result = await pollForResponse('sensor.southtech_login_response', 10);
+                console.log('✅ [Setup] Richiesta CORRETTA inviata con entrambe le password, attendo risposta...');
                 
-                if (result.success && result.data.success) {
+                // Attendi risposta dal sensore
+                const result = await SouthTechCore.pollForSensorResponse(
+                    'sensor.southtech_setup_response',
+                    15,
+                    haToken
+                );
+                
+                if (result.success && result.data.success === true) {
                     authToken = result.data.token;
                     
-                    // Salva token di sessione
+                    // Salva sessione
                     sessionStorage.setItem('southtech_session_token', authToken);
                     sessionStorage.setItem('southtech_ha_token', haToken);
                     sessionStorage.setItem('southtech_browser_id', browserId);
                     
-                    showAlert('Accesso effettuato con successo!', 'success');
-                    setTimeout(() => showMainDashboard(), 1000);
+                    SouthTechUI.showAlert('✅ Password configurata con successo!', 'success');
+                    
+                    setTimeout(() => {
+                        showMainDashboard();
+                    }, 1500);
                 } else {
-                    // Password errata
-                    showAlert('Password non corretta', 'error');
-                    document.getElementById('loginPassword').value = '';
-                    document.getElementById('loginPassword').focus();
+                    // ✅ GESTIONE BLOCCHI: Mostra messaggio specifico se bloccato
+                    if (result.data.blocked) {
+                        const minutes = Math.ceil(result.data.remaining_seconds / 60);
+                        SouthTechUI.showAlert(`⚠️ Sistema temporaneamente bloccato per sicurezza.\nRiprova tra ${minutes} minuti.\n\nSe hai appena fatto un reset, attendi che il sistema si stabilizzi.`, 'warning');
+                    } else {
+                        const errorMsg = result.data.error || 'Errore configurazione password';
+                        console.error('❌ [Setup] Errore dal backend:', errorMsg);
+                        SouthTechUI.showAlert(`❌ ${errorMsg}`, 'error');
+                    }
                 }
+                
             } catch (error) {
-                console.error('Errore login:', error);
+                console.error('❌ [Setup] Errore:', error);
                 
-                // Gestione specifica degli errori
-                if (error.message.includes('Timeout') || error.message.includes('nessuna risposta')) {
-                    showAlert('Sistema di autenticazione non disponibile. Controlla che AppDaemon sia in esecuzione.', 'error');
-                } else if (error.message.includes('comunicazione')) {
-                    showAlert('Errore di comunicazione con Home Assistant', 'error');
+                // ✅ MESSAGGI MIGLIORATI per timeout/blocchi
+                if (error.message.includes('Timeout')) {
+                    SouthTechUI.showAlert('⏳ Timeout del sistema. Il backend potrebbe essere occupato.\n\nSe hai appena fatto un reset, attendi qualche minuto e riprova.', 'warning');
+                } else if (error.message.includes('blocked')) {
+                    SouthTechUI.showAlert('🔒 Sistema bloccato per sicurezza. Attendi qualche minuto e riprova.', 'warning');
                 } else {
-                    showAlert('Errore di accesso. Riprova più tardi.', 'error');
+                    SouthTechUI.showAlert('❌ Errore configurazione. Riprova più tardi.', 'error');
+                }
+            } finally {
+                // Pulisci campi password
+                document.getElementById('setupPassword').value = '';
+                document.getElementById('setupPasswordConfirm').value = '';
+            }
+        }
+
+        // ====================================================================
+        // LOGIN CON SICUREZZA MIGLIORATA
+        // ====================================================================
+        
+        async function login() {
+            const password = document.getElementById('loginPassword').value;
+            
+            if (!password) {
+                SouthTechUI.showAlert('Inserisci la password', 'error');
+                return;
+            }
+            
+            try {
+                SouthTechUI.showAlert('Accesso in corso...', 'info');
+                
+                const timestamp = new Date().toISOString();
+                let passwordHash = null;
+                
+                // ✅ CORREZIONE: Usa sistema sicuro se disponibile
+                if (window.southTechSecure && typeof window.southTechSecure.hashPassword === 'function') {
+                    passwordHash = await window.southTechSecure.hashPassword(password, browserId, timestamp);
+                    console.log('🔐 [Login] Utilizzo hash sicuro');
+                } else {
+                    console.log('⚠️ [Login] Sistema sicuro non disponibile - uso password diretta');
                 }
                 
-                // Pulisci il campo password
+                // ✅ CORREZIONE: Struttura dati pulita per login
+                const requestData = {
+                    state: 'pending',
+                    attributes: {
+                        action: 'login',
+                        browser_id: browserId,
+                        timestamp: timestamp
+                    }
+                };
+                
+                if (passwordHash) {
+                    // Metodo sicuro con hash
+                    requestData.attributes.password_hash = passwordHash;
+                    requestData.attributes.security_method = 'client_hash_sha256';
+                    console.log('🔐 [Login] Invio con hash sicuro');
+                } else {
+                    // Metodo legacy con password in chiaro
+                    requestData.attributes.password = password;
+                    requestData.attributes.security_method = 'legacy';
+                    console.log('⚠️ [Login] Invio con password legacy');
+                }
+                
+                // Invia richiesta login
+                const requestResponse = await fetch('/api/states/sensor.southtech_login_request', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${haToken}`
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                if (!requestResponse.ok) {
+                    throw new Error(`Errore richiesta login: HTTP ${requestResponse.status}`);
+                }
+                
+                console.log('✅ [Login] Richiesta inviata, attendo risposta...');
+                
+                // Attendi risposta
+                const result = await SouthTechCore.pollForSensorResponse(
+                    'sensor.southtech_login_response',
+                    10,
+                    haToken
+                );
+                
+                if (result.success && result.data.success === true) {
+                    authToken = result.data.token;
+                    
+                    // Salva sessione
+                    sessionStorage.setItem('southtech_session_token', authToken);
+                    sessionStorage.setItem('southtech_ha_token', haToken);
+                    sessionStorage.setItem('southtech_browser_id', browserId);
+                    
+                    SouthTechUI.showAlert('✅ Accesso riuscito!', 'success');
+                    
+                    setTimeout(() => {
+                        showMainDashboard();
+                    }, 1000);
+                } else {
+                    if (result.data.blocked) {
+                        const minutes = Math.ceil(result.data.remaining_seconds / 60);
+                        SouthTechUI.showAlert(`🔒 Troppi tentativi. Riprova tra ${minutes} minuti.`, 'error');
+                    } else {
+                        const errorMsg = result.data.error || 'Password non corretta';
+                        SouthTechUI.showAlert(`❌ ${errorMsg}`, 'error');
+                    }
+                }
+                
+            } catch (error) {
+                console.error('❌ [Login] Errore:', error);
+                SouthTechUI.showAlert('❌ Errore di accesso. Riprova più tardi.', 'error');
+            } finally {
                 document.getElementById('loginPassword').value = '';
             }
         }
+
+        // ====================================================================
+        // DASHBOARD E NAVIGAZIONE (mantenute uguali)
+        // ====================================================================
         
-        // Polling migliorato per le risposte
-        async function pollForResponse(sensorName, maxAttempts = 10) {
-            console.log(`🔍 POLLING: Inizio polling per ${sensorName}`);
+        function showMainDashboard() {
+            isAuthenticated = true;
+            document.getElementById('authContainer').style.display = 'none';
+            document.getElementById('mainContainer').style.display = 'block';
             
-            for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                console.log(`🔍 POLLING: Tentativo ${attempt + 1}/${maxAttempts} per ${sensorName}`);
-                
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                
-                try {
-                    const response = await fetch(`/api/states/${sensorName}`, {
-                        headers: { 'Authorization': `Bearer ${haToken}` }
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        console.log(`🔍 POLLING: Risposta ricevuta per ${sensorName}:`, data.state);
-                        console.log(`🔍 POLLING: Attributi completi per ${sensorName}:`, data.attributes);
-                        
-                        if (data.state === 'completed') {
-                            const result = data.attributes;
-                            
-                            // Pulisci il sensore
-                            try {
-                                await fetch(`/api/states/${sensorName}`, { 
-                                    method: 'DELETE',
-                                    headers: { 'Authorization': `Bearer ${haToken}` }
-                                });
-                                console.log(`🔍 POLLING: Sensore ${sensorName} pulito`);
-                            } catch (e) {
-                                console.log('🔍 POLLING: Errore pulizia sensore:', e.message);
-                            }
-                            
-                            return { success: true, data: result };
-                        } else if (data.state === 'error') {
-                            // Gestisci errori espliciti dal backend
-                            const errorMsg = data.attributes?.error || 'Errore sconosciuto dal server';
-                            console.log(`🔍 POLLING: Errore esplicito ricevuto: ${errorMsg}`);
-                            throw new Error(errorMsg);
-                        } else if (data.state === 'pending') {
-                            console.log(`🔍 POLLING: ${sensorName} ancora in elaborazione...`);
-                            // Continua il polling
-                        } else {
-                            console.log(`🔍 POLLING: Stato inaspettato per ${sensorName}: ${data.state}`);
-                        }
-                    } else if (response.status === 404) {
-                        console.log(`🔍 POLLING: Sensore ${sensorName} non ancora disponibile (404)`);
-                        // Continua il polling per 404 - normale durante l'attesa
-                    } else {
-                        console.log(`🔍 POLLING: Errore HTTP ${response.status} per ${sensorName}`);
-                        throw new Error(`Errore HTTP ${response.status}`);
-                    }
-                } catch (error) {
-                    console.log(`🔍 POLLING: Errore tentativo ${attempt + 1}:`, error.message);
-                    
-                    // Se non è un 404 o timeout, potrebbe essere un errore serio
-                    if (!error.message.includes('404') && attempt > 3) {
-                        console.log(`🔍 POLLING: Errore persistente dopo ${attempt + 1} tentativi`);
-                    }
-                }
+            // ✅ CORREZIONE: Inizializza timeout SOLO qui quando siamo SICURI di essere autenticati
+            if (typeof SouthTechTimeout !== 'undefined' && typeof SouthTechTimeout.initialize === 'function') {
+                console.log('🔒 [Dashboard] Inizializzazione sistema timeout SICURA');
+                SouthTechTimeout.initialize();
             }
             
-            console.log(`🔍 POLLING: Timeout raggiunto per ${sensorName} dopo ${maxAttempts} tentativi`);
-            throw new Error('Timeout - nessuna risposta dal server. Verifica che AppDaemon sia attivo.');
+            SouthTechUI.showAlert('Benvenuto nel Menu Principale SouthTech!', 'success');
         }
         
-        // Reset sistema
-        function showResetConfirmation() {
-            hideAllScreens();
-            document.getElementById('resetConfirmationScreen').style.display = 'block';
+        function openLightPresence() {
+            // Salva token per la prossima pagina
+            sessionStorage.setItem('southtech_session_token', authToken);
+            sessionStorage.setItem('southtech_ha_token', haToken);
+            sessionStorage.setItem('southtech_browser_id', browserId);
+            sessionStorage.setItem('southtech_page_source', 'index');
+            
+            window.location.href = 'light_presence.html';
         }
         
-        function cancelReset() {
-            initializeAuthentication();
+        function openMonitoring() {
+            sessionStorage.setItem('southtech_session_token', authToken);
+            sessionStorage.setItem('southtech_ha_token', haToken);
+            sessionStorage.setItem('southtech_browser_id', browserId);
+            sessionStorage.setItem('southtech_page_source', 'index');
+            
+            window.location.href = 'monitoring.html';
         }
         
-        async function confirmResetSystem() {
-            try {
-                showAlert('Reset sistema in corso...', 'info');
-                console.log('🔧 RESET: Inizio procedura di reset completo');
-                
-                // Invia richiesta di reset
-                const requestResponse = await fetch('/api/states/sensor.southtech_reset_request', {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${haToken}`
-                    },
-                    body: JSON.stringify({
-                        state: 'pending',
-                        attributes: {
-                            action: 'reset_system',
-                            browser_id: browserId,
-                            timestamp: new Date().toISOString()
-                        }
-                    })
-                });
-                
-                console.log('🔧 RESET: Richiesta inviata, status:', requestResponse.status);
-                
-                if (!requestResponse.ok) {
-                    throw new Error(`Errore invio richiesta reset: HTTP ${requestResponse.status}`);
-                }
-                
-                // Attendi risposta
-                const result = await pollForResponse('sensor.southtech_reset_response', 8);
-                console.log('🔧 RESET: Risultato ricevuto:', result);
-                
-                if (result.success) {
-                    // Controlla se il reset è andato a buon fine
-                    if (result.data.success === true) {
-                        console.log('🔧 RESET: Reset completato con successo');
-                        
-                        // Pulisci tutto
-                        localStorage.removeItem('ha_token');
-                        localStorage.removeItem('southtech_browser_id');
-                        sessionStorage.clear();
-                        haToken = null;
-                        authToken = null;
-                        browserId = generateBrowserId(); // Genera nuovo ID
-                        
-                        showAlert('Sistema resettato con successo! Inserisci un nuovo token.', 'success');
-                        setTimeout(() => {
-                            showTokenScreen();
-                            document.getElementById('haToken').value = '';
-                        }, 2000);
-                    } else {
-                        // Reset fallito dal backend
-                        const errorMsg = result.data.error || result.data.message || 'Reset fallito dal server';
-                        console.log('🔧 RESET: Reset fallito:', errorMsg);
-                        throw new Error(errorMsg);
-                    }
-                } else {
-                    throw new Error('Nessuna risposta valida dal server');
-                }
-                
-            } catch (error) {
-                console.error('🔧 RESET: Errore completo:', error);
-                
-                // In caso di errore, offri reset locale
-                showAlert(`Errore reset remoto: ${error.message}`, 'error');
-                
-                setTimeout(() => {
-                    const forceLocal = confirm(
-                        'Reset remoto fallito. Vuoi eseguire un reset locale?\n\n' +
-                        'Questo cancellerà solo i dati salvati localmente nel browser.'
-                    );
-                    
-                    if (forceLocal) {
-                        performLocalReset();
-                    } else {
-                        cancelReset();
-                    }
-                }, 3000);
-            }
+        function openBackup() {
+            SouthTechUI.showAlert('Funzione Backup in sviluppo', 'info');
         }
         
-        // Reset locale di emergenza
-        function performLocalReset() {
-            console.log('🔧 RESET: Eseguo reset locale di emergenza');
-            
-            try {
-                // Pulisci tutto dal browser
-                localStorage.clear();
-                sessionStorage.clear();
-                
-                // Reset variabili
-                haToken = null;
-                authToken = null;
-                browserId = generateBrowserId();
-                
-                showAlert('Reset locale completato. Inserisci un nuovo token HA.', 'warning');
-                
-                setTimeout(() => {
-                    showTokenScreen();
-                    document.getElementById('haToken').value = '';
-                }, 1500);
-                
-            } catch (error) {
-                console.error('🔧 RESET: Errore anche nel reset locale:', error);
-                showAlert('Errore nel reset locale. Ricarica la pagina manualmente.', 'error');
-            }
+        function openAdvancedAutomations() {
+            SouthTechUI.showAlert('Funzione Automazioni Avanzate prossimamente disponibile', 'info');
         }
         
-        // Cambio password
-        async function changePassword() {
-            const oldPassword = document.getElementById('oldPassword').value;
-            const newPassword = document.getElementById('newPassword').value;
-            const confirmPassword = document.getElementById('newPasswordConfirm').value;
-            
-            if (!oldPassword || !newPassword || !confirmPassword) {
-                showAlert('Compila tutti i campi', 'error');
-                return;
-            }
-            
-            if (newPassword !== confirmPassword) {
-                showAlert('Le nuove password non coincidono', 'error');
-                return;
-            }
-            
-            if (newPassword.length < 6) {
-                showAlert('La nuova password deve essere di almeno 6 caratteri', 'error');
-                return;
-            }
-            
-            try {
-                showAlert('Cambio password in corso...', 'info');
-                
-                // Invia richiesta di cambio password
-                const requestResponse = await fetch('/api/states/sensor.southtech_change_password_request', {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${haToken}`
-                    },
-                    body: JSON.stringify({
-                        state: 'pending',
-                        attributes: {
-                            action: 'change_password',
-                            old_password: oldPassword,
-                            new_password: newPassword,
-                            new_password_confirm: confirmPassword,
-                            browser_id: browserId,
-                            timestamp: new Date().toISOString()
-                        }
-                    })
-                });
-                
-                if (!requestResponse.ok) {
-                    throw new Error('Errore comunicazione con Home Assistant');
-                }
-                
-                // Attendi risposta
-                const result = await pollForResponse('sensor.southtech_change_password_response', 10);
-                
-                if (result.success && result.data.success) {
-                    showAlert('Password cambiata con successo!', 'success');
-                    
-                    // Pulisci i campi
-                    document.getElementById('oldPassword').value = '';
-                    document.getElementById('newPassword').value = '';
-                    document.getElementById('newPasswordConfirm').value = '';
-                    
-                    // Nota: I token vengono invalidati dal backend, quindi manteniamo la sessione corrente
-                    setTimeout(() => showMainDashboard(), 1500);
-                } else {
-                    // Gestisci errori specifici
-                    const errorMsg = result.data?.error || 'Errore sconosciuto';
-                    
-                    if (errorMsg.includes('password attuale') || errorMsg.includes('Password attuale non corretta')) {
-                        showAlert('Password attuale non corretta', 'error');
-                        document.getElementById('oldPassword').value = '';
-                        document.getElementById('oldPassword').focus();
-                    } else if (errorMsg.includes('password troppo corta') || errorMsg.includes('almeno 6 caratteri')) {
-                        showAlert('La nuova password deve essere di almeno 6 caratteri', 'error');
-                    } else if (errorMsg.includes('non coincidono')) {
-                        showAlert('Le nuove password non coincidono', 'error');
-                    } else {
-                        showAlert(`Errore cambio password: ${errorMsg}`, 'error');
-                    }
-                }
-            } catch (error) {
-                console.error('Errore cambio password:', error);
-                
-                // Gestione specifica degli errori
-                if (error.message.includes('Timeout') || error.message.includes('nessuna risposta')) {
-                    showAlert('Sistema di autenticazione non disponibile. Controlla che AppDaemon sia in esecuzione.', 'error');
-                } else if (error.message.includes('comunicazione')) {
-                    showAlert('Errore di comunicazione con Home Assistant', 'error');
-                } else {
-                    showAlert('Errore durante il cambio password. Riprova più tardi.', 'error');
-                }
-            }
+        function openIoTDevices() {
+            SouthTechUI.showAlert('Funzione Dispositivi IoT prossimamente disponibile', 'info');
         }
+        
+        function openSecurity() {
+            SouthTechUI.showAlert('Funzione Sicurezza Sistema in sviluppo', 'info');
+        }
+
+        // ====================================================================
+        // GESTIONE IMPOSTAZIONI E LOGOUT (mantenute uguali)
+        // ====================================================================
         
         function showChangePassword() {
             document.getElementById('mainContainer').style.display = 'none';
@@ -1246,58 +1202,45 @@
             const newToken = document.getElementById('renewalToken').value.trim();
             
             if (!newToken) {
-                showAlert('Inserisci il nuovo token di Home Assistant', 'error');
+                SouthTechUI.showAlert('Inserisci il nuovo token di Home Assistant', 'error');
                 return;
             }
             
-            // Salva il token precedente per eventuale ripristino
-            const previousToken = haToken;
-            
-            showAlert('Validazione nuovo token...', 'info');
+            SouthTechUI.showAlert('Validazione nuovo token...', 'info');
             
             try {
-                // Testa la connessione con il nuovo token
-                const response = await fetch('/api/states', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${newToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
+                const isValid = await validateHATokenQuick(newToken);
                 
-                if (response.ok) {
-                    // Token valido - salva e aggiorna
+                if (isValid) {
                     localStorage.setItem('ha_token', newToken);
                     haToken = newToken;
                     sessionStorage.setItem('southtech_ha_token', haToken);
                     
-                    showAlert('Token aggiornato con successo!', 'success');
+                    SouthTechUI.showAlert('Token aggiornato con successo!', 'success');
+                    
                     setTimeout(() => {
                         document.getElementById('authContainer').style.display = 'none';
                         document.getElementById('mainContainer').style.display = 'block';
                     }, 1500);
                 } else {
-                    // Token non valido
-                    showAlert('Nuovo token non valido', 'error');
+                    SouthTechUI.showAlert('Nuovo token non valido', 'error');
                     document.getElementById('renewalToken').value = '';
+                    document.getElementById('renewalToken').focus();
                 }
             } catch (error) {
-                console.error('Errore validazione nuovo token:', error);
-                
-                // Distingui tra errori di connessione e token invalidi
-                if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch')) {
-                    showAlert('Impossibile raggiungere Home Assistant. Verifica la connessione.', 'error');
-                } else {
-                    showAlert('Nuovo token non valido', 'error');
-                }
-                
-                // Mantieni il token precedente
+                console.error('❌ [Token] Errore validazione:', error);
+                SouthTechUI.showAlert('Impossibile validare il token. Verifica la connessione.', 'error');
                 document.getElementById('renewalToken').value = '';
             }
         }
         
-        function logout() {
-            // Pulisci tutti i token dalla sessione
+        function performLogout() {
+            // Cleanup timeout system
+            if (typeof SouthTechTimeout !== 'undefined' && typeof SouthTechTimeout.cleanup === 'function') {
+                SouthTechTimeout.cleanup();
+            }
+            
+            // Pulisci sessione
             authToken = null;
             isAuthenticated = false;
             sessionStorage.removeItem('southtech_session_token');
@@ -1310,103 +1253,188 @@
             document.getElementById('authContainer').style.display = 'flex';
             showLogin();
         }
+
+        // ====================================================================
+        // GESTIONE RESET SISTEMA (corretta con attesa maggiore)
+        // ====================================================================
         
-        function showMainDashboard() {
-            isAuthenticated = true;
-            document.getElementById('authContainer').style.display = 'none';
-            document.getElementById('mainContainer').style.display = 'block';
+        function showResetConfirmation() {
+            hideAllScreens();
+            document.getElementById('resetConfirmationScreen').style.display = 'block';
+        }
+        
+        function cancelReset() {
+            const hasToken = localStorage.getItem('ha_token');
+            if (!hasToken) {
+                showTokenScreen();
+            } else {
+                checkApplicationAuthStatus();
+            }
+        }
+        
+        async function confirmResetSystem() {
+            try {
+                SouthTechUI.showAlert('Reset sistema in corso...', 'info');
+                
+                // Invia richiesta reset
+                const requestResponse = await fetch('/api/states/sensor.southtech_reset_request', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${haToken}`
+                    },
+                    body: JSON.stringify({
+                        state: 'pending',
+                        attributes: {
+                            action: 'reset_system',
+                            browser_id: browserId,
+                            timestamp: new Date().toISOString()
+                        }
+                    })
+                });
+                
+                if (!requestResponse.ok) {
+                    throw new Error(`Errore richiesta reset: HTTP ${requestResponse.status}`);
+                }
+                
+                // Attendi risposta
+                const result = await SouthTechCore.pollForSensorResponse(
+                    'sensor.southtech_reset_response',
+                    20, // ✅ Timeout maggiore per reset
+                    haToken
+                );
+                
+                if (result.success && result.data.success === true) {
+                    // Pulizia completa storage
+                    console.log('🧹 [Reset] Pulizia completa sistema');
+                    
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    
+                    // Reset variabili globali
+                    haToken = null;
+                    authToken = null;
+                    
+                    // Genera nuovo browser ID
+                    browserId = SouthTechCore.generateSecureBrowserId();
+                    localStorage.setItem('southtech_persistent_browser_id', browserId);
+                    sessionStorage.setItem('southtech_browser_id', browserId);
+                    
+                    SouthTechUI.showAlert('✅ Sistema resettato con successo!\n\n⏳ Attendi 30 secondi prima di configurare una nuova password per permettere al sistema di stabilizzarsi.', 'success');
+                    
+                    // ✅ ATTESA MAGGIORE dopo reset
+                    setTimeout(() => {
+                        showTokenScreen();
+                        const tokenField = document.getElementById('haToken');
+                        if (tokenField) {
+                            tokenField.value = '';
+                        }
+                    }, 3000);
+                    
+                } else {
+                    throw new Error(result.data.error || 'Reset fallito dal server');
+                }
+                
+            } catch (error) {
+                console.error('❌ [Reset] Errore:', error);
+                
+                // Reset locale di emergenza
+                if (error.message.includes('Timeout') || error.message.includes('HTTP')) {
+                    console.log('🔧 [Reset] Tentativo reset locale di emergenza');
+                    
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    
+                    browserId = SouthTechCore.generateSecureBrowserId();
+                    localStorage.setItem('southtech_persistent_browser_id', browserId);
+                    sessionStorage.setItem('southtech_browser_id', browserId);
+                    
+                    haToken = null;
+                    authToken = null;
+                    
+                    SouthTechUI.showAlert('⚠️ Reset locale completato.\n\n⏳ Attendi almeno 1 minuto prima di inserire il nuovo token per permettere al backend di sincronizzarsi.', 'warning');
+                    
+                    setTimeout(() => {
+                        showTokenScreen();
+                    }, 2000);
+                } else {
+                    SouthTechUI.showAlert(`❌ Errore reset: ${error.message}`, 'error');
+                }
+            }
+        }
+        
+        // ====================================================================
+        // GESTIONE CAMBIO PASSWORD (mantenuta uguale)
+        // ====================================================================
+        
+        async function changePassword() {
+            const oldPassword = document.getElementById('oldPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const newPasswordConfirm = document.getElementById('newPasswordConfirm').value;
             
-            initializeDashboard();
-        }
-        
-        // Dashboard functions
-        async function initializeDashboard() {
-            showAlert('Benvenuto nel Menu Principale SouthTech!', 'success');
-        }
-        
-        // Funzioni Menu Principale
-        function openLightPresence() {
-            // Salva token per la prossima pagina
-            sessionStorage.setItem('southtech_session_token', authToken);
-            sessionStorage.setItem('southtech_ha_token', haToken);
-            sessionStorage.setItem('southtech_browser_id', browserId);
-            sessionStorage.setItem('southtech_page_source', 'index');
-            
-            // Reindirizza alla pagina automatismi luci
-            window.location.href = 'light_presence.html';
-        }
-        
-        function openMonitoring() {
-            // Salva token per la prossima pagina
-            sessionStorage.setItem('southtech_session_token', authToken);
-            sessionStorage.setItem('southtech_ha_token', haToken);
-            sessionStorage.setItem('southtech_browser_id', browserId);
-            sessionStorage.setItem('southtech_page_source', 'index');
-            
-            // Reindirizza alla pagina monitoraggio
-            window.location.href = 'monitoring.html';
-        }
-        
-        function openBackup() {
-            showAlert('Funzione Backup in sviluppo', 'info');
-        }
-        
-        function openAdvancedAutomations() {
-            showAlert('Funzione Automazioni Avanzate prossimamente disponibile', 'info');
-        }
-        
-        function openIoTDevices() {
-            showAlert('Funzione Dispositivi IoT prossimamente disponibile', 'info');
-        }
-        
-        function openSecurity() {
-            showAlert('Funzione Sicurezza Sistema in sviluppo', 'info');
-        }
-        
-        // Utility functions
-        function showAlert(message, type = 'info', duration = 4000) {
-            const indicator = document.getElementById('statusIndicator');
-            
-            let alertClass, icon;
-            switch (type) {
-                case 'success':
-                    alertClass = 'alert-success';
-                    icon = 'fas fa-check-circle';
-                    break;
-                case 'error':
-                    alertClass = 'alert-danger';
-                    icon = 'fas fa-exclamation-triangle';
-                    duration = 6000;
-                    break;
-                case 'warning':
-                    alertClass = 'alert-warning';
-                    icon = 'fas fa-exclamation-circle';
-                    break;
-                default:
-                    alertClass = 'alert-info';
-                    icon = 'fas fa-info-circle';
+            if (!oldPassword || !newPassword || !newPasswordConfirm) {
+                SouthTechUI.showAlert('Compila tutti i campi', 'error');
+                return;
             }
             
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert ${alertClass} alert-dismissible fade show`;
-            alertDiv.innerHTML = `
-                <i class="${icon} me-2"></i>
-                ${message.replace(/\n/g, '<br>')}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
+            if (newPassword !== newPasswordConfirm) {
+                SouthTechUI.showAlert('Le nuove password non coincidono', 'error');
+                return;
+            }
             
-            indicator.appendChild(alertDiv);
+            if (newPassword.length < 6) {
+                SouthTechUI.showAlert('Nuova password troppo corta', 'error');
+                return;
+            }
             
-            setTimeout(() => {
-                if (alertDiv.parentNode) {
-                    alertDiv.remove();
+            try {
+                SouthTechUI.showAlert('Cambio password in corso...', 'info');
+                
+                // Usa AppDaemon API per cambio password
+                const response = await fetch(`${APPDAEMON_API_URL}/southtech_auth_change`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        old_password: oldPassword,
+                        new_password: newPassword
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    authToken = null;
+                    sessionStorage.removeItem('southtech_session_token');
+                    
+                    SouthTechUI.showAlert('Password cambiata! Effettua nuovamente il login.', 'success');
+                    
+                    setTimeout(() => {
+                        showLogin();
+                    }, 2000);
+                } else {
+                    SouthTechUI.showAlert(data.error || 'Errore cambio password', 'error');
                 }
-            }, duration);
+                
+            } catch (error) {
+                console.error('❌ [ChangePassword] Errore:', error);
+                SouthTechUI.showAlert('Errore di connessione', 'error');
+            } finally {
+                document.getElementById('oldPassword').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('newPasswordConfirm').value = '';
+            }
         }
         
-        // Event listeners
+        // ====================================================================
+        // EVENT LISTENERS (mantenuti uguali)
+        // ====================================================================
+        
+        // Gestione Enter key
         document.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && systemInitialized) {
                 const activeScreen = document.querySelector('#authContainer .auth-card > div[style*="block"]');
                 if (activeScreen) {
                     switch (activeScreen.id) {
@@ -1429,8 +1457,8 @@
                 }
             }
         });
-        
-        console.log('✅ SouthTech Configurator Menu Principale caricato con successo');
+
+        console.log('✅ [SouthTech] Sistema v3.0.1 caricato - CORREZIONI APPLICATE');
     </script>
 </body>
 </html>

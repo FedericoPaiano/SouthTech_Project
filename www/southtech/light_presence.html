@@ -258,6 +258,35 @@
             font-style: italic;
             font-size: 0.9em;
         }
+
+        .modal-content {
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            border-bottom: none;
+        }
+
+        .modal-footer {
+            border-top: none;
+        }
+
+        .btn {
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-success:hover {
+            box-shadow: 0 8px 20px rgba(39, 174, 96, 0.4);
+        }
+
+        .btn-outline-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        }
     </style>
 </head>
 <body>
@@ -282,8 +311,8 @@
                   <i class="fas fa-bars"></i> Menu
               </button>
               <ul class="dropdown-menu">
-                  <li><a class="dropdown-item" href="#" onclick="goToMainMenu()">
-                      <i class="fas fa-home"></i> Menu Principale
+                  <li><a class="dropdown-item" href="#" onclick="SouthTechCore.goToMainMenu()">
+                    <i class="fas fa-home"></i> Menu Principale
                   </a></li>
                   <li><hr class="dropdown-divider"></li>
                   <li><a class="dropdown-item" href="#" onclick="syncConfigurations()">
@@ -292,12 +321,9 @@
                   <li><a class="dropdown-item" href="#" onclick="validateConfiguration()">
                       <i class="fas fa-check-circle"></i> Valida
                   </a></li>
-                  <!-- 🎯 FILTRO AREA -->
-                  <li><a class="dropdown-item" href="#" onclick="toggleAreaFilter()" id="filterMenuToggle">
-                      <i class="fas fa-filter"></i> Disattiva Filtro Area
-                  </a></li>
+                  <!-- Il submenu filtri viene aggiunto dinamicamente da initializeFiltersSubmenu() -->
                   <li><hr class="dropdown-divider"></li>
-                  <li><a class="dropdown-item" href="#" onclick="logout()">
+                  <li><a class="dropdown-item" href="#" onclick="SouthTechCore.performLogout()">
                       <i class="fas fa-sign-out-alt"></i> Logout
                   </a></li>
               </ul>
@@ -381,76 +407,20 @@
     <div id="statusIndicator" class="status-indicator"></div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="southtech_secure.js"></script>         <!-- 1° -->
+    <script src="southtech_core.js"></script>          <!-- 2° -->
+    <script src="southtech_ui.js"></script>            <!-- 3° -->
+    <script src="southtech_timeout.js"></script>       <!-- 4° -->
+    <script src="southtech_session_guard.js"></script> <!-- 5° ULTIMO -->
 
     <script>
-        async function validateDirectPageAccess() {
-            console.log('🔐 Controllo accesso diretto alla pagina...');
-            
-            try {
-                // Recupera token di sessione
-                const authToken = sessionStorage.getItem('southtech_session_token');
-                const haToken = sessionStorage.getItem('southtech_ha_token');
-                const browserId = sessionStorage.getItem('southtech_browser_id');
-                
-                // Controllo presenza token
-                if (!authToken || !haToken || !browserId) {
-                    console.log('🔐 Token mancanti - reindirizzo a index');
-                    redirectToIndex('Token di sessione mancanti');
-                    return false;
-                }
-                
-                console.log('🔐 Token di sessione presenti, validazione HA...');
-                
-                // Verifica SOLO il token HA (più affidabile e veloce)
-                const response = await fetch('/api/states', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${haToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                if (!response.ok) {
-                    console.log('🔐 Token HA non valido');
-                    redirectToIndex('Token Home Assistant scaduto');
-                    return false;
-                }
-                
-                console.log('✅ Accesso autorizzato - token HA valido');
-                return true;
-                
-            } catch (error) {
-                console.error('🔐 Errore durante validazione:', error);
-                redirectToIndex('Errore di validazione');
-                return false;
-            }
-        }
-
-        function redirectToIndex(reason) {
-            console.log(`🔐 Reindirizzamento: ${reason}`);
-            
-            // Pulisci la sessione
-            sessionStorage.removeItem('southtech_session_token');
-            sessionStorage.removeItem('southtech_ha_token');
-            sessionStorage.removeItem('southtech_browser_id');
-            sessionStorage.removeItem('southtech_return_to_menu');
-            sessionStorage.removeItem('southtech_page_source');
-            
-            // Mostra messaggio e reindirizza
-            if (typeof showAlert === 'function') {
-                showAlert(`Accesso non autorizzato: ${reason}. Reindirizzamento in corso...`, 'warning');
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 2000);
-            } else {
-                alert(`Accesso non autorizzato: ${reason}`);
-                window.location.href = 'index.html';
-            }
-        }
-
         // Configurazione API
         const APPDAEMON_API_URL = `${window.location.protocol}//${window.location.hostname}:5050/api/appdaemon`;
         
+        let haAreasRegistry = [];
+        let haEntityRegistry = [];
+        let haDeviceRegistry = [];
+
         // Variabili globali
         let entities = { lights: [], binary_sensors: [], sensors: [] };
         let configurations = [];
@@ -460,10 +430,16 @@
         let authToken = null;
         let haToken = null;
         let browserId = null;
-        let currentCommunicationMode = 'api';
+        let currentCommunicationMode = 'websocket_manager';
+        let entityAreaCache = new Map(); // Cache entity_id -> area_name
+        let areasDataCache = null; // Cache completa aree
+
+        // Variabili globali per salvataggio
+        let isSaving = false;
         
         // 🎯 SISTEMA DI FILTRO CORRETTO
-        let areaFilterEnabled = true; // Attivo di default
+        let areaFilterEnabled = true; // Filtro per aree (attivo di default)
+        let entityFilterEnabled = true; // Filtro per entità popolate (attivo di default)
         let templateSensorsCache = null; // Cache per evitare ricaricamenti
         let lastFilterCheck = null; // Timestamp ultimo controllo template
         
@@ -472,21 +448,28 @@
         
         // Inizializzazione
         window.addEventListener('load', async () => {
-            console.log('🚀 SouthTech Automatismo Luci avviato');
+            console.log('🚀 SouthTech Automatismo Luci avviato (v3.1.0)');
+            console.log('🌐 Network Info:', SouthTechCore.getNetworkInfo());
             
-            // ✅ CONTROLLO SICUREZZA OBBLIGATORIO
-            const accessGranted = await validateDirectPageAccess();
-            
-            if (!accessGranted) {
-                console.log('🔐 Accesso negato - interruzione caricamento pagina');
-                return; // Ferma l'esecuzione se l'accesso non è autorizzato
+            // ✅ STEP 1: CONTROLLO SESSIONE per pagine protette (versione inline)
+            console.log('🛡️ Controllo sessione timeout per pagina protetta...');
+
+            // Esegui controllo
+            const sessionValid = await SouthTechSessionGuard.init();
+            if (!sessionValid) {
+                return; // Session Guard gestisce tutto automaticamente
             }
             
-            // ✅ Se arriviamo qui, l'accesso è autorizzato
-            console.log('✅ Accesso autorizzato - continuazione inizializzazione...');
+            // ✅ STEP 2: CONTROLLO ACCESSO AUTORIZZATO
+            const accessGranted = await SouthTechCore.validateDirectPageAccess();
+            if (!accessGranted) {
+                console.log('🔐 Accesso negato - interruzione caricamento pagina');
+                return;
+            }
             
-            // Il resto del tuo codice esistente...
-            await initializeAuthentication();
+            // ✅ STEP 3: Continua con inizializzazione esistente
+            console.log('✅ Sessione e accesso validi - continuazione inizializzazione...');
+            await initializeAuthentication(); // ← Questa funzione ESISTE in light_presence
         });
         
         // Verifica autenticazione dalla sessione
@@ -495,17 +478,14 @@
             haToken = sessionStorage.getItem('southtech_ha_token');
             browserId = sessionStorage.getItem('southtech_browser_id');
             
-            console.log('🔍 Verifica autenticazione...');
-            console.log('Auth Token:', authToken ? 'Presente' : 'Mancante');
-            console.log('HA Token:', haToken ? 'Presente' : 'Mancante');
-            
             if (!authToken || !haToken) {
                 console.log('❌ Token mancanti, reindirizzo al menu principale');
                 showAuthError();
                 return;
             }
             
-            const tokenValid = await validateHAToken(haToken);
+            // ✅ CHIAMATA CORRETTA con namespace
+            const tokenValid = await SouthTechCore.validateHAToken(haToken);
             if (!tokenValid) {
                 console.log('❌ Token HA non valido, reindirizzo al menu principale');
                 showAuthError();
@@ -516,22 +496,6 @@
             isAuthenticated = true;
             showMainContent();
             await initializeDashboard();
-        }
-
-        async function validateHAToken(token) {
-            try {
-                const response = await fetch('/api/states', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                return response.ok;
-            } catch (error) {
-                console.error('🔍 Errore validazione token:', error);
-                return false;
-            }
         }
         
         function showAuthError() {
@@ -548,71 +512,278 @@
             window.location.href = 'index.html';
         }
         
-        function goToMainMenu() {
-            sessionStorage.setItem('southtech_session_token', authToken);
-            sessionStorage.setItem('southtech_ha_token', haToken);
-            sessionStorage.setItem('southtech_browser_id', browserId);
-            sessionStorage.setItem('southtech_return_to_menu', 'true');
-            window.location.href = 'index.html';
+        /**
+        * Crea nome di visualizzazione per un'entità INCLUDENDO L'AREA
+        * Combina entity_id, friendly_name e area per un display completo e leggibile
+        * 
+        * @param {string} entityId - ID dell'entità (es: "light.rgb_01_05")
+        * @param {string} friendlyName - Nome friendly dall'attributo HA (es: "Luce RGB Soggiorno")
+        * @returns {string} - Nome di visualizzazione con area (es: "Luce RGB Soggiorno (Soggiorno)")
+        */
+        function createEntityDisplayName(entityId, friendlyName) {
+            let baseName;
+            
+            if (friendlyName && friendlyName !== entityId) {
+                // Se abbiamo un friendly name diverso dall'entity_id, usalo
+                baseName = friendlyName;
+            } else {
+                // Altrimenti, pulisci l'entity_id per renderlo più leggibile
+                baseName = entityId
+                    .split('.')[1] // Rimuovi il prefisso (light., sensor., ecc.)
+                    .replace(/_/g, ' ') // Sostituisci underscore con spazi
+                    .replace(/\b\w/g, l => l.toUpperCase()); // Capitalizza prime lettere
+            }
+            
+            // 🏠 AGGIUNTA: Ottieni l'area dell'entità
+            const entityArea = getEntityArea(entityId);
+            
+            // 🏠 AGGIUNTA: Aggiungi area tra parentesi
+            if (entityArea) {
+                return `${baseName} (${entityArea})`;
+            } else {
+                return `${baseName} (Area non assegnata)`;
+            }
         }
-        
-        function logout() {
-            sessionStorage.removeItem('southtech_session_token');
-            sessionStorage.removeItem('southtech_ha_token');
-            sessionStorage.removeItem('southtech_browser_id');
-            sessionStorage.removeItem('southtech_return_to_menu');
-            sessionStorage.removeItem('southtech_page_source');
-            window.location.href = 'index.html';
+
+        /**
+         * Ottieni l'area di un'entità dalla cache
+         * @param {string} entityId - ID dell'entità
+         * @returns {string|null} - Nome dell'area o null se non trovata
+         */
+        function getEntityArea(entityId) {
+            return entityAreaCache.get(entityId) || null;
         }
-        
+
         // ✅ INIZIALIZZAZIONE DASHBOARD CORRETTA (ORDINE FISSO)
         async function initializeDashboard() {
             console.log('🔍 Inizializzazione dashboard automatismo luci...');
-            updateConnectionStatus('Caricamento entità...', 'loading');
+            SouthTechUI.updateConnectionStatus('Caricamento entità...', 'loading');
+
+            // ✅ IMPORTANTE: Inizializza timeout system per questa pagina
+            SouthTechTimeout.initialize();
             
             try {
-                // 1. Aggiorna menu filtro
-                updateFilterMenuIcon();
-                
-                // 2. Mostra stato filtro (assicura che l'elemento sia presente)
+                // 1. Mostra stato filtro
                 showFilterStatus();
                 
-                // 3. ⚠️ IMPORTANTE: CARICA PRIMA LE CONFIGURAZIONI
-                console.log('📋 Caricamento configurazioni prima delle entità...');
-                loadConfigurationsFromYourFile();
-                
-                // 4. Poi carica entità (che ora può vedere le configurazioni esistenti)
+                // 2. ✅ PRIMA carica entità e aree
                 await loadEntities();
                 
-                // 5. Infine aggiorna l'interfaccia
+                // 3. ✅ POI carica configurazioni (ora le aree ci sono!)
+                console.log('📋 Caricamento configurazioni dopo le entità...');
+                await syncConfigurations();
+                
+                // 4. Aggiorna interfaccia
                 updateConfigurationsList();
                 
-                // 6. Mostra interfaccia
+                // 5. Mostra interfaccia
                 document.getElementById('configurationsContainer').style.display = 'block';
-                
-                // Nascondi il pannello di connessione iniziale
                 document.getElementById('connectionStatus').style.display = 'none';
                 
-                const filterInfo = areaFilterEnabled ? 
-                    (templateSensorsCache ? 'CON filtro area (template attivi)' : 'CON filtro area (template NON disponibili - fallback)') :
-                    'SENZA filtro area';
-                    
-                showAlert(`Dashboard caricata: ${filterInfo}`, 'success');
+                // 6. Messaggio finale
+                let statusMessage = '';
+                if (currentCommunicationMode === 'websocket_filtered' || currentCommunicationMode === 'websocket_unfiltered') {
+                    statusMessage = areaFilterEnabled ? 'CON filtro area (WebSocket Manager)' : 'SENZA filtro area (WebSocket Manager)';
+                } else if (currentCommunicationMode === 'fallback_direct') {
+                    statusMessage = 'Modalità fallback (WebSocket Manager non disponibile)';
+                } else {
+                    statusMessage = areaFilterEnabled ? 'CON filtro area' : 'SENZA filtro area';
+                }
+                SouthTechUI.showAlert(`Dashboard caricata: ${statusMessage}`, 'success');
+                
+                // 7. Inizializza submenu filtri dopo il caricamento
+                setTimeout(() => {
+                    initializeFiltersSubmenu();
+                    setupSubmenuBehavior();
+                }, 500);
                 
             } catch (error) {
                 console.error('Errore inizializzazione:', error);
-                updateConnectionStatus('Errore di connessione', 'error');
-                showAlert(`Errore inizializzazione: ${error.message}`, 'error');
+                SouthTechUI.updateConnectionStatus('Caricamento entità...', 'loading');
+                SouthTechUI.showAlert(`Errore inizializzazione: ${error.message}`, 'error');
             }
+        }
+
+        function setupSubmenuBehavior() {
+            // CSS per submenu dropdown
+            const submenuCSS = `
+                <style id="submenu-styles">
+                .dropdown-submenu {
+                    position: relative;
+                }
+                
+                .dropdown-submenu .submenu {
+                    position: absolute;
+                    top: 0;
+                    left: 100%;
+                    margin-top: -1px;
+                    min-width: 200px;
+                    display: none;
+                }
+                
+                .dropdown-submenu:hover .submenu {
+                    display: block;
+                }
+                
+                .dropdown-submenu .dropdown-toggle::after {
+                    display: inline-block;
+                    margin-left: 0.255em;
+                    vertical-align: 0.255em;
+                    content: "";
+                    border-top: 0.3em solid transparent;
+                    border-right: 0;
+                    border-bottom: 0.3em solid transparent;
+                    border-left: 0.3em solid;
+                }
+                </style>
+            `;
+            
+            // Aggiungi CSS se non esiste
+            if (!document.getElementById('submenu-styles')) {
+                document.head.insertAdjacentHTML('beforeend', submenuCSS);
+            }
+            
+            // Gestisci click su submenu
+            const submenu = document.querySelector('.dropdown-submenu .submenu');
+            if (submenu) {
+                submenu.addEventListener('click', function(e) {
+                    e.stopPropagation(); // Impedisce chiusura del menu principale
+                });
+            }
+        }
+
+        // 🔧 FUNZIONE: forceInterfaceUpdate (conteggio corretto)
+        function forceInterfaceUpdate() {
+            console.log('🔄 Aggiornamento forzato interfaccia...');
+            
+            setTimeout(() => {
+                updateConfigurationsList();
+                
+                if (entities && entities.lights) {
+                    // ✅ CALCOLA ENTITÀ RILEVANTI ATTUALI invece di hardcode 1801
+                    const currentRelevantTotal = entities.lights.length + entities.binary_sensors.length + entities.sensors.length;
+                    
+                    // Per forceInterfaceUpdate, usiamo il totale delle entità attualmente caricate
+                    // che rappresenta il nostro universo di entità rilevanti
+                    let mode;
+                    if (currentCommunicationMode === 'fallback_direct') {
+                        mode = 'fallback_no_areas';
+                    } else if (areaFilterEnabled) {
+                        mode = 'active_with_websocket';
+                    } else {
+                        mode = 'disabled_with_websocket';
+                    }
+                    
+                    // ✅ USA IL TOTALE CORRETTO: se i filtri sono attivi, le entità mostrate 
+                    // sono un subset del totale possibile, quindi usiamo un totale stimato
+                    let estimatedTotal = currentRelevantTotal;
+                    if (areaFilterEnabled && currentCommunicationMode !== 'fallback_direct') {
+                        // Se il filtro area è attivo, stima il totale basandoti sul rapporto
+                        // Questo è approssimativo ma più accurato di 1801
+                        estimatedTotal = Math.round(currentRelevantTotal * 1.5); // Stima conservativa
+                    }
+                    
+                    updateFilterStatusDisplay(mode, estimatedTotal, entities);
+                }
+            }, 100);
         }
         
         // ✅ CARICAMENTO ENTITÀ COMPLETAMENTE RISCRITTO
         async function loadEntities() {
-            console.log('📋 === INIZIO CARICAMENTO ENTITÀ ===');
+            console.log('📋 === INIZIO CARICAMENTO ENTITÀ (WebSocket Manager) ===');
             console.log(`🎯 Filtro area: ${areaFilterEnabled ? 'ATTIVO' : 'DISATTIVO'}`);
             
             try {
-                // 1. Carica tutte le entità da Home Assistant
+                // Se abbiamo cache recente (< 5 minuti), usala
+                if (areasDataCache && (Date.now() - areasDataCache.timestamp < 300000)) {
+                    console.log('💾 Usando dati da cache (< 5 minuti)');
+                    await processEntitiesFromCache();
+                    return;
+                }
+                
+                // ✅ USA SOLO WEBSOCKET MANAGER
+                await loadEntitiesViaWebSocketManager();
+                
+            } catch (error) {
+                console.error('❌ Errore WebSocket Manager:', error);
+                
+                // ✅ FALLBACK SEMPLIFICATO
+                await loadEntitiesRestFallback();
+            }
+            
+            console.log('✅ === FINE CARICAMENTO ENTITÀ ===');
+        }
+
+        // ✅ SOSTITUISCE TUTTA LA LOGICA WEBSOCKET CUSTOM
+        async function loadEntitiesViaWebSocketManager() {
+            console.log('🔌 Caricamento dati via WebSocket Manager (v3.1.0)...');
+            
+            // ✅ USA IL NUOVO SISTEMA DI RILEVAMENTO RETE
+            const networkInfo = SouthTechCore.getNetworkInfo();
+            console.log(`🌐 Rete: ${networkInfo.networkType} - URL: ${networkInfo.wsUrl}`);
+            
+            const wsManager = new SouthTechCore.WebSocketManager(haToken);
+            
+            try {
+                await wsManager.connect();
+                console.log(`🔌 WebSocket Manager connesso (${networkInfo.networkType})`);
+                
+                // ✅ CARICA TUTTO IN PARALLELO
+                const [areas, entityRegistry, deviceRegistry, allStates] = await Promise.all([
+                    wsManager.getAreas(),
+                    wsManager.getEntityRegistry(),
+                    wsManager.getDeviceRegistry(),
+                    wsManager.getStates()
+                ]);
+                
+                console.log('✅ Dati WebSocket caricati:', {
+                    areas: areas.length,
+                    entities: entityRegistry.length,
+                    devices: deviceRegistry.length,
+                    states: allStates.length,
+                    networkType: networkInfo.networkType
+                });
+                
+                // ✅ AGGIORNA CACHE GLOBALI
+                updateGlobalCache(areas, entityRegistry, deviceRegistry);
+                
+                // ✅ PROCESSA ENTITÀ
+                await processEntitiesFromWebSocketData(allStates);
+                
+                // ✅ IMPOSTA MODALITÀ
+                currentCommunicationMode = areaFilterEnabled ? 'websocket_filtered' : 'websocket_unfiltered';
+                
+                console.log(`✅ Caricamento completato via ${networkInfo.networkType} WebSocket`);
+                
+            } catch (error) {
+                console.error(`❌ Errore WebSocket (${networkInfo.networkType}):`, error);
+                throw error;
+            } finally {
+                // ✅ DISCONNETTI SEMPRE
+                wsManager.disconnect();
+                console.log('🔌 WebSocket Manager disconnesso');
+            }
+        }
+
+        function getPopulatedAreas() {
+            const populatedAreas = new Set();
+            
+            // Controlla tutte le entità caricate per vedere quali aree sono "popolate"
+            [...entities.lights, ...entities.binary_sensors, ...entities.sensors].forEach(entity => {
+                const area = getEntityArea(entity.entity_id);
+                if (area) {
+                    populatedAreas.add(area);
+                }
+            });
+            
+            return populatedAreas;
+        }
+
+        // ✅ FALLBACK SEMPLIFICATO (SOLO REST API)
+        async function loadEntitiesRestFallback() {
+            console.log('🔄 FALLBACK: Caricamento diretto REST API...');
+            
+            try {
                 const response = await fetch('/api/states', {
                     headers: { 'Authorization': `Bearer ${haToken}` }
                 });
@@ -620,120 +791,47 @@
                 if (!response.ok) throw new Error('Errore accesso HA API');
                 
                 const allStates = await response.json();
-                console.log(`📊 Totale entità HA: ${allStates.length}`);
                 
-                // 2. Se filtro DISATTIVATO, controlla comunque i template per mostrare lo stato
-                if (!areaFilterEnabled) {
-                    console.log('🔴 Filtro DISATTIVATO - carico tutte le entità');
-                    
-                    // Controlla i template per mostrare lo stato e popolare le aree
-                    const templateSensors = await loadTemplateSensors();
-                    const templatesAvailable = templateSensors && templateSensors.success;
-                    
-                    if (templatesAvailable) {
-                        templateSensorsCache = templateSensors.data;
-                        // 🏠 POPOLA MAPPA AREE ANCHE SE FILTRO DISATTIVATO
-                        populateEntityAreasMap(templateSensors.data);
-                    }
-                    
-                    await loadAllEntities(allStates);
-                    setTimeout(() => {
-                        if (templatesAvailable) {
-                            updateFilterStatusDisplay('disabled_with_templates', allStates.length, entities);
-                        } else {
-                            updateFilterStatusDisplay('disabled', allStates.length, entities);
-                        }
-                    }, 100);
-                    return;
-                }
+                // ✅ PROCESSA SENZA CACHE AREE
+                await processEntitiesDirectly(allStates);
                 
-                // 3. Se filtro ATTIVATO, prova prima con template
-                console.log('🟢 Filtro ATTIVATO - controllo template...');
-                const templateSensors = await loadTemplateSensors();
+                // ✅ PULISCI CACHE
+                entityAreaCache.clear();
+                areasDataCache = null;
                 
-                if (templateSensors && templateSensors.success) {
-                    console.log('✅ Template disponibili, uso filtro avanzato');
-                    templateSensorsCache = templateSensors.data;
-                    // 🏠 POPOLA MAPPA AREE
-                    populateEntityAreasMap(templateSensors.data);
-                    await loadEntitiesWithFilter(allStates, templateSensors.data);
-                    setTimeout(() => {
-                        updateFilterStatusDisplay('active_with_templates', allStates.length, entities);
-                    }, 100);
-                } else {
-                    console.log('⚠️ Template NON disponibili, fallback senza filtro');
-                    templateSensorsCache = null;
-                    await loadAllEntities(allStates);
-                    setTimeout(() => {
-                        updateFilterStatusDisplay('active_no_templates', allStates.length, entities);
-                    }, 100);
-                }
+                currentCommunicationMode = 'fallback_rest';
+                
+                console.log(`✅ FALLBACK completato: ${entities.lights.length} luci, ${entities.binary_sensors.length} sensori`);
                 
             } catch (error) {
-                console.error('❌ Errore caricamento entità:', error);
+                console.error('❌ Anche il fallback REST è fallito:', error);
                 throw error;
             }
-            
-            console.log('✅ === FINE CARICAMENTO ENTITÀ ===');
         }
-        
-        // 🏠 NUOVA FUNZIONE: Popola mappa aree dalle template
-        function populateEntityAreasMap(templateData) {
-            console.log('🏠 Popolamento mappa aree dalle template...');
+
+        // 🔧 FUNZIONE: Calcola entità rilevanti totali
+        function calculateTotalRelevantEntities(allStates) {
+            let totalRelevant = 0;
             
-            entityAreasMap.clear();
-            let totalMapped = 0;
-            
-            Object.entries(templateData).forEach(([templateKey, sensor]) => {
-                if (sensor.attributes && sensor.attributes.areas_entity) {
-                    const areasEntity = sensor.attributes.areas_entity;
-                    const lines = areasEntity.split('\n');
+            allStates.forEach(state => {
+                if (state.entity_id.startsWith('light.')) {
+                    totalRelevant++;
+                } else if (state.entity_id.startsWith('binary_sensor.')) {
+                    totalRelevant++;
+                } else if (state.entity_id.startsWith('sensor.')) {
+                    const isIlluminanceSensor = 
+                        state.attributes.device_class === 'illuminance' ||
+                        state.entity_id.toLowerCase().includes('illuminance') || 
+                        state.entity_id.toLowerCase().includes('lux');
                     
-                    lines.forEach(line => {
-                        if (line.trim()) {
-                            const parts = line.split(' | ');
-                            if (parts.length >= 2) {
-                                const entityId = parts[0].trim();
-                                const areaName = parts[1].trim();
-                                
-                                if (entityId && entityId.includes('.') && areaName) {
-                                    entityAreasMap.set(entityId, areaName);
-                                    totalMapped++;
-                                }
-                            }
-                        }
-                    });
+                    if (isIlluminanceSensor) {
+                        totalRelevant++;
+                    }
                 }
             });
             
-            console.log(`✅ Mappate ${totalMapped} entità con le loro aree`);
-        }
-        
-        // 🏠 NUOVA FUNZIONE: Formatta nome area (CORRETTA)
-        function formatAreaName(areaName) {
-            if (!areaName) return '';
-            
-            // Sostituisci "_" con spazi e converti solo la prima lettera in maiuscolo
-            return areaName
-                .replace(/_/g, ' ')                    // Sostituisce "_" con spazi
-                .charAt(0).toUpperCase() +             // Prima lettera maiuscola
-                areaName.replace(/_/g, ' ').slice(1).toLowerCase();  // Resto minuscolo
-        }
-        
-        // 🏠 NUOVA FUNZIONE: Ottieni area di un'entità
-        function getEntityArea(entityId) {
-            const rawArea = entityAreasMap.get(entityId);
-            return rawArea ? formatAreaName(rawArea) : null;
-        }
-        
-        // 🏠 NUOVA FUNZIONE: Crea nome con area (AGGIORNATA)
-        function createEntityDisplayName(entityId, friendlyName) {
-            const area = getEntityArea(entityId);
-            if (area) {
-                return `${friendlyName} (${area})`;
-            } else {
-                return `${friendlyName} (Area non assegnata)`;
-            }
+            console.log(`📊 Entità rilevanti totali: ${totalRelevant} (luci + sensori presenza + sensori lux)`);
+            return totalRelevant;
         }
         
         // 🏠 NUOVA FUNZIONE: Conta aree uniche nelle entità filtrate
@@ -750,11 +848,170 @@
             
             return uniqueAreas.size;
         }
-        // 🏠 NUOVA FUNZIONE: Estrai tutte le aree uniche dalle entità caricate
+
+        // 🏠 Estrai tutte le aree uniche dalle entità caricate
+        async function toggleAreaFilter() {
+            areaFilterEnabled = !areaFilterEnabled;
+            console.log(`🎯 Filtro Area: ${areaFilterEnabled ? 'ATTIVATO' : 'DISATTIVATO'}`);
+            
+            // Aggiorna toggle nel submenu
+            const areaToggle = document.getElementById('areaFilterToggle');
+            if (areaToggle) areaToggle.checked = areaFilterEnabled;
+            
+            await applyFiltersImmediate();
+        }
+
+        async function toggleEntityFilter() {
+            entityFilterEnabled = !entityFilterEnabled;
+            console.log(`🏠 Filtro Entità: ${entityFilterEnabled ? 'ATTIVATO' : 'DISATTIVATO'}`);
+            
+            // Aggiorna toggle nel submenu
+            const entityToggle = document.getElementById('entityFilterToggle');
+            if (entityToggle) entityToggle.checked = entityFilterEnabled;
+            
+            await applyFiltersImmediate();
+        }
+
+        // 🔧 FUNZIONI TOGGLE: aggiorna alert con ordine invertito
+        async function applyFiltersImmediate() {
+            SouthTechUI.showAlert('🔄 Aggiornamento filtri in corso...', 'info', 2000);
+            
+            try {
+                await loadEntities();
+                updateConfigurationsList();
+                forceInterfaceUpdate();
+                
+                // Ordine invertito: Entità prima, Area dopo (invariato)
+                const entityStatus = entityFilterEnabled ? 'Entità ✅' : 'Entità ❌';
+                const areaStatus = areaFilterEnabled ? 'Area ✅' : 'Area ❌';
+                SouthTechUI.showAlert(`✅ Filtri aggiornati: ${entityStatus} | ${areaStatus}`, 'success');
+                
+            } catch (error) {
+                console.error('Errore applicazione filtri:', error);
+                SouthTechUI.showAlert(`Errore applicazione filtri: ${error.message}`, 'error');
+            }
+        }
+
+        // 🔧 FUNZIONE: initializeFiltersSubmenu (COMPLETA CON POSIZIONE CORRETTA)
+        function initializeFiltersSubmenu() {
+            // Trova il menu dropdown e aggiungi il submenu
+            const menuDropdown = document.querySelector('.dropdown-menu');
+            if (!menuDropdown) {
+                console.warn('⚠️ Menu dropdown non trovato');
+                return;
+            }
+            
+            // Trova la voce filtri esistente e sostituiscila
+            const existingFilterItem = document.getElementById('filterMenuToggle');
+            if (existingFilterItem) {
+                existingFilterItem.parentElement.remove();
+            }
+            
+            // ✅ SUBMENU CON STYLING MIGLIORATO - Toggle più grandi e allineamento perfetto
+            const submenuHTML = `
+                <li class="dropdown-submenu">
+                    <a class="dropdown-item dropdown-toggle" href="#" id="filtersSubmenuToggle">
+                        <i class="fas fa-filter"></i> Filtri
+                    </a>
+                    <ul class="dropdown-menu submenu">
+                        <!-- ✅ TOGGLE ENTITÀ - MARGINI BILANCIATI FINALI -->
+                        <li style="padding: 0 !important; margin: 0 !important;">
+                            <div class="form-check form-switch" style="display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 18px;">
+                                <input class="form-check-input" type="checkbox" id="entityFilterToggle" 
+                                      ${entityFilterEnabled ? 'checked' : ''} onchange="toggleEntityFilter()" 
+                                      style="margin: 0; width: 40px; height: 20px; transform: scale(1.2); flex-shrink: 0;">
+                                <i class="fas fa-microchip" style="width: 16px; text-align: center; color: #495057; flex-shrink: 0;"></i>
+                                <label class="form-check-label" for="entityFilterToggle" 
+                                      style="margin: 0; cursor: pointer; font-size: 15px; font-weight: 500; white-space: nowrap;">
+                                    Filtra per Entità
+                                </label>
+                            </div>
+                        </li>
+                        
+                        <!-- ✅ TOGGLE AREA - MARGINI BILANCIATI FINALI -->
+                        <li style="padding: 0 !important; margin: 0 !important;">
+                            <div class="form-check form-switch" style="display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 18px;">
+                                <input class="form-check-input" type="checkbox" id="areaFilterToggle" 
+                                      ${areaFilterEnabled ? 'checked' : ''} onchange="toggleAreaFilter()"
+                                      style="margin: 0; width: 40px; height: 20px; transform: scale(1.2); flex-shrink: 0;">
+                                <i class="fas fa-home" style="width: 16px; text-align: center; color: #495057; flex-shrink: 0;"></i>
+                                <label class="form-check-label" for="areaFilterToggle" 
+                                      style="margin: 0; cursor: pointer; font-size: 15px; font-weight: 500; white-space: nowrap;">
+                                    Filtra per Area
+                                </label>
+                            </div>
+                        </li>
+                    </ul>
+                </li>
+            `;
+            
+            // 🎯 POSIZIONAMENTO CORRETTO: Subito dopo Menu Principale con divider sopra
+            let menuPrincipaleItem = menuDropdown.querySelector('a[onclick="SouthTechCore.goToMainMenu()"]') ||
+                                    menuDropdown.querySelector('a[onclick="goToMainMenu()"]');
+            
+            if (menuPrincipaleItem) {
+                console.log('✅ Trovato Menu Principale, inserisco Filtri con divider sopra...');
+                
+                const menuPrincipaleParent = menuPrincipaleItem.parentElement;
+                const nextElement = menuPrincipaleParent.nextElementSibling;
+                
+                // Controlla se c'è già un divider dopo Menu Principale
+                if (nextElement && nextElement.classList.contains('dropdown-divider')) {
+                    // C'è già un divider, inserisci i Filtri dopo
+                    nextElement.insertAdjacentHTML('afterend', submenuHTML);
+                    console.log('✅ Filtri inseriti dopo divider esistente');
+                } else {
+                    // Non c'è divider, crealo e poi aggiungi i Filtri
+                    const dividerAndFilters = '<li><hr class="dropdown-divider"></li>' + submenuHTML;
+                    menuPrincipaleParent.insertAdjacentHTML('afterend', dividerAndFilters);
+                    console.log('✅ Creato divider e inseriti Filtri dopo Menu Principale');
+                }
+                
+                // 🗑️ RIMUOVI TUTTI i divider dopo Filtri fino a Ricarica Configurazioni
+                setTimeout(() => {
+                    const filtersSubmenu = document.querySelector('.dropdown-submenu');
+                    if (filtersSubmenu) {
+                        let currentElement = filtersSubmenu.nextElementSibling;
+                        
+                        // Rimuovi tutti i divider consecutivi dopo i Filtri
+                        while (currentElement) {
+                            if (currentElement.classList.contains('dropdown-divider')) {
+                                const elementToRemove = currentElement;
+                                currentElement = currentElement.nextElementSibling;
+                                elementToRemove.remove();
+                                console.log('🗑️ Rimosso divider dopo Filtri');
+                            } else {
+                                // Se trovi un elemento che non è divider, fermati
+                                break;
+                            }
+                        }
+                        
+                        // Controlla anche se "Ricarica Configurazioni" ha un divider prima
+                        const ricaricaItem = menuDropdown.querySelector('a[onclick*="syncConfigurations"]');
+                        if (ricaricaItem) {
+                            const ricaricaParent = ricaricaItem.parentElement;
+                            const prevElement = ricaricaParent.previousElementSibling;
+                            if (prevElement && prevElement.classList.contains('dropdown-divider')) {
+                                prevElement.remove();
+                                console.log('🗑️ Rimosso divider prima di Ricarica Configurazioni');
+                            }
+                        }
+                    }
+                }, 100);
+                
+            } else {
+                // Fallback: inserisci all'inizio con divider
+                console.warn('⚠️ Menu Principale non trovato, inserisco all\'inizio');
+                const dividerAndFilters = '<li><hr class="dropdown-divider"></li>' + submenuHTML;
+                menuDropdown.insertAdjacentHTML('afterbegin', dividerAndFilters);
+            }
+        }
+
+        // 🔧 Estrai aree per dropdown (INCLUDI TUTTE se filtro entità disattivo)
         function extractUniqueAreas() {
             const areas = new Set();
             
-            // Aggiungi aree da tutte le categorie di entità
+            // Aggiungi aree da tutte le categorie di entità CARICATE
             [...entities.lights, ...entities.binary_sensors, ...entities.sensors].forEach(entity => {
                 const area = getEntityArea(entity.entity_id);
                 if (area) {
@@ -762,10 +1019,45 @@
                 }
             });
             
-            // Converti in array ordinato alfabeticamente
-            const sortedAreas = Array.from(areas).sort();
+            let sortedAreas = Array.from(areas).sort();
+            
+            // 🎯 SE FILTRO ENTITÀ DISATTIVO: Aggiungi TUTTE le aree con entità rilevanti
+            if (!entityFilterEnabled) {
+                const allAreasWithEntities = new Set();
+                entityAreaCache.forEach((areaName, entityId) => {
+                    if (entityId.startsWith('light.') || 
+                        entityId.startsWith('binary_sensor.') || 
+                        (entityId.startsWith('sensor.') && 
+                        (entityId.toLowerCase().includes('illuminance') || entityId.toLowerCase().includes('lux')))) {
+                        allAreasWithEntities.add(areaName);
+                    }
+                });
+                
+                // Unisci le aree caricate con tutte le aree del sistema
+                const combinedAreas = new Set([...sortedAreas, ...allAreasWithEntities]);
+                sortedAreas = Array.from(combinedAreas).sort();
+                
+                console.log(`🏠 Filtro entità DISATTIVO - Aree totali: ${sortedAreas.length} (${areas.size} caricate + ${allAreasWithEntities.size - areas.size} sistema)`);
+            } else {
+                console.log(`🏠 Filtro entità ATTIVO - Aree popolate: ${sortedAreas.length}/${areas.size}`);
+            }
+            
             console.log(`🏠 Aree uniche estratte: ${sortedAreas.length} -> ${sortedAreas.join(', ')}`);
             return sortedAreas;
+        }
+
+        function getPopulatedAreas() {
+            const populatedAreas = new Set();
+            
+            // Controlla tutte le entità caricate per vedere quali aree sono "popolate"
+            [...entities.lights, ...entities.binary_sensors, ...entities.sensors].forEach(entity => {
+                const area = getEntityArea(entity.entity_id);
+                if (area) {
+                    populatedAreas.add(area);
+                }
+            });
+            
+            return populatedAreas;
         }
         
         // 🏠 NUOVA FUNZIONE: Rileva area automatica di una configurazione (CORRETTA)
@@ -780,7 +1072,7 @@
                 config.presence_sensor_off,
                 config.illuminance_sensor
             ];
-            
+
             fieldsToCheck.forEach(entityId => {
                 if (entityId) {
                     const area = getEntityArea(entityId);
@@ -890,23 +1182,40 @@
                 
                 const message = `I seguenti campi non appartengono all'area "${selectedArea}":\n\n${fieldsList}\n\nConfermi il reset di questi campi?`;
                 
-                if (confirm(message)) {
-                    // Reset campi incompatibili
-                    incompatibleFields.forEach(field => {
-                        config[field.field] = '';
-                    });
-                    
-                    console.log(`✅ Reset ${incompatibleFields.length} campi incompatibili`);
-                    showAlert(`Reset ${incompatibleFields.length} campi incompatibili con l'area "${selectedArea}"`, 'info');
-                } else {
-                    // Annulla cambio area - ripristina valore precedente
-                    const areaSelect = document.querySelector(`#areaSelect_${configIndex}`);
-                    if (areaSelect) {
-                        const detectedArea = detectConfigurationArea(config);
-                        areaSelect.value = detectedArea || '';
+                SouthTechUI.showConfirmDialog(
+                    'Campi Incompatibili',
+                    `I seguenti campi non appartengono all'area "${selectedArea}":\n\n${fieldsList}\n\nConfermi il reset di questi campi?`,
+                    {
+                        confirmText: 'Sì, Reset',
+                        cancelText: 'Annulla',
+                        confirmClass: 'btn-warning',
+                        cancelClass: 'btn-secondary',
+                        onConfirm: () => {
+                            // Reset campi incompatibili
+                            incompatibleFields.forEach(field => {
+                                config[field.field] = '';
+                            });
+                            
+                            console.log(`✅ Reset ${incompatibleFields.length} campi incompatibili`);
+                            SouthTechUI.showAlert(`Reset ${incompatibleFields.length} campi incompatibili con l'area "${selectedArea}"`, 'info');
+                            
+                            // Aggiorna configurazione con area selezionata
+                            config.selected_area = selectedArea;
+                            
+                            // Ricarica interfaccia configurazione
+                            updateConfigurationsList();
+                        },
+                        onCancel: () => {
+                            // Annulla cambio area - ripristina valore precedente
+                            const areaSelect = document.querySelector(`#areaSelect_${configIndex}`);
+                            if (areaSelect) {
+                                const detectedArea = detectConfigurationArea(config);
+                                areaSelect.value = detectedArea || '';
+                            }
+                        }
                     }
-                    return;
-                }
+                );
+                return; // Esce dalla funzione, il resto viene gestito nei callback
             }
             
             // Aggiorna configurazione con area selezionata
@@ -915,277 +1224,39 @@
             // Ricarica interfaccia configurazione
             updateConfigurationsList();
         }
-        
-        // 📋 Carica TUTTE le entità (senza filtro) - AGGIORNATA
-        async function loadAllEntities(allStates) {
-            console.log('📋 Caricamento TUTTE le entità (senza filtro)...');
-            
-            entities = { lights: [], binary_sensors: [], sensors: [] };
-            
-            allStates.forEach(state => {
-                const baseEntityData = {
-                    entity_id: state.entity_id,
-                    friendly_name: state.attributes.friendly_name || state.entity_id
-                };
-                
-                // 🏠 AGGIUNGI AREA AL NOME SE DISPONIBILE
-                const entityData = {
-                    ...baseEntityData,
-                    display_name: createEntityDisplayName(state.entity_id, baseEntityData.friendly_name)
-                };
-                
-                if (state.entity_id.startsWith('light.')) {
-                    entities.lights.push(entityData);
-                } else if (state.entity_id.startsWith('binary_sensor.')) {
-                    entities.binary_sensors.push(entityData);
-                } else if (state.entity_id.startsWith('sensor.')) {
-                    // Filtro generico per sensori (quando non usiamo template)
-                    const isIlluminanceSensor = 
-                        state.attributes.device_class === 'illuminance' ||
-                        state.entity_id.toLowerCase().includes('illuminance') || 
-                        state.entity_id.toLowerCase().includes('lux') ||
-                        state.entity_id.toLowerCase().includes('illuminamento') ||
-                        state.entity_id.toLowerCase().includes('light') ||
-                        state.entity_id.toLowerCase().includes('luce');
-                    
-                    if (isIlluminanceSensor) {
-                        entities.sensors.push(entityData);
-                    }
-                }
-            });
-            
-            // Ordina alfabeticamente PER DISPLAY NAME
-            Object.values(entities).forEach(category => {
-                category.sort((a, b) => a.display_name.localeCompare(b.display_name));
-            });
-            
-            console.log(`✅ Caricate SENZA FILTRO: ${entities.lights.length} luci, ${entities.binary_sensors.length} sensori binari, ${entities.sensors.length} sensori lux`);
-            currentCommunicationMode = 'ha_direct_unfiltered';
-        }
-        
-        // 🎯 Carica entità CON filtro template (AGGIORNATA CON ENTITÀ ESISTENTI)
-        async function loadEntitiesWithFilter(allStates, templateData) {
-            console.log('🎯 Caricamento entità CON FILTRO template...');
-            
-            // ✅ ESTRAI ENTITÀ SEPARATE PER CATEGORIA DAI TEMPLATE
-            const templateEntities = extractEntitiesByTypeFromTemplates(templateData);
-            
-            // 📋 OTTIENI ENTITÀ DA CONFIGURAZIONI ESISTENTI
-            const existingEntities = getEntitiesFromExistingConfigurations();
-            
-            console.log(`📝 Template Luci: ${templateEntities.lights.size} entità`);
-            console.log(`📝 Template Presenza: ${templateEntities.binary_sensors.size} entità`);
-            console.log(`📝 Template Luminosità: ${templateEntities.sensors.size} entità`);
-            console.log(`📋 Configurazioni esistenti: ${existingEntities.size} entità`);
-            
-            entities = { lights: [], binary_sensors: [], sensors: [] };
-            let stats = { 
-                lights: {kept: 0, filtered: 0, existing: 0}, 
-                binary_sensors: {kept: 0, filtered: 0, existing: 0}, 
-                sensors: {kept: 0, filtered: 0, existing: 0} 
-            };
-            
-            allStates.forEach(state => {
-                const baseEntityData = {
-                    entity_id: state.entity_id,
-                    friendly_name: state.attributes.friendly_name || state.entity_id
-                };
-                
-                // 🏠 AGGIUNGI AREA AL NOME (ora sempre con indicazione area o "Area non assegnata")
-                const entityData = {
-                    ...baseEntityData,
-                    display_name: createEntityDisplayName(state.entity_id, baseEntityData.friendly_name)
-                };
-                
-                if (state.entity_id.startsWith('light.')) {
-                    // ✅ FILTRO LUCI: Template + Entità già configurate
-                    const inTemplate = templateEntities.lights.has(state.entity_id);
-                    const inExisting = existingEntities.has(state.entity_id);
-                    
-                    if (inTemplate || inExisting) {
-                        entities.lights.push(entityData);
-                        if (inTemplate) stats.lights.kept++;
-                        if (inExisting && !inTemplate) stats.lights.existing++;
-                    } else {
-                        stats.lights.filtered++;
-                    }
-                    
-                } else if (state.entity_id.startsWith('binary_sensor.')) {
-                    // ✅ FILTRO SENSORI PRESENZA: Template + Entità già configurate
-                    const inTemplate = templateEntities.binary_sensors.has(state.entity_id);
-                    const inExisting = existingEntities.has(state.entity_id);
-                    
-                    if (inTemplate || inExisting) {
-                        entities.binary_sensors.push(entityData);
-                        if (inTemplate) stats.binary_sensors.kept++;
-                        if (inExisting && !inTemplate) stats.binary_sensors.existing++;
-                    } else {
-                        stats.binary_sensors.filtered++;
-                    }
-                    
-                } else if (state.entity_id.startsWith('sensor.')) {
-                    // ✅ FILTRO SENSORI LUMINOSITÀ: Template + Entità già configurate
-                    const inTemplate = templateEntities.sensors.has(state.entity_id);
-                    const inExisting = existingEntities.has(state.entity_id);
-                    
-                    if (inTemplate || inExisting) {
-                        entities.sensors.push(entityData);
-                        if (inTemplate) stats.sensors.kept++;
-                        if (inExisting && !inTemplate) stats.sensors.existing++;
-                    } else {
-                        stats.sensors.filtered++;
-                    }
-                }
-            });
-            
-            // Ordina alfabeticamente PER DISPLAY NAME
-            Object.values(entities).forEach(category => {
-                category.sort((a, b) => a.display_name.localeCompare(b.display_name));
-            });
-            
-            console.log(`✅ Caricate CON FILTRO TEMPLATE + ESISTENTI:`);
-            console.log(`   💡 Luci: ${entities.lights.length} (${stats.lights.kept} da template, ${stats.lights.existing} da config, ${stats.lights.filtered} filtrate)`);
-            console.log(`   🚶 Sensori presenza: ${entities.binary_sensors.length} (${stats.binary_sensors.kept} da template, ${stats.binary_sensors.existing} da config, ${stats.binary_sensors.filtered} filtrati)`);
-            console.log(`   ☀️ Sensori luminosità: ${entities.sensors.length} (${stats.sensors.kept} da template, ${stats.sensors.existing} da config, ${stats.sensors.filtered} filtrati)`);
-            
-            const totalKept = stats.lights.kept + stats.binary_sensors.kept + stats.sensors.kept;
-            const totalExisting = stats.lights.existing + stats.binary_sensors.existing + stats.sensors.existing;
-            const totalFiltered = stats.lights.filtered + stats.binary_sensors.filtered + stats.sensors.filtered;
-            const totalShown = totalKept + totalExisting;
-            
-            console.log(`📊 Statistiche: ${totalShown} mostrate (${totalKept} template + ${totalExisting} esistenti), ${totalFiltered} filtrate`);
-            
-            currentCommunicationMode = 'ha_direct_filtered';
-        }
-        
-        // 📝 Estrai entità dai template divise per tipo (NUOVA FUNZIONE)
-        function extractEntitiesByTypeFromTemplates(templateData) {
-            console.log('📝 Estrazione entità dai template per tipo...');
-            
-            const result = {
-                lights: new Set(),
-                binary_sensors: new Set(), 
-                sensors: new Set()
-            };
-            
-            // Template mapping
-            const templateMapping = {
-                'light': 'lights',           // sensor.area_light_list -> lights
-                'presence': 'binary_sensors', // sensor.area_presence_list -> binary_sensors  
-                'illuminance': 'sensors'      // sensor.area_illuminance_list -> sensors
-            };
-            
-            Object.entries(templateData).forEach(([templateKey, sensor]) => {
-                const entityType = templateMapping[templateKey];
-                if (!entityType) {
-                    console.warn(`⚠️ Tipo template non riconosciuto: ${templateKey}`);
-                    return;
-                }
-                
-                if (sensor.attributes && sensor.attributes.areas_entity) {
-                    const areasEntity = sensor.attributes.areas_entity;
-                    const lines = areasEntity.split('\n');
-                    
-                    lines.forEach(line => {
-                        if (line.trim()) {
-                            const parts = line.split(' | ');
-                            if (parts.length >= 1) {
-                                const entityId = parts[0].trim();
-                                if (entityId && entityId.includes('.')) {
-                                    result[entityType].add(entityId);
-                                }
-                            }
-                        }
-                    });
-                    
-                    console.log(`✅ ${templateKey}: ${result[entityType].size} entità estratte`);
-                } else {
-                    console.warn(`⚠️ Template ${templateKey} senza areas_entity`);
-                }
-            });
-            
-            return result;
-        }
 
-        // 🔍 Carica template sensors (versione migliorata)
-        async function loadTemplateSensors() {
-            try {
-                console.log('🔍 Caricamento template sensors...');
-                
-                const templateSensorNames = [
-                    'sensor.area_light_list',
-                    'sensor.area_presence_list', 
-                    'sensor.area_illuminance_list'
-                ];
-                
-                const results = {};
-                let successCount = 0;
-                
-                for (const sensorName of templateSensorNames) {
-                    try {
-                        const response = await fetch(`/api/states/${sensorName}`, {
-                            headers: { 'Authorization': `Bearer ${haToken}` }
-                        });
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            const sensorKey = sensorName.replace('sensor.area_', '').replace('_list', '');
-                            results[sensorKey] = data;
-                            successCount++;
-                            console.log(`✅ Template ${sensorKey}: ${data.state || 'OK'}`);
-                        } else {
-                            console.log(`❌ Template ${sensorName}: ${response.status}`);
-                        }
-                    } catch (error) {
-                        console.log(`❌ Template ${sensorName}: ${error.message}`);
+        function buildEntityAreaCache() {
+            console.log('🏠 Costruzione cache entità-aree...');
+            
+            entityAreaCache.clear();
+            let mappedCount = 0;
+            
+            // Mappa entità direttamente assegnate ad aree
+            haEntityRegistry.forEach(entity => {
+                if (entity.area_id && entity.entity_id) {
+                    const area = haAreasRegistry.find(a => a.area_id === entity.area_id);
+                    if (area) {
+                        entityAreaCache.set(entity.entity_id, area.name);
+                        mappedCount++;
                     }
                 }
-                
-                if (successCount === templateSensorNames.length) {
-                    console.log('✅ Tutti i template caricati con successo');
-                    return { success: true, data: results };
-                } else {
-                    console.log(`⚠️ Solo ${successCount}/${templateSensorNames.length} template disponibili`);
-                    return { success: false, data: null };
+            });
+            
+            // Mappa entità tramite device
+            haEntityRegistry.forEach(entity => {
+                if (!entityAreaCache.has(entity.entity_id) && entity.device_id) {
+                    const device = haDeviceRegistry.find(d => d.id === entity.device_id);
+                    if (device && device.area_id) {
+                        const area = haAreasRegistry.find(a => a.area_id === device.area_id);
+                        if (area) {
+                            entityAreaCache.set(entity.entity_id, area.name);
+                            mappedCount++;
+                        }
+                    }
                 }
-                
-            } catch (error) {
-                console.error('❌ Errore generale caricamento template:', error);
-                return { success: false, data: null };
-            }
-        }
-        
-        // ✅ TOGGLE FILTRO CORRETTO
-        async function toggleAreaFilter() {
-            console.log('🔄 Toggle filtro area...');
+            });
             
-            // Cambia stato
-            areaFilterEnabled = !areaFilterEnabled;
-            const status = areaFilterEnabled ? 'ATTIVATO' : 'DISATTIVATO';
-            
-            console.log(`🎯 Filtro area ${status}`);
-            
-            // Aggiorna interfaccia
-            updateFilterMenuIcon();
-            showAlert(`🔄 Filtro area ${status} - ricaricamento entità...`, 'info');
-            
-            // Ricarica entità
-            updateConnectionStatus('Ricaricamento entità...', 'loading');
-            
-            try {
-                await loadEntities();
-                updateConfigurationsList(); // Aggiorna le dropdown
-                
-                const newStatus = areaFilterEnabled ? 
-                    (templateSensorsCache ? 'CON filtro (template OK)' : 'CON filtro (fallback)') :
-                    'SENZA filtro';
-                    
-                showAlert(`✅ Entità ricaricate ${newStatus}`, 'success');
-                
-            } catch (error) {
-                console.error('Errore toggle filtro:', error);
-                showAlert(`Errore toggle filtro: ${error.message}`, 'error');
-            }
+            console.log(`✅ Cache costruita: ${mappedCount} entità mappate su ${entityAreaCache.size} totali`);
         }
         
         // 🎯 AGGIORNA ICONA MENU FILTRO
@@ -1209,98 +1280,183 @@
             }
         }
         
-        // 📊 AGGIORNA DISPLAY STATO FILTRO (AGGIORNATO CON CONTEGGIO AREE)
+        // 📊 AGGIORNA DISPLAY STATO FILTRO (LAYOUT A 3 COLONNE)
         function updateFilterStatusDisplay(mode, totalEntities, filteredEntities) {
             const systemFilterStatusDiv = document.getElementById('systemFilterStatus');
-            const systemStatusContent = document.getElementById('systemStatusContent');
-            const filterStatusContent = document.getElementById('filterStatusContent');
-            const detailsDiv = document.getElementById('filterStatusDetails');
             
-            // ✅ CONTROLLO SICUREZZA: Verifica che gli elementi esistano
-            if (!systemFilterStatusDiv || !systemStatusContent || !filterStatusContent || !detailsDiv) {
-                console.warn('⚠️ Elementi stato sistema/filtro non trovati, skip aggiornamento');
+            if (!systemFilterStatusDiv) {
+                console.warn('⚠️ Elemento systemFilterStatus non trovato, skip aggiornamento');
                 return;
             }
             
+            console.log(`📊 Aggiornamento display filtri - Modalità: ${mode}`);
+            console.log(`🎯 Area: ${areaFilterEnabled}, Entità: ${entityFilterEnabled}`);
+            
             const totalFiltered = filteredEntities.lights.length + filteredEntities.binary_sensors.length + filteredEntities.sensors.length;
             
-            // Crea il dettaglio per tipo di entità
-            const entityBreakdown = `${filteredEntities.lights.length} luci, ${filteredEntities.binary_sensors.length} sensori presenza, ${filteredEntities.sensors.length} sensori luminosità`;
+            // ✅ USA IL CONTEGGIO TOTALE DELLE AREE (non solo quelle caricate)
+            const totalAreasCount = getTotalAreasWithEntities();
             
-            // 🏠 CONTA AREE UNICHE NELLE ENTITÀ MOSTRATE
-            const uniqueAreasCount = countUniqueAreasInEntities(filteredEntities);
-            const areasText = uniqueAreasCount > 0 ? `in ${uniqueAreasCount} aree` : 'senza aree';
-            
-            // Assicurati che il div sia visibile
             systemFilterStatusDiv.style.display = 'block';
             
-            // Aggiorna stato sistema (sempre connesso)
-            systemStatusContent.innerHTML = `
-                <i class="fas fa-check-circle text-success me-2"></i>
-                <strong>Sistema: Connesso</strong>
-                <span class="badge bg-primary ms-2">API</span>
-            `;
+            // Contenuto filtri
+            let filterAreaContent = '';
+            let cssClass = '';
             
-            switch (mode) {
-                case 'disabled':
-                    systemFilterStatusDiv.className = 'filter-status disabled';
-                    filterStatusContent.innerHTML = `
-                        <i class="fas fa-filter-slash me-2"></i>
-                        <strong>Filtro Area: DISATTIVATO</strong>
-                    `;
-                    detailsDiv.innerHTML = `Tutte le ${totalEntities} entità disponibili (${entityBreakdown}) ${areasText}`;
-                    break;
-                    
-                case 'disabled_with_templates':
-                    systemFilterStatusDiv.className = 'filter-status disabled';
-                    filterStatusContent.innerHTML = `
-                        <i class="fas fa-filter-slash me-2"></i>
-                        <strong>Filtro Area: DISATTIVATO</strong>
-                        <span class="badge bg-success ms-2">Template OK</span>
-                    `;
-                    detailsDiv.innerHTML = `Tutte le ${totalEntities} entità disponibili (${entityBreakdown}) ${areasText}`;
-                    break;
-                    
-                case 'active_with_templates':
-                    systemFilterStatusDiv.className = 'filter-status';
-                    filterStatusContent.innerHTML = `
-                        <i class="fas fa-filter me-2"></i>
-                        <strong>Filtro Area: ATTIVATO</strong>
-                        <span class="badge bg-success ms-2">Template OK</span>
-                    `;
-                    const excluded = totalEntities - totalFiltered;
-                    const percentage = Math.round((excluded / totalEntities) * 100);
-                    detailsDiv.innerHTML = `${totalFiltered} entità mostrate (${entityBreakdown}) ${areasText} - ${excluded} entità filtrate (${percentage}% escluse)`;
-                    break;
-                    
-                case 'active_no_templates':
-                    systemFilterStatusDiv.className = 'filter-status';
-                    filterStatusContent.innerHTML = `
-                        <i class="fas fa-filter me-2"></i>
-                        <strong>Filtro Area: ATTIVATO</strong>
-                        <span class="badge bg-warning ms-2">Fallback</span>
-                    `;
-                    detailsDiv.innerHTML = `Template non disponibili - mostrate tutte le ${totalEntities} entità (${entityBreakdown}) ${areasText}`;
-                    break;
-                    
-                default:
-                    console.warn('⚠️ Modalità filtro non riconosciuta:', mode);
-                    break;
+            if (mode === 'fallback_no_areas') {
+                cssClass = 'filter-status disabled';
+                filterAreaContent = `
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Modalità Fallback</strong>
+                    <span class="badge bg-warning ms-2">No Areas</span>
+                `;
+            } else {
+                if (areaFilterEnabled || entityFilterEnabled) {
+                    cssClass = 'filter-status';
+                } else {
+                    cssClass = 'filter-status disabled';
+                }
+                
+                let filterText = 'Filtri: ';
+                if (entityFilterEnabled && areaFilterEnabled) {
+                    filterText += 'Entità ✅ | Area ✅';
+                } else if (entityFilterEnabled && !areaFilterEnabled) {
+                    filterText += 'Entità ✅ | Area ❌';
+                } else if (!entityFilterEnabled && areaFilterEnabled) {
+                    filterText += 'Entità ❌ | Area ✅';
+                } else {
+                    filterText = 'Filtri: DISATTIVATI';
+                }
+                
+                filterAreaContent = `
+                    <i class="fas fa-filter me-2"></i>
+                    <strong>${filterText}</strong>
+                    <span class="badge bg-success ms-2">WebSocket</span>
+                `;
             }
             
-            console.log(`📊 Stato filtro aggiornato: ${mode}, ${totalFiltered}/${totalEntities} entità in ${uniqueAreasCount} aree`);
+            systemFilterStatusDiv.className = cssClass;
+            
+            let areasText = (mode === 'fallback_no_areas') ? 'N/A' : totalAreasCount.toString();
+            
+            // Layout aggiornato
+            systemFilterStatusDiv.innerHTML = `
+                <div style="display: flex; align-items: stretch; min-height: 60px;">
+                    <div style="width: 25%; display: flex; align-items: center; justify-content: center; border-right: 1px solid rgba(0,0,0,0.1);">
+                        <div style="text-align: center;">
+                            <div>
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                <strong>Sistema Connesso</strong>
+                                <span class="badge bg-primary ms-2">API</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="width: 50%; display: flex; flex-direction: column; justify-content: space-between; padding: 8px 15px;">
+                        <div style="display: flex; align-items: center; justify-content: center;">
+                            ${filterAreaContent}
+                        </div>
+                        
+                        <div style="text-align: center; font-size: 14px; color: #333;">
+                            <strong>Luci:</strong> ${filteredEntities.lights.length} • <strong>Sensori presenza:</strong> ${filteredEntities.binary_sensors.length} • <strong>Sensori luminosità:</strong> ${filteredEntities.sensors.length}
+                        </div>
+                    </div>
+                    
+                    <div style="width: 25%; display: flex; flex-direction: column; justify-content: space-between; padding: 8px 0; border-left: 1px solid rgba(0,0,0,0.1);">
+                        <div style="display: flex; align-items: center; height: 50%;">
+                            <div style="width: 100%; padding-left: 15px; display: flex; align-items: center;">
+                                <i class="fas fa-microchip me-2" style="width: 16px;"></i>
+                                <span style="font-weight: bold; width: 55px;">Entità:</span>
+                                <span style="font-weight: bold; color: #2c3e50; text-align: right; width: 30px;">${totalFiltered}</span>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; align-items: center; height: 50%;">
+                            <div style="width: 100%; padding-left: 15px; display: flex; align-items: center;">
+                                <i class="fas fa-home me-2" style="width: 16px;"></i>
+                                <span style="font-weight: bold; width: 55px;">Aree:</span>
+                                <span style="font-weight: bold; color: #2c3e50; text-align: right; width: 30px;">${areasText}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; font-size: 12px; color: #333; margin-top: 5px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 5px;">
+                    ${getFilterStatusMessage(mode, totalEntities, totalFiltered, extractUniqueAreas().length)}
+                </div>
+            `;
+            
+            console.log(`✅ Display aggiornato: Area ${areaFilterEnabled ? 'ON' : 'OFF'}, Entità ${entityFilterEnabled ? 'ON' : 'OFF'}`);
         }
-        
-        // ✅ SINCRONIZZA CONFIGURAZIONI (CORRETTA - CARICA PRIMA CONFIGURAZIONI)
-        async function syncConfigurations() {
-            console.log('🔄 Ricaricamento configurazioni...');
+
+        // 🔧 FUNZIONE: getFilterStatusMessage (testo semplificato + aree escluse)
+        function getFilterStatusMessage(mode, totalEntities, totalFiltered, shownAreasCount) {
+            if (mode === 'fallback_no_areas') {
+                return 'WebSocket non disponibile - modalità fallback attiva';
+            }
             
-            // ⚠️ IMPORTANTE: Carica PRIMA le configurazioni, poi aggiorna la lista
-            loadConfigurationsFromYourFile();
+            if (!areaFilterEnabled && !entityFilterEnabled) {
+                return 'Tutti i filtri disattivati - tutte le entità rilevanti visibili';
+            }
             
-            // Ora aggiorna la lista con le nuove configurazioni
-            updateConfigurationsList();
-            showAlert(`✅ ${configurations.length} configurazioni ricaricate`, 'success');
+            const excludedEntities = totalEntities - totalFiltered;
+            const entitiesPercentage = Math.round((excludedEntities / totalEntities) * 100);
+            
+            // ✅ LOGICA CORRETTA: Usa sempre il totale delle aree del sistema come riferimento
+            const totalAreasReference = getTotalAreasWithEntities(); // Sempre 13
+            let excludedAreas, areasPercentage;
+            
+            if (entityFilterEnabled || areaFilterEnabled) {
+                // Con qualsiasi filtro attivo: aree escluse = totale sistema - aree mostrate
+                excludedAreas = totalAreasReference - shownAreasCount;
+                
+                console.log(`🔍 CALCOLO AREE CON FILTRI:`);
+                console.log(`   📊 Aree totali sistema: ${totalAreasReference}`);
+                console.log(`   📋 Aree mostrate: ${shownAreasCount}`);
+                console.log(`   ❌ Aree escluse: ${excludedAreas}`);
+                
+            } else {
+                // Nessun filtro: tutte le aree disponibili
+                excludedAreas = 0;
+            }
+            
+            areasPercentage = totalAreasReference > 0 ? Math.round((excludedAreas / totalAreasReference) * 100) : 0;
+            
+            // ✅ TESTO NATURALE per entità ed aree
+            let entitiesText = excludedEntities === 0 ? 
+                'Nessuna entità esclusa' : 
+                `${excludedEntities} entità escluse (${entitiesPercentage}%)`;
+            
+            let areasText = excludedAreas === 0 ? 
+                'Nessuna area esclusa' : 
+                `${excludedAreas} aree escluse (${areasPercentage}%)`;
+            
+            // Testo semplificato
+            let filters = [];
+            if (entityFilterEnabled) filters.push('entità');
+            if (areaFilterEnabled) filters.push('area');
+            
+            return `Filtri attivi: ${filters.join(' + ')} - ${entitiesText} - ${areasText}`;
+        }
+
+        // 🔧 FUNZIONE: Calcola aree totali con entità
+        function getTotalAreasWithEntities() {
+            // Conta tutte le aree che hanno almeno un'entità RILEVANTE (senza filtri)
+            const allAreasWithEntities = new Set();
+            
+            // ✅ CONTROLLA SOLO ENTITÀ RILEVANTI nella cache
+            entityAreaCache.forEach((areaName, entityId) => {
+                // Verifica se l'entità è del tipo che ci interessa per l'automatismo luci
+                if (entityId.startsWith('light.') || 
+                    entityId.startsWith('binary_sensor.') || 
+                    (entityId.startsWith('sensor.') && 
+                    (entityId.toLowerCase().includes('illuminance') || entityId.toLowerCase().includes('lux')))) {
+                    allAreasWithEntities.add(areaName);
+                }
+            });
+            
+            console.log(`🏠 Aree totali con entità rilevanti: ${allAreasWithEntities.size}`);
+            return allAreasWithEntities.size;
         }
         
         // 📋 CARICA CONFIGURAZIONI DAL TUO FILE
@@ -1331,6 +1487,129 @@
             configurations = yourConfigurations;
             console.log(`✅ Caricate ${configurations.length} configurazioni`);
         }
+
+        // 🔧 CORREZIONE 4: Sync configurations via sensori (NUOVA)
+        async function syncConfigurationsViaSensors() {
+            try {
+                console.log('📡 SENSOR SYNC: Inizio sincronizzazione via sensori...');
+                
+                // Reset sensore risposta
+                await fetch('/api/states/sensor.southtech_sync_response', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${haToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        state: 'ready',
+                        attributes: { reset_at: new Date().toISOString() }
+                    })
+                });
+                
+                // Invia richiesta
+                const requestResponse = await fetch('/api/states/sensor.southtech_sync_request', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${haToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        state: 'pending',
+                        attributes: {
+                            action: 'sync_configurations',
+                            browser_id: browserId,
+                            timestamp: new Date().toISOString(),
+                            request_id: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+                        }
+                    })
+                });
+                
+                if (!requestResponse.ok) {
+                    throw new Error(`Errore invio richiesta: HTTP ${requestResponse.status}`);
+                }
+                
+                console.log('📤 Richiesta sync inviata via sensore');
+                
+                // Attendi risposta
+                const result = await waitForSyncSensorResponse();
+                
+                console.log('📨 Risposta sync ricevuta:', result);
+                return result;
+                
+            } catch (error) {
+                console.error('❌ Errore sync via sensori:', error);
+                throw error;
+            }
+        }
+
+        // 🔧 Attesa risposta sync sensore
+        async function waitForSyncSensorResponse() {
+            const maxAttempts = 15; // 30 secondi
+            const pollInterval = 2000;
+            
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    const response = await fetch('/api/states/sensor.southtech_sync_response', {
+                        headers: { 'Authorization': `Bearer ${haToken}` }
+                    });
+                    
+                    if (!response.ok) {
+                        await SouthTechCore.sleep(pollInterval);
+                        continue;
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.state === 'completed' && data.attributes) {
+                        return data.attributes;
+                    }
+                    
+                } catch (error) {
+                    console.log(`❌ Errore controllo sync (${attempt}):`, error);
+                }
+                
+                await SouthTechCore.sleep(pollInterval);
+            }
+            
+            throw new Error('Timeout sincronizzazione via sensori');
+        }
+
+        async function syncConfigurations() {
+            try {
+                SouthTechUI.showAlert('🔄 Richiesta sincronizzazione...', 'info');
+                
+                // Prima prova via sensori (il sistema più affidabile attualmente)
+                console.log('📡 Tentativo sincronizzazione via sensori...');
+                
+                try {
+                    const result = await syncConfigurationsViaSensors();
+                    
+                    if (result.success && result.configurations) {
+                        const newConfigurations = result.configurations;
+                        
+                        if (newConfigurations.length > 0) {
+                            configurations = newConfigurations;
+                            SouthTechUI.showAlert(`✅ ${configurations.length} configurazioni caricate da apps.yaml`, 'success');
+                        } else {
+                            SouthTechUI.showAlert('⚠️ File apps.yaml vuoto o nessuna configurazione trovata', 'warning');
+                        }
+                        
+                        updateConfigurationsList();
+                        return;
+                    } else {
+                        throw new Error(result.error || 'Errore sincronizzazione sensori');
+                    }
+                    
+                } catch (sensorError) {
+                    console.error('❌ Sync sensori fallita:', sensorError);
+                    SouthTechUI.showAlert(`⚠️ Sync via sensori fallita: ${sensorError.message}. Uso configurazioni locali.`, 'warning');
+                }
+                
+            } catch (error) {
+                console.error('❌ Errore sincronizzazione completo:', error);
+                SouthTechUI.showAlert(`⚠️ Errore sync: ${error.message}`, 'warning');
+            }
+        }
         
         // 📋 AGGIORNA LISTA CONFIGURAZIONI - AGGIORNATA CON DISPLAY_NAME
         function updateConfigurationsList() {
@@ -1353,7 +1632,7 @@
             });
         }
         
-        // 📋 NUOVA FUNZIONE: Ottieni entità da configurazioni esistenti
+        // 📋 Ottieni entità da configurazioni esistenti
         function getEntitiesFromExistingConfigurations() {
             const existingEntities = new Set();
             
@@ -1400,7 +1679,7 @@
                 <div class="row mb-3">
                     <div class="col-12">
                         <label class="form-label">
-                            <i class="fas fa-map-marker-alt me-1"></i> Area
+                            <i class="fas fa-home me-1"></i> Area
                         </label>
                         <select class="form-select" id="areaSelect_${index}" onchange="handleAreaChange(${index}, this.value)">
                             <option value="">Seleziona area</option>
@@ -1480,7 +1759,7 @@
                 <div class="mt-3 p-3 bg-light rounded">
                     <h6><i class="fas fa-info-circle me-2"></i>Riepilogo Configurazione:</h6>
                     <div class="small text-muted">
-                        ${selectedArea ? `🏠 Area: ${selectedArea}` : '🏠 Area: Non specificata'}<br>
+                        ${selectedArea ? `<i class="fas fa-home me-1"></i> Area: ${selectedArea}` : '<i class="fas fa-home me-1"></i> Area: Non specificata'}<br>
                         ${config.light_entity ? `✅ Luce: ${entities.lights.find(l => l.entity_id === config.light_entity)?.display_name || config.light_entity}` : '❌ Luce non selezionata'}<br>
                         ${config.presence_sensor_on ? `✅ Accensione: ${entities.binary_sensors.find(s => s.entity_id === config.presence_sensor_on)?.display_name || config.presence_sensor_on}` : '❌ Sensore accensione non selezionato'}<br>
                         ${config.presence_sensor_off ? `✅ Spegnimento: ${entities.binary_sensors.find(s => s.entity_id === config.presence_sensor_off)?.display_name || config.presence_sensor_off}` : '❌ Sensore spegnimento non selezionato'}<br>
@@ -1503,7 +1782,7 @@
             });
             
             updateConfigurationsList();
-            showAlert('Nuova configurazione aggiunta', 'success');
+            SouthTechUI.showAlert('Nuova configurazione aggiunta', 'success');
             
             // Scroll verso la nuova configurazione
             setTimeout(() => {
@@ -1516,11 +1795,24 @@
         
         // ❌ RIMUOVI CONFIGURAZIONE
         function removeConfiguration(index) {
-            if (confirm('Sei sicuro di voler rimuovere questa configurazione?')) {
-                configurations.splice(index, 1);
-                updateConfigurationsList();
-                showAlert('Configurazione rimossa', 'info');
-            }
+            SouthTechUI.showConfirmDialog(
+                'Rimuovi Configurazione',
+                `Sei sicuro di voler rimuovere la configurazione ${index + 1}? Questa azione non può essere annullata.`,
+                {
+                    confirmText: 'Rimuovi',
+                    cancelText: 'Annulla',
+                    confirmClass: 'btn-danger',
+                    cancelClass: 'btn-secondary',
+                    onConfirm: () => {
+                        configurations.splice(index, 1);
+                        updateConfigurationsList();
+                        SouthTechUI.showAlert('Configurazione rimossa', 'info');
+                    },
+                    onCancel: () => {
+                        // Nessuna azione necessaria
+                    }
+                }
+            );
         }
         
         // 🔄 AGGIORNA CONFIGURAZIONE - AGGIORNATO PER GESTIRE CAMBIO AREA
@@ -1574,6 +1866,27 @@
                 generateButton.innerHTML = '<i class="fas fa-code"></i> Genera e Salva Configurazione YAML';
                 generateButton.className = generateButton.className.replace('btn-warning', 'btn-success');
             }
+        }
+
+        // ✅ SOSTITUISCE buildEntityAreaCache() e altra logica
+        function updateGlobalCache(areas, entityRegistry, deviceRegistry) {
+            // Salva nei registri globali
+            haAreasRegistry = areas;
+            haEntityRegistry = entityRegistry;
+            haDeviceRegistry = deviceRegistry;
+            
+            // Aggiorna cache
+            areasDataCache = {
+                areas: areas,
+                entityRegistry: entityRegistry,
+                deviceRegistry: deviceRegistry,
+                timestamp: Date.now()
+            };
+            
+            // Costruisci cache aree
+            buildEntityAreaCache();
+            
+            console.log('💾 Cache globali aggiornate');
         }
         
         // 🔍 VALIDAZIONE SILENZIOSA
@@ -1644,15 +1957,24 @@
             }
             
             const alertType = errors.length > 0 ? 'error' : (warnings.length > 0 ? 'warning' : 'success');
-            showAlert(message, alertType);
+            SouthTechUI.showAlert(message, alertType);
             
             return errors.length === 0;
+        }
+
+        /**
+        * Crea nome sensore dinamico basato su operazione
+        */
+        function createSensorName(operation, suffix = '') {
+            const timestamp = Date.now();
+            const base = `sensor.southtech_${operation}`;
+            return suffix ? `${base}_${suffix}_${timestamp}` : `${base}_${timestamp}`;
         }
         
         // 📝 GENERA YAML
         function generateYAML() {
             if (!validateConfiguration()) {
-                showAlert('Correggi gli errori prima di generare il YAML', 'error');
+                SouthTechUI.showAlert('Correggi gli errori prima di generare il YAML', 'error');
                 return;
             }
             
@@ -1667,7 +1989,7 @@
                 block: 'start' 
             });
             
-            showAlert('YAML generato con successo!', 'success');
+            SouthTechUI.showAlert('YAML generato con successo!', 'success');
         }
         
         // 📝 GENERA CONTENUTO YAML
@@ -1713,7 +2035,7 @@
                 yaml += `      turn_off_light_offset: input_number.${baseId}_turn_off_light_offset\n`;
                 
                 if (index < configurations.length - 1) {
-                    yaml += `\n`;
+                    yaml += '\n';
                 }
             });
             
@@ -1730,7 +2052,7 @@
             
             try {
                 await navigator.clipboard.writeText(yamlContent);
-                showAlert('YAML copiato negli appunti!', 'success');
+                SouthTechUI.showAlert('YAML copiato negli appunti!', 'success');
             } catch (error) {
                 // Fallback
                 const textArea = document.createElement('textarea');
@@ -1739,183 +2061,915 @@
                 textArea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textArea);
-                showAlert('YAML copiato negli appunti!', 'success');
+                SouthTechUI.showAlert('YAML copiato negli appunti!', 'success');
             }
         }
         
-        // 💾 SALVA CONFIGURAZIONE
+        // 💾 FUNZIONE PRINCIPALE: Salva configurazione (cascata completa)
         async function saveConfiguration() {
-            if (!validateConfiguration()) {
-                showAlert('Correggi gli errori prima di salvare', 'error');
+            if (isSaving) {
+                SouthTechUI.showAlert('⚠️ Salvataggio già in corso, attendere...', 'warning');
                 return;
             }
             
+            if (!validateConfiguration()) {
+                SouthTechUI.showAlert('❌ Correggi gli errori prima di salvare', 'error');
+                return;
+            }
+            
+            // NUOVO: Mostra popup di conferma prima di salvare
+            showSaveConfirmation();
+        }
+
+        // ✅ NUOVA FUNZIONE: Mostra popup di conferma salvataggio
+        function showSaveConfirmation() {
+            // Genera anteprima della configurazione
+            const yamlContent = generateYAMLContent();
+            const configCount = configurations.length;
+            const yamlSize = yamlContent.length;
+            const yamlLines = yamlContent.split('\n').length;
+            
+            // Crea modal di conferma con lo stile di index.html
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.id = 'saveConfirmationModal';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content" style="border-radius: 20px; border: none;">
+                        <div class="modal-header" style="background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%); color: white; border-radius: 20px 20px 0 0;">
+                            <h5 class="modal-title" style="font-weight: bold;">
+                                <i class="fas fa-save me-2"></i>Conferma Salvataggio Configurazione
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body" style="padding: 30px;">
+                            <div style="text-align: center; margin-bottom: 25px;">
+                                <div style="font-size: 3rem; color: var(--secondary-color); margin-bottom: 15px;">
+                                    <i class="fas fa-file-code"></i>
+                                </div>
+                                <h4 style="color: var(--primary-color); font-weight: bold;">Salvataggio in apps.yaml</h4>
+                                <p class="text-muted">Stai per salvare la configurazione dell'automatismo luci</p>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div style="background: #f8f9fa; border-left: 4px solid var(--secondary-color); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                                        <h6 style="color: var(--primary-color); font-weight: bold; margin-bottom: 15px;">
+                                            <i class="fas fa-info-circle me-2"></i>Dettagli Configurazione
+                                        </h6>
+                                        <div style="font-size: 0.95rem;">
+                                            <div class="mb-2">
+                                                <strong>📊 Configurazioni:</strong> <span class="badge bg-primary">${configCount}</span>
+                                            </div>
+                                            <div class="mb-2">
+                                                <strong>📏 Dimensione YAML:</strong> <span class="badge bg-info">${yamlSize} caratteri</span>
+                                            </div>
+                                            <div class="mb-2">
+                                                <strong>📄 Righe di codice:</strong> <span class="badge bg-success">${yamlLines}</span>
+                                            </div>
+                                            <div>
+                                                <strong>💾 File destinazione:</strong><br>
+                                                <code style="font-size: 0.85rem;">/config/appdaemon/apps/apps.yaml</code>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div style="background: #e8f5e8; border-left: 4px solid var(--success-color); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                                        <h6 style="color: var(--success-color); font-weight: bold; margin-bottom: 15px;">
+                                            <i class="fas fa-shield-alt me-2"></i>Operazioni di Sicurezza
+                                        </h6>
+                                        <div style="font-size: 0.9rem;">
+                                            <div class="mb-2">
+                                                <i class="fas fa-check text-success me-2"></i>Backup automatico del file esistente
+                                            </div>
+                                            <div class="mb-2">
+                                                <i class="fas fa-check text-success me-2"></i>Validazione YAML prima della scrittura
+                                            </div>
+                                            <div class="mb-2">
+                                                <i class="fas fa-check text-success me-2"></i>Verifica integrità file salvato
+                                            </div>
+                                            <div>
+                                                <i class="fas fa-check text-success me-2"></i>Preservazione configurazioni esistenti
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 10px; padding: 15px; margin-bottom: 20px;">
+                                <div style="display: flex; align-items: center;">
+                                    <i class="fas fa-exclamation-triangle text-warning me-3" style="font-size: 1.5rem;"></i>
+                                    <div>
+                                        <strong>Importante:</strong> Il salvataggio sostituirà la sezione "CONTROLLO LUCI AUTOMATICHE" 
+                                        nel file apps.yaml. Le altre configurazioni rimarranno invariate.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="text-align: center; color: #6c757d;">
+                                <small>
+                                    <i class="fas fa-clock me-1"></i>
+                                    Il processo di salvataggio richiede solitamente 2-5 secondi
+                                </small>
+                            </div>
+                        </div>
+                        <div class="modal-footer" style="border: none; padding: 20px 30px 30px;">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="border-radius: 10px; padding: 12px 25px; font-weight: 600;">
+                                <i class="fas fa-times me-2"></i>Annulla
+                            </button>
+                            <button type="button" class="btn btn-success" onclick="proceedWithSave()" style="background: linear-gradient(135deg, var(--success-color) 0%, #229954 100%); border: none; border-radius: 10px; padding: 12px 25px; font-weight: 600; font-size: 1.1rem;">
+                                <i class="fas fa-save me-2"></i>Conferma e Salva
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            const bootstrapModal = new bootstrap.Modal(modal);
+            bootstrapModal.show();
+            
+            // Rimuovi modal quando chiuso
+            modal.addEventListener('hidden.bs.modal', () => {
+                modal.remove();
+            });
+        }
+
+        // ✅ NUOVA FUNZIONE: Procede con il salvataggio dopo conferma
+        async function proceedWithSave() {
+            // Chiudi il modal di conferma
+            const modal = bootstrap.Modal.getInstance(document.getElementById('saveConfirmationModal'));
+            modal.hide();
+            
+            // Avvia il processo di salvataggio effettivo
+            await executeActualSave();
+        }
+
+        async function processEntitiesFromWebSocketData(allStates) {
+            console.log('📊 Processamento entità da dati WebSocket...');
+            console.log(`🎯 FILTRI - Area: ${areaFilterEnabled}, Entità: ${entityFilterEnabled}`);
+            
+            const totalRelevantEntities = calculateTotalRelevantEntities(allStates);
+            
+            // ✅ NUOVA LOGICA UNIFICATA (senza chiamare vecchie funzioni)
+            entities = { lights: [], binary_sensors: [], sensors: [] };
+            
+            // Ottieni entità esistenti per il filtro
+            const existingEntities = getEntitiesFromExistingConfigurations();
+            
+            allStates.forEach(state => {
+                const baseEntityData = {
+                    entity_id: state.entity_id,
+                    friendly_name: state.attributes.friendly_name || state.entity_id
+                };
+                
+                const entityData = {
+                    ...baseEntityData,
+                    display_name: createEntityDisplayName(state.entity_id, baseEntityData.friendly_name)
+                };
+                
+                // Determina se includere l'entità
+                const hasArea = entityAreaCache.has(state.entity_id);
+                const inExisting = existingEntities.has(state.entity_id);
+                const shouldInclude = areaFilterEnabled ? (hasArea || inExisting) : true;
+                
+                if (!shouldInclude) return;
+                
+                // Aggiungi alle categorie appropriate
+                if (state.entity_id.startsWith('light.')) {
+                    entities.lights.push(entityData);
+                } else if (state.entity_id.startsWith('binary_sensor.')) {
+                    entities.binary_sensors.push(entityData);
+                } else if (state.entity_id.startsWith('sensor.')) {
+                    const isIlluminanceSensor = 
+                        state.attributes.device_class === 'illuminance' ||
+                        state.entity_id.toLowerCase().includes('illuminance') || 
+                        state.entity_id.toLowerCase().includes('lux');
+                    
+                    if (isIlluminanceSensor) {
+                        entities.sensors.push(entityData);
+                    }
+                }
+            });
+            
+            // Ordina alfabeticamente
+            Object.values(entities).forEach(category => {
+                category.sort((a, b) => a.display_name.localeCompare(b.display_name));
+            });
+            
+            // Determina modalità per display
+            const mode = areaFilterEnabled ? 'websocket_filtered' : 'websocket_unfiltered';
+            
+            console.log(`✅ Processate: ${entities.lights.length} luci, ${entities.binary_sensors.length} sensori presenza, ${entities.sensors.length} sensori lux`);
+            
+            // Aggiorna display
+            setTimeout(() => {
+                updateFilterStatusDisplay(mode, totalRelevantEntities, entities);
+                forceInterfaceUpdate();
+            }, 100);
+        }
+
+        async function processEntitiesDirectly(allStates) {
+            console.log('📊 Processamento diretto entità (fallback)...');
+            
+            entities = { lights: [], binary_sensors: [], sensors: [] };
+            
+            allStates.forEach(state => {
+                const entityData = {
+                    entity_id: state.entity_id,
+                    friendly_name: state.attributes.friendly_name || state.entity_id,
+                    display_name: createEntityDisplayName(state.entity_id, state.attributes.friendly_name)
+                };
+                
+                if (state.entity_id.startsWith('light.')) {
+                    entities.lights.push(entityData);
+                } else if (state.entity_id.startsWith('binary_sensor.')) {
+                    entities.binary_sensors.push(entityData);
+                } else if (state.entity_id.startsWith('sensor.')) {
+                    const isIlluminanceSensor = 
+                        state.attributes.device_class === 'illuminance' ||
+                        state.entity_id.toLowerCase().includes('illuminance') || 
+                        state.entity_id.toLowerCase().includes('lux');
+                    
+                    if (isIlluminanceSensor) {
+                        entities.sensors.push(entityData);
+                    }
+                }
+            });
+            
+            // Ordina
+            Object.values(entities).forEach(category => {
+                category.sort((a, b) => a.display_name.localeCompare(b.display_name));
+            });
+            
+            console.log(`✅ Fallback: ${entities.lights.length} luci, ${entities.binary_sensors.length} sensori presenza, ${entities.sensors.length} sensori lux`);
+        }
+
+        // ✅ PROCESSA DA CACHE
+        async function processEntitiesFromCache() {
+            // Ripristina dati dalla cache
+            haAreasRegistry = areasDataCache.areas;
+            haEntityRegistry = areasDataCache.entityRegistry;
+            haDeviceRegistry = areasDataCache.deviceRegistry;
+            
+            // Ricostruisci cache aree
+            buildEntityAreaCache();
+            
+            // Carica stati aggiornati
+            const response = await fetch('/api/states', {
+                headers: { 'Authorization': `Bearer ${haToken}` }
+            });
+            const allStates = await response.json();
+            
+            // Processa entità
+            await processEntitiesFromWebSocketData(allStates);
+        }
+
+        // ✅ Esegue il salvataggio effettivo (logica originale)
+        async function executeActualSave() {
+            if (isSaving) {
+                SouthTechUI.showAlert('⚠️ Salvataggio già in corso, attendere...', 'warning');
+                return;
+            }
+            
+            isSaving = true;
             const yamlContent = generateYAMLContent();
             
             try {
-                showAlert('Salvataggio configurazione in corso...', 'info');
+                console.log('🚀 === INIZIO SALVATAGGIO SEMPLIFICATO ===');
                 
-                const response = await fetch(`${APPDAEMON_API_URL}/southtech_save`, {
+                // ✅ UNICO METODO: Sensori ottimizzati (che funziona)
+                console.log('📡 Salvataggio via sensori ottimizzati...');
+                SouthTechUI.showAlert('📡 Salvataggio in corso...', 'info');
+                
+                const sensorResult = await saveViaSensorsOptimized(yamlContent, configurations);
+                if (sensorResult.success) {
+                    SouthTechUI.showAlert('✅ Configurazione salvata con successo!', 'success');
+                    console.log('✅ Salvataggio completato:', sensorResult);
+                    return;
+                }
+                
+                console.log('❌ Anche i sensori ottimizzati sono falliti');
+                throw new Error('Metodo automatico di salvataggio fallito');
+                
+            } catch (error) {
+                console.error('❌ Errore salvataggio:', error);
+                
+                // Fallback: istruzioni manuali
+                console.log('📖 Mostra istruzioni salvataggio manuale');
+                SouthTechUI.showAlert('⚠️ Salvataggio automatico fallito, mostra istruzioni manuali', 'warning');
+                showManualSaveInstructions();
+                
+            } finally {
+                isSaving = false;
+                console.log('🏁 === FINE SALVATAGGIO SEMPLIFICATO ===');
+            }
+        }
+
+        /**
+        * ✅ Aggiorna sensore debug WebSocket
+        */
+        async function updateWebSocketDebugSensor(error, networkInfo, suggestions, yamlContent = null) {
+            try {
+                await fetch('/api/states/sensor.southtech_websocket_debug', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
+                        'Authorization': `Bearer ${haToken}`,
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        yaml_content: yamlContent,
-                        configurations: configurations,
-                        ha_token: haToken,
-                        browser_id: browserId
+                        state: 'frontend_error_detailed',
+                        attributes: {
+                            error_message: error.message,
+                            error_type: error.constructor.name,
+                            error_time: new Date().toISOString(),
+                            network_type: networkInfo.networkType,
+                            ws_url: networkInfo.wsUrl,
+                            browser_id: browserId,
+                            yaml_size: yamlContent ? yamlContent.length : 0,  // ← Fix qui
+                            configs_count: configurations.length,
+                            suggestions: suggestions,
+                            debug_source: 'frontend_websocket_v3.2.1',
+                            troubleshooting_complete: true
+                        }
                     })
                 });
                 
-                if (response.ok) {
-                    const data = await response.json();
-                    showAlert('Configurazione salvata con successo in apps.yaml!', 'success');
-                    console.log('✅ Salvato via API:', data);
-                } else {
-                    throw new Error('Errore salvataggio via API');
-                }
+                console.log('📱 Sensore debug aggiornato con dettagli errore');
                 
-            } catch (error) {
-                console.error('Errore salvataggio:', error);
-                showAlert(`Errore durante il salvataggio: ${error.message}`, 'error');
+            } catch (debugError) {
+                console.warn('⚠️ Errore aggiornamento sensore debug:', debugError);
             }
         }
-        
-        // 📊 AGGIORNA STATO CONNESSIONE
-        function updateConnectionStatus(message, type) {
-            const statusDiv = document.getElementById('connectionStatus');
-            
-            let statusClass, icon;
-            switch (type) {
-                case 'success':
-                    statusClass = 'status-api';
-                    icon = 'fas fa-check-circle';
-                    break;
-                case 'error':
-                    statusClass = 'status-error';
-                    icon = 'fas fa-exclamation-triangle';
-                    break;
-                case 'loading':
-                    statusClass = 'status-file';
-                    icon = 'fas fa-spinner fa-spin';
-                    break;
-                default:
-                    statusClass = 'status-file';
-                    icon = 'fas fa-info-circle';
-            }
-            
-            statusDiv.innerHTML = `
-                <div class="connection-status ${statusClass}">
-                    <i class="${icon}"></i>
-                    <span>${message}</span>
-                    ${currentCommunicationMode !== 'api' ? '<small class="ms-2">(Modalità Fallback)</small>' : ''}
-                </div>
-            `;
-        }
-        
-        // 🧪 DEBUG TEMPLATES
-        async function debugTemplates() {
-            console.log('🧪 === DEBUG TEMPLATE ===');
-            
-            const result = await loadTemplateSensors();
-            if (result.success) {
-                console.log('✅ Template caricati con successo');
-                Object.entries(result.data).forEach(([key, sensor]) => {
-                    console.log(`📊 ${key.toUpperCase()}:`);
-                    console.log(`   State: ${sensor.state}`);
-                    console.log(`   Areas Entity: ${sensor.attributes.areas_entity ? 'Presente' : 'Mancante'}`);
-                    
-                    if (sensor.attributes.areas_entity) {
-                        const lines = sensor.attributes.areas_entity.split('\n').filter(l => l.trim());
-                        console.log(`   Entità trovate: ${lines.length}`);
-                        console.log(`   Prime 3 entità:`, lines.slice(0, 3));
+
+        // 📡 STEP 2: Salvataggio via sensori HA (fallback)
+        async function saveViaSensors(yamlContent) {
+            try {
+                console.log('📡 SENSOR SAVE: Preparazione salvataggio via sensori...');
+                
+                const saveData = {
+                    action: 'save_yaml',
+                    yaml_content: yamlContent,
+                    configurations: configurations,
+                    browser_id: browserId || 'unknown',
+                    timestamp: new Date().toISOString(),
+                    debug_info: {
+                        frontend_version: '3.0.1',
+                        method: 'sensor_fallback',
+                        fallback_reason: 'websocket_failed'
                     }
+                };
+                
+                // Reset sensore risposta
+                console.log('🔄 Reset sensore risposta...');
+                await fetch('/api/states/sensor.southtech_save_response', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${haToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        state: 'ready',
+                        attributes: { 
+                            reset_at: new Date().toISOString(),
+                            reset_reason: 'websocket_fallback'
+                        }
+                    })
                 });
                 
-                const entityIds = extractEntitiesFromTemplates(result.data);
-                console.log(`🎯 Totale entità uniche: ${entityIds.size}`);
+                // Attendi un momento per il reset
+                await SouthTechCore.sleep(1000);
                 
-                showAlert(`✅ Debug template OK - ${entityIds.size} entità trovate`, 'success');
-            } else {
-                console.log('❌ Template non disponibili');
-                showAlert('❌ Template non disponibili - controlla console', 'error');
+                // Invia richiesta via sensore
+                console.log('📤 Invio richiesta via sensore...');
+                const response = await fetch('/api/states/sensor.southtech_save_request', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${haToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        state: 'pending',
+                        attributes: saveData
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Errore HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                console.log('✅ Richiesta sensore inviata, attesa risposta...');
+                SouthTechUI.showAlert('📡 Richiesta inviata via sensore, elaborazione in corso...', 'info');
+                
+                // Attendi risposta con timeout più lungo
+                const result = await waitForSensorResponse(30); // 30 secondi invece di 25
+                
+                console.log('📨 Risposta sensore ricevuta:', result);
+                return result;
+                
+            } catch (error) {
+                console.error('❌ Errore salvataggio sensori:', error);
+                
+                // Aggiorna sensore debug
+                try {
+                    await fetch('/api/states/sensor.southtech_websocket_debug', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${haToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            state: 'sensor_fallback_error',
+                            attributes: {
+                                error_message: error.message,
+                                error_time: new Date().toISOString(),
+                                fallback_method: 'sensor',
+                                debug_source: 'frontend_sensor_fallback'
+                            }
+                        })
+                    });
+                } catch (debugError) {
+                    console.warn('⚠️ Impossibile aggiornare sensore debug:', debugError);
+                }
+                
+                return { success: false, error: error.message, method: 'sensor_failed' };
             }
         }
-        
-        // 🐛 DEBUG ENTITÀ - AGGIORNATO CON INFO AREE
-        function debugEntities() {
-            console.log('🐛 === DEBUG ENTITÀ ===');
-            console.log(`🎯 Filtro attivo: ${areaFilterEnabled}`);
-            console.log(`🏠 Template cache: ${templateSensorsCache ? 'Presente' : 'Vuota'}`);
-            console.log(`📊 Modalità: ${currentCommunicationMode}`);
-            console.log(`💡 Luci: ${entities.lights.length}`);
-            console.log(`🚶 Sensori binari: ${entities.binary_sensors.length}`);
-            console.log(`☀️ Sensori lux: ${entities.sensors.length}`);
-            console.log(`🗺️ Aree mappate: ${entityAreasMap.size}`);
-            
-            const uniqueAreas = extractUniqueAreas();
-            console.log(`🏠 Aree uniche: ${uniqueAreas.length} -> ${uniqueAreas.join(', ')}`);
-            
-            if (entities.lights.length > 0) {
-                console.log('Prime 5 luci:', entities.lights.slice(0, 5).map(l => `${l.entity_id} -> ${l.display_name}`));
+
+        async function saveViaSensorsOptimized(yamlContent, configurations) {
+            try {
+                console.log('📡 Sensori ottimizzati: Inizializzazione...');
+                
+                // Sistema sensori ottimizzato con timestamp per evitare duplicati
+                const requestTimestamp = new Date().toISOString();
+                const requestId = `sensor_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                
+                // Reset sensore risposta
+                await fetch('/api/states/sensor.southtech_save_response', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${haToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        state: 'ready',
+                        attributes: { 
+                            reset_at: requestTimestamp,
+                            reset_for_request: requestId
+                        }
+                    })
+                });
+                
+                // Attendi reset
+                await SouthTechCore.sleep(1500);
+                
+                // Invia richiesta con timestamp univoco
+                const response = await fetch('/api/states/sensor.southtech_save_request', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${haToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        state: 'pending',
+                        attributes: {
+                            request_id: requestId,
+                            timestamp: requestTimestamp, // Chiave per evitare riprocessing
+                            action: 'save_yaml',
+                            yaml_content: yamlContent,
+                            configurations: configurations,
+                            browser_id: browserId,
+                            method: 'sensor_optimized'
+                        }
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Errore invio richiesta sensori: HTTP ${response.status}`);
+                }
+                
+                console.log('📤 Richiesta sensori ottimizzati inviata');
+                
+                // Attendi con timeout ottimizzato
+                const result = await waitForSensorResponseOptimized(25); // 25 secondi
+                return result;
+                
+            } catch (error) {
+                console.error('❌ Sensori ottimizzati falliti:', error);
+                return { success: false, error: error.message };
             }
-            
-            if (entityAreasMap.size > 0) {
-                const firstFiveAreas = Array.from(entityAreasMap.entries()).slice(0, 5);
-                console.log('Prime 5 aree mappate:', firstFiveAreas);
-            }
-            
-            // Debug configurazioni con aree
-            configurations.forEach((config, index) => {
-                const detectedArea = detectConfigurationArea(config);
-                console.log(`Config ${index + 1}: area rilevata="${detectedArea}", area selezionata="${config.selected_area}"`);
-            });
-            
-            showAlert(`Debug entità: ${entities.lights.length + entities.binary_sensors.length + entities.sensors.length} totali, ${entityAreasMap.size} con area, ${uniqueAreas.length} aree uniche`, 'info');
         }
-        
-        // 🚨 MOSTRA ALERT
-        function showAlert(message, type = 'info', duration = 4000) {
-            const indicator = document.getElementById('statusIndicator');
+
+        async function saveViaOptimizedSystem(yamlContent, configurations) {
+            try {
+                console.log('💾 OTTIMIZZATO: Tentativo salvataggio senza servizi AppDaemon...');
+                
+                // STEP 1: Tentativo WebSocket interno (tramite sensore speciale)
+                const wsResult = await saveViaInternalWebSocket(yamlContent, configurations);
+                if (wsResult.success) {
+                    SouthTechUI.showAlert('✅ Salvato via WebSocket interno!', 'success');
+                    return wsResult;
+                }
+                
+                console.log('⚠️ WebSocket interno fallito, uso sensori...');
+                
+                // STEP 2: Fallback sensori ottimizzato
+                const sensorResult = await saveViaSensorsOptimized(yamlContent, configurations);
+                if (sensorResult.success) {
+                    SouthTechUI.showAlert('✅ Salvato via sensori ottimizzati!', 'success');
+                    return sensorResult;
+                }
+                
+                // STEP 3: Ultimo resort - istruzioni manuali
+                showManualSaveInstructions();
+                
+            } catch (error) {
+                console.error('❌ Errore sistema ottimizzato:', error);
+                showManualSaveInstructions();
+            }
+        }
+
+        // 🔧 Debug WebSocket status
+        async function checkWebSocketServiceStatus() {
+            try {
+                console.log('🔍 Controllo stato servizio WebSocket (v3.1.0)...');
+                
+                const networkInfo = SouthTechCore.getNetworkInfo();
+                console.log(`🌐 Test su rete ${networkInfo.networkType}: ${networkInfo.wsUrl}`);
+                
+                const wsManager = new SouthTechCore.WebSocketManager(haToken);
+                await wsManager.connect();
+                
+                // Test chiamata servizio
+                try {
+                    await wsManager.callService('appdaemon', 'southtech_save_yaml', {
+                        test: true,
+                        yaml_content: '# test',
+                        browser_id: browserId,
+                        network_type: networkInfo.networkType
+                    });
+                    
+                    console.log(`✅ Servizio WebSocket disponibile (${networkInfo.networkType})`);
+                    return true;
+                    
+                } catch (serviceError) {
+                    console.error(`❌ Servizio WebSocket non disponibile (${networkInfo.networkType}):`, serviceError);
+                    return false;
+                    
+                } finally {
+                    wsManager.disconnect();
+                }
+                
+            } catch (connectionError) {
+                console.error(`❌ Connessione WebSocket fallita:`, connectionError);
+                return false;
+            }
+        }
+
+        // ⏳ Attendi risposta da sensore
+        async function waitForSensorResponse(maxSeconds = 30) {
+            const maxAttempts = Math.floor(maxSeconds / 2); // Controllo ogni 2 secondi
+            const pollInterval = 2000;
             
-            let alertClass, icon;
-            switch (type) {
-                case 'success':
-                    alertClass = 'alert-success';
-                    icon = 'fas fa-check-circle';
-                    break;
-                case 'error':
-                    alertClass = 'alert-danger';
-                    icon = 'fas fa-exclamation-triangle';
-                    duration = 8000;
-                    break;
-                case 'warning':
-                    alertClass = 'alert-warning';
-                    icon = 'fas fa-exclamation-circle';
-                    duration = 6000;
-                    break;
-                default:
-                    alertClass = 'alert-info';
-                    icon = 'fas fa-info-circle';
+            console.log(`🔍 Attesa risposta sensore (max ${maxSeconds}s, ${maxAttempts} tentativi)`);
+            
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    console.log(`🔍 Controllo risposta sensore (${attempt}/${maxAttempts})...`);
+                    
+                    const response = await fetch('/api/states/sensor.southtech_save_response', {
+                        headers: { 'Authorization': `Bearer ${haToken}` }
+                    });
+                    
+                    if (!response.ok) {
+                        console.log(`⚠️ Errore HTTP ${response.status}, riprovo...`);
+                        await SouthTechCore.sleep(pollInterval);
+                        continue;
+                    }
+                    
+                    const data = await response.json();
+                    const state = data.state;
+                    const attributes = data.attributes || {};
+                    
+                    console.log(`📡 Stato sensore: ${state}, attributi:`, attributes);
+                    
+                    // Controlla se la risposta è pronta
+                    if (state === 'completed' && attributes.timestamp) {
+                        // Verifica che sia una risposta recente (ultimi 60 secondi)
+                        const responseTime = new Date(attributes.timestamp);
+                        const now = new Date();
+                        const ageDiff = now - responseTime;
+                        
+                        if (ageDiff < 60000) { // 60 secondi
+                            console.log('✅ Risposta sensore valida ricevuta');
+                            
+                            // Reset sensore per pulizia
+                            try {
+                                await fetch('/api/states/sensor.southtech_save_response', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Authorization': `Bearer ${haToken}`,
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        state: 'cleaned',
+                                        attributes: { cleaned_at: new Date().toISOString() }
+                                    })
+                                });
+                            } catch (e) {
+                                console.warn('⚠️ Errore pulizia sensore:', e);
+                            }
+                            
+                            return attributes;
+                        } else {
+                            console.log(`⚠️ Risposta troppo vecchia (${Math.round(ageDiff/1000)}s), continuo ad aspettare...`);
+                        }
+                    } else if (state === 'error') {
+                        throw new Error(attributes.error || 'Errore dal backend AppDaemon');
+                    }
+                    
+                    // Aggiorna UI ogni 3 tentativi (6 secondi)
+                    if (attempt % 3 === 0) {
+                        const dots = '.'.repeat((attempt / 3) % 4);
+                        SouthTechUI.showAlert(`📡 Elaborazione in corso${dots} (${attempt * 2}s)`, 'info', 1500);
+                    }
+                    
+                } catch (error) {
+                    console.log(`❌ Errore controllo risposta (${attempt}):`, error);
+                }
+                
+                await SouthTechCore.sleep(pollInterval);
             }
             
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert ${alertClass} alert-dismissible fade show`;
-            alertDiv.innerHTML = `
-                <i class="${icon} me-2"></i>
-                ${message.replace(/\n/g, '<br>')}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            throw new Error(`Timeout: Nessuna risposta dal backend entro ${maxSeconds} secondi`);
+        }
+
+        async function waitForSensorResponseOptimized(maxSeconds) {
+            const maxAttempts = Math.floor(maxSeconds / 2); // Controlla ogni 2 secondi
+            const pollInterval = 2000;
+            
+            console.log(`🔍 Attesa risposta sensori ottimizzati (max ${maxSeconds}s)...`);
+            
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    const response = await fetch('/api/states/sensor.southtech_save_response', {
+                        headers: { 'Authorization': `Bearer ${haToken}` }
+                    });
+                    
+                    if (!response.ok) {
+                        await SouthTechCore.sleep(pollInterval);
+                        continue;
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.state === 'completed' && data.attributes && data.attributes.timestamp) {
+                        // Verifica timestamp recente
+                        const responseTime = new Date(data.attributes.timestamp);
+                        const now = new Date();
+                        
+                        if ((now - responseTime) < 60000) { // 1 minuto
+                            console.log('✅ Risposta sensori ottimizzati ricevuta');
+                            
+                            // Pulizia sensore
+                            try {
+                                await fetch('/api/states/sensor.southtech_save_response', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Authorization': `Bearer ${haToken}`,
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        state: 'cleaned',
+                                        attributes: { cleaned_at: new Date().toISOString() }
+                                    })
+                                });
+                            } catch (e) {
+                                console.warn('⚠️ Errore pulizia sensore:', e);
+                            }
+                            
+                            return data.attributes;
+                        } else {
+                            console.log(`⚠️ Risposta sensori troppo vecchia (${Math.round((now - responseTime)/1000)}s)`);
+                        }
+                    } else if (data.state === 'error') {
+                        throw new Error(data.attributes?.error || 'Errore dal backend sensori');
+                    }
+                    
+                    // Progress feedback ogni 3 tentativi (6 secondi)
+                    if (attempt % 3 === 0) {
+                        SouthTechUI.showAlert(`📡 Sensori... (${attempt * 2}s)`, 'info', 1500);
+                    }
+                    
+                } catch (error) {
+                    console.log(`❌ Errore controllo sensori (${attempt}):`, error);
+                }
+                
+                await SouthTechCore.sleep(pollInterval);
+            }
+            
+            throw new Error(`Timeout sensori ottimizzati: ${maxSeconds} secondi`);
+        }
+
+        // 📖 STEP 3: Mostra istruzioni salvataggio manuale
+        function showManualSaveInstructions() {
+            const yamlContent = generateYAMLContent();
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.id = 'manualSaveModal';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title">
+                                <i class="fas fa-hand-paper me-2"></i>
+                                Salvataggio Manuale Richiesto
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Tutti i metodi automatici di salvataggio sono falliti.</strong>
+                                Segui questi passaggi per salvare manualmente la configurazione:
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-5">
+                                    <h6><i class="fas fa-list-ol me-2"></i>Passaggi da seguire:</h6>
+                                    <ol class="list-group list-group-numbered">
+                                        <li class="list-group-item d-flex align-items-start">
+                                            <div class="ms-2">
+                                                <strong>Copia il codice YAML</strong><br>
+                                                <small class="text-muted">Usa il pulsante "Copia" nella sezione a destra</small>
+                                            </div>
+                                        </li>
+                                        <li class="list-group-item d-flex align-items-start">
+                                            <div class="ms-2">
+                                                <strong>Accedi al file apps.yaml</strong><br>
+                                                <small class="text-muted">Percorso: <code>/config/appdaemon/apps/apps.yaml</code></small>
+                                            </div>
+                                        </li>
+                                        <li class="list-group-item d-flex align-items-start">
+                                            <div class="ms-2">
+                                                <strong>Trova la sezione esistente</strong><br>
+                                                <small class="text-muted">Cerca tra:<br>
+                                                <code># START CONTROLLO LUCI AUTOMATICHE</code><br>
+                                                <code># END CONTROLLO LUCI AUTOMATICHE</code></small>
+                                            </div>
+                                        </li>
+                                        <li class="list-group-item d-flex align-items-start">
+                                            <div class="ms-2">
+                                                <strong>Sostituisci o aggiungi</strong><br>
+                                                <small class="text-muted">Se la sezione esiste, sostituiscila completamente. Altrimenti aggiungi alla fine del file.</small>
+                                            </div>
+                                        </li>
+                                        <li class="list-group-item d-flex align-items-start">
+                                            <div class="ms-2">
+                                                <strong>Salva e riavvia</strong><br>
+                                                <small class="text-muted">Salva il file e riavvia AppDaemon dal menu Supervisor</small>
+                                            </div>
+                                        </li>
+                                    </ol>
+                                    
+                                    <div class="alert alert-info mt-3">
+                                        <i class="fas fa-lightbulb me-2"></i>
+                                        <strong>Suggerimento:</strong> Fai sempre un backup del file prima di modificarlo!
+                                    </div>
+                                    
+                                    <div class="alert alert-secondary mt-2">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        <strong>Configurazioni salvate:</strong> ${configurations.length}<br>
+                                        <strong>Dimensione YAML:</strong> ${yamlContent.length} caratteri
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-7">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6><i class="fas fa-code me-2"></i>Codice YAML da copiare:</h6>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="copyManualYAML()">
+                                            <i class="fas fa-copy me-1"></i>Copia
+                                        </button>
+                                    </div>
+                                    
+                                    <div style="position: relative;">
+                                        <textarea id="manualYamlContent" class="form-control" rows="22" readonly 
+                                                style="font-family: 'Courier New', monospace; font-size: 11px; background-color: #f8f9fa; border: 2px solid #dee2e6;">${yamlContent}</textarea>
+                                        
+                                        <div class="position-absolute" style="bottom: 5px; right: 5px; background: rgba(255,255,255,0.9); padding: 2px 6px; border-radius: 3px; font-size: 10px; color: #666;">
+                                            ${yamlContent.split('\n').length} righe
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            <i class="fas fa-shield-alt me-1"></i>
+                                            Il codice è stato validato ed è pronto per l'uso
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary" onclick="copyManualYAML()">
+                                <i class="fas fa-copy me-2"></i>Copia YAML
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="downloadYAML()">
+                                <i class="fas fa-download me-2"></i>Scarica File
+                            </button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="fas fa-times me-2"></i>Chiudi
+                            </button>
+                        </div>
+                    </div>
+                </div>
             `;
             
-            indicator.appendChild(alertDiv);
+            document.body.appendChild(modal);
+            const bootstrapModal = new bootstrap.Modal(modal);
+            bootstrapModal.show();
             
-            setTimeout(() => {
-                if (alertDiv.parentNode) {
-                    alertDiv.remove();
+            // Rimuovi modal quando chiuso
+            modal.addEventListener('hidden.bs.modal', () => {
+                modal.remove();
+            });
+        }
+
+        // 📋 Copia YAML manuale
+        function copyManualYAML() {
+            const textarea = document.getElementById('manualYamlContent');
+            if (textarea) {
+                textarea.select();
+                textarea.setSelectionRange(0, 99999); // Per dispositivi mobile
+                
+                try {
+                    // Prova il nuovo API navigator.clipboard
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(textarea.value).then(() => {
+                            showCopySuccess();
+                        }).catch(() => {
+                            // Fallback al metodo legacy
+                            legacyCopy(textarea);
+                        });
+                    } else {
+                        // Fallback diretto
+                        legacyCopy(textarea);
+                    }
+                    
+                } catch (error) {
+                    console.error('Errore copia:', error);
+                    SouthTechUI.showAlert('❌ Errore durante la copia. Seleziona tutto il testo e copia manualmente (Ctrl+C)', 'error');
                 }
-            }, duration);
+            }
+        }
+
+        // Copia legacy (fallback)
+        function legacyCopy(textarea) {
+            try {
+                document.execCommand('copy');
+                showCopySuccess();
+            } catch (error) {
+                SouthTechUI.showAlert('❌ Copia automatica non disponibile. Seleziona tutto il testo e usa Ctrl+C', 'warning');
+            }
+        }
+
+        // Mostra successo copia
+        function showCopySuccess() {
+            SouthTechUI.showAlert('✅ YAML copiato negli appunti!', 'success');
+            
+            // Evidenzia visivamente la copia
+            const textarea = document.getElementById('manualYamlContent');
+            if (textarea) {
+                textarea.style.backgroundColor = '#d4edda';
+                textarea.style.borderColor = '#28a745';
+                setTimeout(() => {
+                    textarea.style.backgroundColor = '#f8f9fa';
+                    textarea.style.borderColor = '#dee2e6';
+                }, 1500);
+            }
+        }
+
+        // 📁 Scarica YAML come file
+        function downloadYAML() {
+            const yamlContent = generateYAMLContent();
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            const filename = `southtech_light_config_${timestamp}.yaml`;
+            
+            const blob = new Blob([yamlContent], { type: 'text/yaml' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            SouthTechUI.showAlert(`📁 File scaricato: ${filename}`, 'success');
         }
         
         console.log('✅ SouthTech Automatismo Luci JavaScript caricato');

@@ -243,20 +243,20 @@
     <div class="main-container">
         <!-- Pulsante Indietro -->
         <div class="back-button">
-            <div class="dropdown">
-                <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                    <i class="fas fa-bars"></i> Menu
-                </button>
-                <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="#" onclick="goBack()">
-                        <i class="fas fa-home"></i> Menu Principale
-                    </a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="#" onclick="logout()">
-                        <i class="fas fa-sign-out-alt"></i> Logout
-                    </a></li>
-                </ul>
-            </div>
+          <div class="dropdown">
+              <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                  <i class="fas fa-bars"></i> Menu
+              </button>
+              <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="#" onclick="SouthTechCore.goToMainMenu()">
+                      <i class="fas fa-home"></i> Menu Principale
+                  </a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="#" onclick="SouthTechCore.performLogout()">
+                      <i class="fas fa-sign-out-alt"></i> Logout
+                  </a></li>
+              </ul>
+          </div>
         </div>
         
         <!-- Header -->
@@ -472,74 +472,13 @@
     <div id="statusIndicator" class="status-indicator"></div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="southtech_secure.js"></script>         <!-- 1° -->
+    <script src="southtech_core.js"></script>          <!-- 2° -->
+    <script src="southtech_ui.js"></script>            <!-- 3° -->
+    <script src="southtech_timeout.js"></script>       <!-- 4° -->
+    <script src="southtech_session_guard.js"></script> <!-- 5° ULTIMO -->
 
     <script>
-        // Validazione accesso diretto alla pagina
-        async function validateDirectPageAccess() {
-            console.log('🔐 Controllo accesso diretto alla pagina...');
-            
-            try {
-                // Recupera token di sessione
-                const authToken = sessionStorage.getItem('southtech_session_token');
-                const haToken = sessionStorage.getItem('southtech_ha_token');
-                const browserId = sessionStorage.getItem('southtech_browser_id');
-                
-                // Controllo presenza token
-                if (!authToken || !haToken || !browserId) {
-                    console.log('🔐 Token mancanti - reindirizzo a index');
-                    redirectToIndex('Token di sessione mancanti');
-                    return false;
-                }
-                
-                console.log('🔐 Token di sessione presenti, validazione HA...');
-                
-                // Verifica SOLO il token HA (più affidabile e veloce)
-                const response = await fetch('/api/states', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${haToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                if (!response.ok) {
-                    console.log('🔐 Token HA non valido');
-                    redirectToIndex('Token Home Assistant scaduto');
-                    return false;
-                }
-                
-                console.log('✅ Accesso autorizzato - token HA valido');
-                return true;
-                
-            } catch (error) {
-                console.error('🔐 Errore durante validazione:', error);
-                redirectToIndex('Errore di validazione');
-                return false;
-            }
-        }
-
-        function redirectToIndex(reason) {
-            console.log(`🔐 Reindirizzamento: ${reason}`);
-            
-            // Pulisci la sessione
-            sessionStorage.removeItem('southtech_session_token');
-            sessionStorage.removeItem('southtech_ha_token');
-            sessionStorage.removeItem('southtech_browser_id');
-            sessionStorage.removeItem('southtech_return_to_menu');
-            sessionStorage.removeItem('southtech_page_source');
-            
-            // Mostra messaggio e reindirizza
-            if (typeof showAlert === 'function') {
-                showAlert(`Accesso non autorizzato: ${reason}. Reindirizzamento in corso...`, 'warning');
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 2000);
-            } else {
-                alert(`Accesso non autorizzato: ${reason}`);
-                window.location.href = 'index.html';
-            }
-        }
-
         // Variabili globali
         let isAuthenticated = false;
         let authToken = null;
@@ -551,16 +490,24 @@
         window.addEventListener('load', async () => {
             console.log('🚀 SouthTech Monitoring avviato');
             
-            // ✅ CONTROLLO SICUREZZA OBBLIGATORIO
-            const accessGranted = await validateDirectPageAccess();
-            
+            // ✅ STEP 1: CONTROLLO SESSIONE per pagine protette (versione inline)
+            console.log('🛡️ Controllo sessione timeout per pagina protetta...');
+
+            // Esegui controllo
+            const sessionValid = await SouthTechSessionGuard.init();
+            if (!sessionValid) {
+                return; // Session Guard gestisce tutto automaticamente
+            }
+                    
+            // ✅ STEP 2: CONTROLLO ACCESSO AUTORIZZATO
+            const accessGranted = await SouthTechCore.validateDirectPageAccess();
             if (!accessGranted) {
                 console.log('🔐 Accesso negato - interruzione caricamento pagina');
                 return;
             }
             
-            // ✅ Accesso autorizzato, continua con l'inizializzazione esistente
-            console.log('✅ Accesso autorizzato - continuazione inizializzazione...');
+            // ✅ STEP 3: Continua con inizializzazione esistente
+            console.log('✅ Sessione e accesso validi - continuazione inizializzazione...');
             
             // Recupera token dalla sessione (ora sicuri che ci sono)
             authToken = sessionStorage.getItem('southtech_session_token');
@@ -572,7 +519,10 @@
         
         // Inizializzazione monitoraggio
         async function initializeMonitoring() {
-            showAlert('Dashboard di monitoraggio caricata!', 'success');
+            SouthTechUI.showAlert('Dashboard di monitoraggio caricata!', 'success');
+
+            // Importa gestione timeout
+            SouthTechTimeout.initialize();    // ← GIÀ PRESENTE!
             
             // Registra accesso attuale (che mostrerà quello precedente)
             registerCurrentAccess();
@@ -642,20 +592,20 @@
             try {
                 // Simula controllo Home Assistant
                 const haStatus = await checkHomeAssistantStatus();
-                updateStatusBadge('haStatus', haStatus ? 'online' : 'offline', haStatus ? 'Online' : 'Offline');
+                SouthTechUI.updateStatusBadge('haStatus', haStatus ? 'online' : 'offline', haStatus ? 'Online' : 'Offline');
                 
                 // Simula controllo AppDaemon
                 const adStatus = await checkAppDaemonStatus();
-                updateStatusBadge('appdaemonStatus', adStatus ? 'online' : 'offline', adStatus ? 'Operativo' : 'Non Raggiungibile');
+                SouthTechUI.updateStatusBadge('appdaemonStatus', adStatus ? 'online' : 'offline', adStatus ? 'Operativo' : 'Non Raggiungibile');
                 
                 // Simula controlli altri componenti
-                updateStatusBadge('securityStatus', 'online', 'Attivo');
-                updateStatusBadge('dbStatus', 'online', 'Operativo');
-                updateStatusBadge('iotStatus', 'warning', '7/8 Dispositivi');
+                SouthTechUI.updateStatusBadge('securityStatus', 'online', 'Attivo');
+                SouthTechUI.updateStatusBadge('dbStatus', 'online', 'Operativo');
+                SouthTechUI.updateStatusBadge('iotStatus', 'warning', '7/8 Dispositivi');
                 
             } catch (error) {
                 console.error('Errore aggiornamento stato:', error);
-                showAlert('Errore nell\'aggiornamento dello stato sistema', 'error');
+                SouthTechUI.showAlert('Errore nell\'aggiornamento dello stato sistema', 'error');
             }
         }
         
@@ -687,47 +637,15 @@
             }
         }
         
-        // Aggiorna badge di stato
-        function updateStatusBadge(elementId, status, text) {
-            const element = document.getElementById(elementId);
-            if (!element) return;
-            
-            element.className = 'status-badge';
-            switch (status) {
-                case 'online':
-                    element.classList.add('status-online');
-                    break;
-                case 'offline':
-                    element.classList.add('status-offline');
-                    break;
-                case 'warning':
-                    element.classList.add('status-warning');
-                    break;
-            }
-            element.textContent = text;
-        }
-        
         // Aggiorna metriche
         function updateMetrics() {
             const startTime = Date.now() - (Math.random() * 86400000 * 7); // Uptime casuale fino a 7 giorni
-            const uptime = formatUptime(Date.now() - startTime);
+            const uptime = SouthTechUI.formatUptime(Date.now() - startTime);
             
             document.getElementById('uptimeValue').textContent = uptime;
             document.getElementById('activeConfigsValue').textContent = Math.floor(Math.random() * 10) + 5;
             document.getElementById('eventsValue').textContent = Math.floor(Math.random() * 100) + 30;
             document.getElementById('errorsValue').textContent = Math.floor(Math.random() * 5);
-        }
-        
-        // Formatta uptime
-        function formatUptime(milliseconds) {
-            const days = Math.floor(milliseconds / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((milliseconds % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            
-            if (days > 0) {
-                return `${days}d ${hours}h`;
-            } else {
-                return `${hours}h`;
-            }
         }
         
         // Aggiorna log
@@ -769,72 +687,6 @@
                 minute: '2-digit',
                 second: '2-digit'
             });
-        }
-        
-        // Torna al menu principale
-        function goBack() {
-            // Salva informazione di ritorno
-            sessionStorage.setItem('southtech_return_to_menu', 'true');
-            window.location.href = 'index.html';
-        }
-        
-        // Logout
-        function logout() {
-            // Pulisci tutti i token dalla sessione
-            sessionStorage.removeItem('southtech_session_token');
-            sessionStorage.removeItem('southtech_ha_token');
-            sessionStorage.removeItem('southtech_browser_id');
-            sessionStorage.removeItem('southtech_return_to_menu');
-            sessionStorage.removeItem('southtech_page_source');
-            window.location.href = 'index.html';
-        }
-        
-        // Pulizia prima di uscire
-        window.addEventListener('beforeunload', () => {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-            }
-        });
-        
-        // Utility functions
-        function showAlert(message, type = 'info', duration = 4000) {
-            const indicator = document.getElementById('statusIndicator');
-            
-            let alertClass, icon;
-            switch (type) {
-                case 'success':
-                    alertClass = 'alert-success';
-                    icon = 'fas fa-check-circle';
-                    break;
-                case 'error':
-                    alertClass = 'alert-danger';
-                    icon = 'fas fa-exclamation-triangle';
-                    duration = 6000;
-                    break;
-                case 'warning':
-                    alertClass = 'alert-warning';
-                    icon = 'fas fa-exclamation-circle';
-                    break;
-                default:
-                    alertClass = 'alert-info';
-                    icon = 'fas fa-info-circle';
-            }
-            
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert ${alertClass} alert-dismissible fade show`;
-            alertDiv.innerHTML = `
-                <i class="${icon} me-2"></i>
-                ${message.replace(/\n/g, '<br>')}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-            
-            indicator.appendChild(alertDiv);
-            
-            setTimeout(() => {
-                if (alertDiv.parentNode) {
-                    alertDiv.remove();
-                }
-            }, duration);
         }
         
         console.log('✅ SouthTech Monitoring caricato con successo');

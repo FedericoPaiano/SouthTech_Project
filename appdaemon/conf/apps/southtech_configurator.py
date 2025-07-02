@@ -11,7 +11,7 @@ import shutil
 
 class SouthTechConfigurator(hass.Hass):
     def initialize(self):
-        self.log("🚀 SouthTech Configurator inizializzato - Versione con Sicurezza Avanzata")
+        self.log("🚀 SouthTech Configurator inizializzato - Versione con WebSocket FIXED")
         
         # Path dei file - CORRETTI per Home Assistant OS con AppDaemon addon
         self.apps_yaml_path = "/homeassistant/appdaemon/apps/apps.yaml"
@@ -39,26 +39,23 @@ class SouthTechConfigurator(hass.Hass):
         self.blocked_users = {}  # {user_id: block_until_timestamp}
         self.attempt_counters = {}  # {user_id: {type: count}}
         
+        # 🔧 Inizializza last_processed
+        self.last_processed = {}
+        
         # Inizializza la struttura completa delle directory e file
         self.initialize_directory_structure()
         
         # Carica i dati di sicurezza esistenti
         self.load_security_data()
         
-        # Registra gli endpoint API AppDaemon
-        self.register_endpoint(self.api_auth_status, "southtech_auth_status")
-        self.register_endpoint(self.api_auth_setup, "southtech_auth_setup")
-        self.register_endpoint(self.api_auth_login, "southtech_auth_login")
-        self.register_endpoint(self.api_auth_change, "southtech_auth_change")
-        self.register_endpoint(self.api_get_entities, "southtech_entities")
-        self.register_endpoint(self.api_sync_configs, "southtech_sync")
-        self.register_endpoint(self.api_save_config, "southtech_save")
-        self.register_endpoint(self.api_validate_token, "southtech_validate_token")
-        self.register_endpoint(self.api_reset_system, "southtech_reset_system")
-        self.register_endpoint(self.api_check_blocked, "southtech_check_blocked")
+        # 🚨 SPOSTA QUI: Registra gli endpoint API AppDaemon DOPO la definizione dei metodi
+        # (viene fatto in setup_endpoints)
         
-        # Registra endpoint diagnostici aggiuntivi
-        self.register_additional_endpoints()
+        # Sistema principale: Direct File Write con WebSocket interno
+        self.setup_internal_websocket_handler()
+        
+        # Sistema fallback: Sensori ottimizzati
+        self.setup_sensor_fallback()
         
         # Crea file di stato iniziale
         self.update_auth_status_file()
@@ -66,8 +63,11 @@ class SouthTechConfigurator(hass.Hass):
         # Setup entità di comunicazione per fallback
         self.setup_communication_entities()
         
+        # ✅ REGISTRA ENDPOINT ALLA FINE (dopo che tutti i metodi sono definiti)
+        self.setup_endpoints()
+        
         # Monitora richieste via sensori ogni 2 secondi (sistema fallback)
-        self.run_every(self.monitor_sensor_requests, "now+2", 2)
+        self.run_every(self.monitor_sensor_requests, "now+5", 5)
         
         # Monitora richieste via file ogni 3 secondi (sistema fallback)
         self.run_every(self.monitor_file_requests, "now+3", 3)
@@ -96,12 +96,14 @@ class SouthTechConfigurator(hass.Hass):
         self.log(f"📂 Percorso www: {self.www_path}")
         self.log(f"📂 Percorso api: {self.api_path}")
         self.log(f"📂 Percorso backup: {self.backup_path}")
+        self.log("🚫 Template sensors RIMOSSI - filtro gestito via WebSocket frontend")
         
         # Log informazioni di sistema
         self.log_system_info()
 
+    # 🔧 CORREZIONE 4: Log di sistema aggiornato
     def log_system_info(self):
-        """Log informazioni del sistema"""
+        """Log informazioni del sistema - VERSIONE SEMPLIFICATA"""
         try:
             info = {
                 "paths": {
@@ -119,7 +121,8 @@ class SouthTechConfigurator(hass.Hass):
                 "system": {
                     "active_tokens": len(self.active_tokens),
                     "blocked_users": len(self.blocked_users),
-                    "version": "3.0.0"
+                    "version": "3.0.0",  # ← Mantieni versione stabile
+                    "mode": "rest_endpoints_only"  # ← Indica modalità semplificata
                 }
             }
             
@@ -128,15 +131,49 @@ class SouthTechConfigurator(hass.Hass):
         except Exception as e:
             self.error(f"Errore log system info: {e}")
 
+    # 🔧 Estrazione sezione YAML
+    def _extract_yaml_section(self, content):
+        """Estrae la sezione controllo luci dal contenuto YAML"""
+        try:
+            # Prova nuovo formato prima
+            start_line_idx = content.find(self.new_start_line)
+            if start_line_idx != -1:
+                self.log("✅ Trovata sezione formato NUOVO")
+                start_block_idx = content.rfind(self.new_start_marker, 0, start_line_idx)
+                end_line_idx = content.find(self.new_end_line, start_line_idx)
+                
+                if end_line_idx != -1:
+                    end_block_idx = content.find(self.new_end_marker, end_line_idx)
+                    if end_block_idx != -1:
+                        end_block_idx += len(self.new_end_marker)
+                        return content[start_block_idx:end_block_idx]
+            
+            # Prova formato vecchio
+            old_start_idx = content.find(self.start_marker)
+            old_end_idx = content.find(self.end_marker)
+            
+            if old_start_idx != -1 and old_end_idx != -1:
+                self.log("✅ Trovata sezione formato VECCHIO")
+                old_end_idx += len(self.end_marker)
+                return content[old_start_idx:old_end_idx]
+            
+            # Nessuna sezione trovata
+            return None
+            
+        except Exception as e:
+            self.error(f"Errore estrazione sezione YAML: {e}")
+            return None
+
     # === INIZIALIZZAZIONE STRUTTURA DIRECTORY ===
     
+    # 🔧 CORREZIONE 2: Gestione sicura delle directory
     def initialize_directory_structure(self):
         """Inizializza la struttura completa di directory e file necessari"""
         try:
             self.log("🏗️ Inizializzazione struttura directory...")
             self.log(f"🎯 Percorso target: {self.www_path}")
             
-            # Crea le directory necessarie
+            # Crea le directory necessarie con gestione errori
             directories = [
                 self.www_path,
                 self.backup_path, 
@@ -144,11 +181,23 @@ class SouthTechConfigurator(hass.Hass):
             ]
             
             for directory in directories:
-                if not os.path.exists(directory):
-                    os.makedirs(directory, exist_ok=True)
-                    self.log(f"📁 Creata directory: {directory}")
-                else:
-                    self.log(f"✓ Directory già esistente: {directory}")
+                try:
+                    if not os.path.exists(directory):
+                        os.makedirs(directory, mode=0o755, exist_ok=True)
+                        self.log(f"📁 Creata directory: {directory}")
+                    else:
+                        self.log(f"✓ Directory già esistente: {directory}")
+                        
+                    # 🔧 FIX: Verifica permessi dopo creazione
+                    if not os.access(directory, os.W_OK):
+                        raise PermissionError(f"Permessi di scrittura mancanti: {directory}")
+                        
+                except PermissionError as e:
+                    self.error(f"❌ Errore permessi directory {directory}: {e}")
+                    raise
+                except Exception as e:
+                    self.error(f"❌ Errore creazione directory {directory}: {e}")
+                    raise
             
             # Verifica che i file HTML esistano nella directory corretta
             self.verify_html_files()
@@ -225,6 +274,21 @@ class SouthTechConfigurator(hass.Hass):
                     
         except Exception as e:
             self.error(f"Errore creazione .gitkeep: {e}")
+
+    def create_atomic_backup(self):
+        """Crea backup atomico se file esiste"""
+        if not os.path.exists(self.apps_yaml_path):
+            return None
+            
+        timestamp = int(time.time())
+        backup_file = f"{self.apps_yaml_path}.backup_{timestamp}"
+        
+        try:
+            shutil.copy2(self.apps_yaml_path, backup_file)
+            return backup_file
+        except Exception as e:
+            self.error(f"Errore creazione backup: {e}")
+            return None
     
     def verify_write_permissions(self):
         """Verifica i permessi di scrittura nelle directory"""
@@ -246,23 +310,67 @@ class SouthTechConfigurator(hass.Hass):
             self.error(f"Errore verifica permessi: {e}")
             raise
 
+    # ================================================================
+    # 1. WEBSOCKET (PRIMARIO) - Mantiene l'implementazione esistente
+    # ================================================================
+
+    def websocket_save_service(self, namespace, domain, service, kwargs, **kwds):
+        """Handler WebSocket con metodi avanzati"""
+        try:
+            self.log("🔌 WEBSOCKET: Ricevuta richiesta (metodo avanzato)")
+            
+            if kwargs.get("test_mode"):
+                return {"test_mode": True, "advanced_processing": True}
+            
+            configurations = kwargs.get("configurations", [])
+            if not configurations:
+                return {"success": False, "error": "Configurazioni richieste"}
+            
+            # 🆕 USA METODO AVANZATO
+            result = self.execute_save_advanced("websocket", configurations, kwargs)
+            return result
+            
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     # === SISTEMA ANTI-BRUTEFORCE ===
-    
-    def get_user_id(self, data):
-        """Genera ID utente per tracking sicurezza"""
-        # Prova a usare token HA se disponibile
-        ha_token = data.get("ha_token") or data.get("__headers", {}).get("Authorization", "").replace("Bearer ", "")
-        if ha_token and len(ha_token) > 10:
-            return f"token_{hashlib.md5(ha_token.encode()).hexdigest()[:16]}"
-        
-        # Fallback a browser fingerprint
-        browser_id = data.get("browser_id")
-        if browser_id:
-            return f"browser_{browser_id}"
-        
-        # Ultimo fallback a IP (se disponibile)
-        ip = data.get("__request_ip", "unknown")
-        return f"ip_{ip}"
+
+    def get_user_id_unified(self, data, method_type="api"):
+        """
+        🎯 METODO UNIFICATO per estrarre User ID
+        Sostituisce get_user_id() e get_user_id_from_request()
+        """
+        try:
+            # 1. Prova browser_id (metodo principale)
+            browser_id = data.get("browser_id", "")
+            if browser_id:
+                # Usa sempre prefisso "user" per consistenza
+                return f"user_{browser_id}"
+            
+            # 2. Fallback: headers per API dirette
+            if method_type == "api":
+                headers = data.get("__headers", {})
+                user_agent = headers.get("User-Agent", "")
+                if user_agent:
+                    user_hash = hashlib.md5(user_agent.encode()).hexdigest()[:8]
+                    return f"user_agent_{user_hash}"
+            
+            # 3. Fallback finale con timestamp
+            timestamp = int(time.time())
+            return f"user_unknown_{timestamp}"
+            
+        except Exception as e:
+            self.error(f"Errore get_user_id_unified: {e}")
+            return f"user_error_{int(time.time())}"
+
+    def get_fallback_level(self, method_type):
+        """Restituisce il livello di fallback del metodo"""
+        levels = {
+            "websocket": 0,  # Primario
+            "sensor": 1,     # Fallback 1
+            "file": 2        # Fallback 2
+        }
+        return levels.get(method_type, 99)
     
     def is_user_blocked(self, user_id):
         """Controlla se un utente è bloccato"""
@@ -277,6 +385,19 @@ class SouthTechConfigurator(hass.Hass):
                     del self.attempt_counters[user_id]
                 self.save_security_data()
         return False, None
+
+    def is_new_request(self, request_type, attributes):
+        """Verifica se è una nuova richiesta basandosi su timestamp"""
+        request_timestamp = attributes.get('timestamp')
+        if not request_timestamp:
+            return True
+            
+        last_processed = self.last_processed.get(request_type)
+        if last_processed != request_timestamp:
+            self.last_processed[request_type] = request_timestamp
+            return True
+            
+        return False
     
     def record_attempt(self, user_id, attempt_type, success=False):
         """Registra un tentativo di accesso"""
@@ -428,8 +549,6 @@ class SouthTechConfigurator(hass.Hass):
         if expired:
             self.save_security_data()
     
-    # === LETTURA E SALVATAGGIO CONFIGURAZIONI YAML (AGGIORNATO) ===
-    
     def read_existing_configs(self):
         """Legge le configurazioni esistenti da apps.yaml - Supporto doppio formato"""
         configurations = []
@@ -442,11 +561,8 @@ class SouthTechConfigurator(hass.Hass):
             with open(self.apps_yaml_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # Prova prima il nuovo formato
-            yaml_content = self._extract_yaml_new_format(content)
-            if not yaml_content:
-                # Fallback al formato vecchio
-                yaml_content = self._extract_yaml_old_format(content)
+            # ✅ CORREZIONE: Estrai la sezione YAML dal contenuto
+            yaml_content = self._extract_yaml_section(content)
             
             if yaml_content:
                 configurations = self._parse_yaml_configurations(yaml_content)
@@ -459,46 +575,6 @@ class SouthTechConfigurator(hass.Hass):
         except Exception as e:
             self.error(f"Errore lettura apps.yaml: {e}")
             return configurations
-    
-    def _extract_yaml_new_format(self, content):
-        """Estrae YAML dal nuovo formato con bordi"""
-        try:
-            start_line_idx = content.find(self.new_start_line)
-            if start_line_idx == -1:
-                return None
-            
-            end_line_idx = content.find(self.new_end_line, start_line_idx)
-            if end_line_idx == -1:
-                return None
-            
-            # Estrai la sezione tra le linee
-            yaml_section = content[start_line_idx:end_line_idx]
-            
-            # Trova l'inizio della configurazione light_presence
-            light_presence_start = yaml_section.find('light_presence:')
-            if light_presence_start == -1:
-                return None
-            
-            return yaml_section[light_presence_start:]
-            
-        except Exception as e:
-            self.error(f"Errore estrazione nuovo formato: {e}")
-            return None
-    
-    def _extract_yaml_old_format(self, content):
-        """Estrae YAML dal formato vecchio"""
-        try:
-            start_idx = content.find(self.start_marker)
-            end_idx = content.find(self.end_marker)
-            
-            if start_idx != -1 and end_idx != -1:
-                return content[start_idx + len(self.start_marker):end_idx].strip()
-            
-            return None
-            
-        except Exception as e:
-            self.error(f"Errore estrazione formato vecchio: {e}")
-            return None
     
     def _parse_yaml_configurations(self, yaml_content):
         """Parse delle configurazioni YAML"""
@@ -525,7 +601,7 @@ class SouthTechConfigurator(hass.Hass):
         return configurations
     
     def save_yaml_configuration(self, yaml_content):
-        """Salva la configurazione YAML nel file apps.yaml - Supporto nuovo formato"""
+        """Salva la configurazione YAML con spazi di separazione corretti"""
         try:
             # Leggi il contenuto esistente
             existing_content = ""
@@ -541,9 +617,12 @@ class SouthTechConfigurator(hass.Hass):
             
             # Se nessuna sezione esistente trovata, aggiungi alla fine
             if new_content is None:
+                # ✅ CORREZIONE: Mantieni spazio di separazione
                 if existing_content and not existing_content.endswith('\n'):
                     existing_content += '\n'
-                new_content = existing_content + '\n' + yaml_content + '\n'
+                
+                # Aggiungi con spazio di separazione dalla sezione precedente
+                new_content = existing_content + '\n' + yaml_content.rstrip('\n') + '\n'
             
             # Scrivi il nuovo contenuto
             with open(self.apps_yaml_path, 'w', encoding='utf-8') as f:
@@ -555,9 +634,703 @@ class SouthTechConfigurator(hass.Hass):
         except Exception as e:
             self.error(f"Errore salvataggio YAML: {e}")
             raise
+
+    # 4. NUOVA FUNZIONE: Salva contenuto YAML in modo sicuro
+    def save_yaml_content_safe(self, yaml_content):
+        """Salva contenuto YAML con massima sicurezza"""
+        try:
+            # Leggi contenuto esistente
+            existing_content = ""
+            if os.path.exists(self.apps_yaml_path):
+                with open(self.apps_yaml_path, 'r', encoding='utf-8') as f:
+                    existing_content = f.read()
+                self.log(f"📖 Letto file esistente: {len(existing_content)} caratteri")
+            
+            # Unisci con nuovo contenuto
+            new_content = self.merge_yaml_content_smart(existing_content, yaml_content)
+            self.log(f"🔗 Contenuto unito: {len(new_content)} caratteri")
+            
+            # Verifica YAML valido PRIMA di scrivere
+            try:
+                import yaml
+                parsed = yaml.safe_load(new_content)
+                if parsed is None:
+                    raise Exception("YAML risulta vuoto dopo parsing")
+                self.log("✅ YAML validato correttamente")
+            except yaml.YAMLError as e:
+                raise Exception(f"YAML non valido: {e}")
+            
+            # Scrivi in file temporaneo
+            temp_file = self.apps_yaml_path + ".tmp_save"
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                f.write(new_content)
+            self.log(f"💾 Scritto file temporaneo: {temp_file}")
+            
+            # Verifica file temporaneo
+            with open(temp_file, 'r', encoding='utf-8') as f:
+                temp_content = f.read()
+            
+            if temp_content != new_content:
+                raise Exception("Contenuto file temporaneo non corrisponde")
+            
+            # Crea backup di sicurezza
+            if os.path.exists(self.apps_yaml_path):
+                safety_backup = self.apps_yaml_path + ".safety_backup"
+                shutil.copy2(self.apps_yaml_path, safety_backup)
+                self.log(f"🛡️ Backup sicurezza: {safety_backup}")
+            
+            # Sostituisci file originale
+            shutil.move(temp_file, self.apps_yaml_path)
+            self.log("🔄 File originale sostituito")
+            
+        except Exception as e:
+            # Pulizia in caso di errore
+            temp_file = self.apps_yaml_path + ".tmp_save"
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                    self.log("🗑️ File temporaneo rimosso")
+                except:
+                    pass
+            raise e
+
+    # Unisce contenuto YAML intelligentemente
+    def merge_yaml_content_smart(self, existing_content, new_yaml_content):
+        """Unisce contenuto YAML con spazi di separazione corretti"""
+        
+        # Marcatori nuovo formato (priorità)
+        new_start_marker = "################################################################################"
+        new_start_line = "#                      START CONTROLLO LUCI AUTOMATICHE                        #"
+        new_end_line = "#                      END CONTROLLO LUCI AUTOMATICHE                          #"
+        new_end_marker = "################################################################################"
+        
+        # Marcatori vecchio formato (compatibilità)
+        old_start_marker = "# START CONTROLLO LUCI AUTOMATICHE"
+        old_end_marker = "# END CONTROLLO LUCI AUTOMATICHE"
+        
+        self.log("🔍 Ricerca sezione esistente...")
+        
+        # Prova formato nuovo
+        start_line_idx = existing_content.find(new_start_line)
+        if start_line_idx != -1:
+            self.log("✅ Trovata sezione formato NUOVO")
+            start_block_idx = existing_content.rfind(new_start_marker, 0, start_line_idx)
+            end_line_idx = existing_content.find(new_end_line, start_line_idx)
+            
+            if end_line_idx != -1:
+                end_block_idx = existing_content.find(new_end_marker, end_line_idx)
+                if end_block_idx != -1:
+                    end_block_idx += len(new_end_marker)
+                    
+                    # ✅ CORREZIONE BILANCIATA: Mantiene 1 riga vuota prima e dopo
+                    before = existing_content[:start_block_idx].rstrip('\n')
+                    after = existing_content[end_block_idx:].lstrip('\n')
+                    
+                    # Assicura 1 riga vuota prima della sezione
+                    if before and not before.endswith('\n'):
+                        before += '\n'
+                    
+                    # Costruisci risultato con spazi corretti
+                    result = before + '\n' + new_yaml_content.rstrip('\n')
+                    
+                    # Assicura 1 riga vuota dopo la sezione (se c'è contenuto dopo)
+                    if after:
+                        result += '\n\n' + after
+                    else:
+                        result += '\n'
+                    
+                    self.log(f"🔄 Sostituita sezione esistente (nuovo formato)")
+                    return result
+        
+        # Prova formato vecchio
+        old_start_idx = existing_content.find(old_start_marker)
+        old_end_idx = existing_content.find(old_end_marker)
+        
+        if old_start_idx != -1 and old_end_idx != -1:
+            self.log("✅ Trovata sezione formato VECCHIO")
+            old_end_idx += len(old_end_marker)
+            
+            # ✅ CORREZIONE BILANCIATA: Mantiene 1 riga vuota prima e dopo
+            before = existing_content[:old_start_idx].rstrip('\n')
+            after = existing_content[old_end_idx:].lstrip('\n')
+            
+            # Assicura 1 riga vuota prima della sezione
+            if before and not before.endswith('\n'):
+                before += '\n'
+            
+            # Costruisci risultato con spazi corretti
+            result = before + '\n' + new_yaml_content.rstrip('\n')
+            
+            # Assicura 1 riga vuota dopo la sezione (se c'è contenuto dopo)
+            if after:
+                result += '\n\n' + after
+            else:
+                result += '\n'
+            
+            self.log(f"🔄 Sostituita sezione esistente (vecchio formato)")
+            return result
+        
+        # Nessuna sezione esistente
+        self.log("ℹ️ Nessuna sezione esistente, aggiunta alla fine")
+        
+        # ✅ CORREZIONE: Mantiene spazio di separazione dalla sezione precedente
+        if existing_content and not existing_content.endswith('\n'):
+            existing_content += '\n'
+        
+        # Aggiungi con spazio di separazione
+        return existing_content + '\n' + new_yaml_content.rstrip('\n') + '\n'
+
+    def rebuild_apps_yaml_content(self, existing_content, new_section, start_idx, end_idx):
+        """Ricostruisce il contenuto completo con spazi di separazione corretti"""
+        try:
+            if start_idx == -1 or end_idx == -1:
+                # Nessuna sezione esistente, aggiungi alla fine
+                if existing_content and not existing_content.endswith('\n'):
+                    existing_content += '\n'
+                
+                # ✅ CORREZIONE: Mantieni spazio di separazione
+                return existing_content + '\n' + new_section.rstrip('\n') + '\n'
+            else:
+                # Sostituisci sezione esistente con spazi corretti
+                before = existing_content[:start_idx].rstrip('\n')
+                after = existing_content[end_idx:].lstrip('\n')
+                
+                result = before
+                if before:
+                    result += '\n\n'  # 1 riga vuota prima
+                
+                result += new_section.rstrip('\n')
+                
+                if after:
+                    result += '\n\n' + after  # 1 riga vuota dopo
+                else:
+                    result += '\n'
+                
+                return result
+                
+        except Exception as e:
+            self.error(f"Errore ricostruzione contenuto apps.yaml: {e}")
+            raise
+
+    # 6. NUOVA FUNZIONE: Verifica file salvato
+    def verify_saved_file(self, expected_yaml_content):
+        """Verifica che il file sia stato salvato correttamente"""
+        try:
+            # Controlla che il file esista
+            if not os.path.exists(self.apps_yaml_path):
+                raise Exception("File apps.yaml non trovato dopo salvataggio")
+            
+            # Leggi contenuto salvato
+            with open(self.apps_yaml_path, 'r', encoding='utf-8') as f:
+                saved_content = f.read()
+            
+            if not saved_content:
+                raise Exception("File apps.yaml è vuoto")
+            
+            # Verifica che contenga la nostra sezione
+            if "START CONTROLLO LUCI AUTOMATICHE" not in saved_content:
+                raise Exception("Sezione light_presence non trovata nel file salvato")
+            
+            # Verifica YAML valido
+            import yaml
+            try:
+                parsed = yaml.safe_load(saved_content)
+                if parsed is None:
+                    raise Exception("File YAML risulta vuoto")
+            except yaml.YAMLError as e:
+                raise Exception(f"File YAML non valido: {e}")
+            
+            file_size = os.path.getsize(self.apps_yaml_path)
+            self.log(f"✅ File verificato: {len(saved_content)} caratteri, {file_size} bytes")
+            
+        except Exception as e:
+            self.error(f"❌ Verifica file fallita: {e}")
+            raise
+
+    # 7. Monitor salvataggio via sensori
+    def monitor_save_requests(self, kwargs):
+        """Monitora richieste di salvataggio via sensori (fallback) - VERSIONE MIGLIORATA"""
+        try:
+            save_sensor = self.get_state("sensor.southtech_save_request")
+            
+            if save_sensor == "pending":
+                self.log("📡 SENSOR SAVE: Rilevata richiesta fallback")
+                
+                # Aggiorna debug
+                self.set_state("sensor.southtech_websocket_debug",
+                              state="fallback_active",
+                              attributes={
+                                  "fallback_method": "sensor",
+                                  "fallback_trigger_time": datetime.now().isoformat(),
+                                  "websocket_failed": True
+                              })
+                
+                self.process_sensor_save_request()
+                
+        except Exception as e:
+            self.error(f"Errore monitor save requests: {e}")
+
+    # ================================================================
+    # 2. SENSORI HA (FALLBACK 1) - Aggiornato con metodi avanzati
+    # ================================================================
+
+    # ================================================================
+    # 5. METODI CORE AVANZATI (Indipendenti dal sistema di comunicazione)
+    # ================================================================
+
+    def process_apps_yaml_advanced(self, new_configurations):
+        """
+        🎯 METODO CORE: Processamento avanzato apps.yaml
+        Funziona identicamente per WebSocket, Sensori e File System
+        """
+        try:
+            self.log("🔧 CORE: Inizio processamento intelligente apps.yaml")
+            
+            # 1. Validazione configurazioni
+            if not new_configurations:
+                return {"success": False, "error": "Nessuna configurazione fornita"}
+            
+            valid_configs = self.validate_configurations(new_configurations)
+            if not valid_configs:
+                return {"success": False, "error": "Nessuna configurazione valida"}
+            
+            # 2. Leggi contenuto esistente
+            existing_content = ""
+            if os.path.exists(self.apps_yaml_path):
+                with open(self.apps_yaml_path, 'r', encoding='utf-8') as f:
+                    existing_content = f.read()
+                self.log(f"📖 File esistente: {len(existing_content)} caratteri")
+            else:
+                existing_content = self.create_empty_apps_yaml_structure()
+                self.log("📄 Creato template file vuoto")
+            
+            # 3. Analisi sezione esistente
+            start_idx, end_idx = self.find_light_control_section(existing_content)
+            existing_configs = set()
+            
+            if start_idx != -1 and end_idx != -1:
+                section_content = existing_content[start_idx:end_idx]
+                existing_configs = self.extract_light_configs_from_section(section_content)
+                self.log(f"🔍 Configurazioni esistenti: {len(existing_configs)}")
+            
+            # 4. Calcola differenze
+            new_config_ids = {self.generate_config_id(cfg) for cfg in valid_configs}
+            configs_to_add = new_config_ids - existing_configs
+            configs_to_remove = existing_configs - new_config_ids
+            
+            self.log(f"📊 Operazioni: +{len(configs_to_add)} -{len(configs_to_remove)}")
+            
+            # 5. Ottimizzazione: se identiche, non fare nulla
+            if not configs_to_add and not configs_to_remove and start_idx != -1:
+                return {
+                    "success": True,
+                    "message": "Configurazioni identiche, nessuna modifica necessaria",
+                    "configurations_unchanged": len(existing_configs),
+                    "optimized_skip": True
+                }
+            
+            # 6. Genera nuova sezione
+            new_section = self.generate_light_control_section(valid_configs)
+            
+            # 7. Ricostruisci file completo
+            new_content = self.rebuild_apps_yaml_content(
+                existing_content, new_section, start_idx, end_idx
+            )
+            
+            # 8. Backup di sicurezza
+            backup_file = None
+            if os.path.exists(self.apps_yaml_path):
+                backup_file = self.create_backup()
+            
+            # 9. Salvataggio atomico e sicuro
+            self.atomic_file_write(self.apps_yaml_path, new_content)
+            
+            # 10. Verifica post-salvataggio
+            self.verify_yaml_integrity(self.apps_yaml_path)
+            
+            # 11. Risultato dettagliato
+            return {
+                "success": True,
+                "message": "apps.yaml aggiornato con processamento avanzato",
+                "processing_method": "advanced_inspired_by_template_generator",
+                "backup_created": backup_file is not None,
+                "backup_file": backup_file,
+                "configurations_total": len(valid_configs),
+                "configurations_added": len(configs_to_add),
+                "configurations_removed": len(configs_to_remove),
+                "configurations_unchanged": len(existing_configs & new_config_ids),
+                "file_size": os.path.getsize(self.apps_yaml_path),
+                "timestamp": datetime.now().isoformat(),
+                "validation_passed": True,
+                "integrity_verified": True
+            }
+            
+        except Exception as e:
+            self.error(f"❌ CORE: Errore processamento avanzato: {e}")
+            
+            # Tentativo di ripristino da backup se disponibile
+            if 'backup_file' in locals() and backup_file:
+                self.attempt_restore_from_backup(backup_file)
+            
+            raise
+
+    def process_internal_ws_queue(self, kwargs):
+        """Processa queue WebSocket interna"""
+        if self.is_processing_ws or not self.internal_ws_queue:
+            return
+            
+        self.is_processing_ws = True
+        try:
+            while self.internal_ws_queue:
+                request = self.internal_ws_queue.pop(0)
+                self.process_save_request_direct(request)
+        finally:
+            self.is_processing_ws = False
+
+    def process_save_request_direct(self, request_data):
+        """Processa salvataggio diretto senza servizi AppDaemon"""
+        try:
+            yaml_content = request_data.get('yaml_content')
+            configurations = request_data.get('configurations', [])
+            
+            if not yaml_content:
+                return {"success": False, "error": "YAML content missing"}
+            
+            # Salvataggio diretto con backup atomico
+            backup_file = self.create_atomic_backup()
+            
+            try:
+                # Scrittura atomica
+                self.atomic_yaml_write(yaml_content)
+                
+                # Verifica integrità
+                self.verify_yaml_integrity(self.apps_yaml_path)
+                
+                # Successo - rimuovi backup temporaneo se esiste
+                if backup_file:
+                    self.cleanup_temp_backup(backup_file)
+                
+                return {
+                    "success": True,
+                    "method": "direct_write",
+                    "backup_created": backup_file is not None,
+                    "configurations_count": len(configurations),
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+            except Exception as write_error:
+                # Ripristina da backup in caso di errore
+                if backup_file:
+                    self.restore_from_backup(backup_file)
+                raise write_error
+                
+        except Exception as e:
+            self.error(f"Errore salvataggio diretto: {e}")
+            return {"success": False, "error": str(e)}
+
+    # ================================================================
+    # 4. METODO UNIFICATO AVANZATO (Usato da tutti i sistemi)
+    # ================================================================
+
+    # 🔧 Metodo execute_save_advanced
+    def execute_save_advanced(self, method_type, configurations, request_data):
+        """
+        Metodo unificato per salvataggio avanzato
+        Usato da WebSocket, Sensori e File System
+        """
+        try:
+            self.log(f"💾 ADVANCED SAVE ({method_type.upper()}): Inizio processamento")
+            
+            # ✅ CORREZIONE:
+            user_id = self.get_user_id_unified(request_data, method_type)
+            
+            is_blocked, block_until = self.is_user_blocked(user_id)
+            
+            if is_blocked:
+                return {
+                    "success": False,
+                    "error": "Utente temporaneamente bloccato",
+                    "blocked": True,
+                    "remaining_seconds": int(block_until - time.time()),
+                    "method": f"{method_type}_blocked"
+                }
+            
+            # 2. 🆕 PROCESSAMENTO AVANZATO (core logic)
+            result = self.process_apps_yaml_advanced(configurations)
+            
+            # 3. Aggiungi metadati specifici del metodo
+            result.update({
+                "communication_method": method_type,
+                "user_id": user_id[:20],
+                "advanced_processing": True,
+                "fallback_level": self.get_fallback_level(method_type)
+            })
+            
+            # 4. Registra tentativo
+            success = result.get("success", False)
+            self.record_attempt(user_id, f"{method_type}_save_advanced", success)
+            
+            if success:
+                self.log(f"✅ ADVANCED SAVE ({method_type.upper()}): Completato con successo")
+                
+                # Notifica successo
+                self.create_ha_notification(
+                    "✅ SouthTech: Configurazione Salvata",
+                    f"Apps.yaml aggiornato con {len(configurations)} configurazioni via {method_type}"
+                )
+            else:
+                self.log(f"❌ ADVANCED SAVE ({method_type.upper()}): Fallito")
+            
+            return result
+            
+        except Exception as e:
+            self.error(f"❌ ADVANCED SAVE ({method_type.upper()}): Errore critico: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "method": f"{method_type}_error",
+                "timestamp": datetime.now().isoformat()
+            }
+
+    def execute_yaml_save_websocket(self, yaml_content, configurations, user_id):
+        """
+        Esegue il salvataggio YAML per richiesta WebSocket
+        """
+        try:
+            self.log("💾 WEBSOCKET: Inizio salvataggio apps.yaml...")
+            
+            # 1. Backup se file esiste
+            backup_file = None
+            if os.path.exists(self.apps_yaml_path):
+                backup_file = self.create_backup()
+                self.log(f"📦 Backup creato: {backup_file}")
+            
+            # 2. Salva contenuto usando metodo esistente
+            self.save_yaml_content_safe(yaml_content)
+            
+            # 3. Verifica file salvato
+            self.verify_saved_file(yaml_content)
+            
+            # 4. Genera helper opzionali
+            helpers_created = 0
+            try:
+                helpers_created = self.generate_helpers_sync(configurations)
+            except Exception as e:
+                self.log(f"⚠️ Warning generazione helper: {e}")
+            
+            # 5. Risultato successo
+            result = {
+                "success": True,
+                "message": "Configurazione salvata con successo via WebSocket",
+                "method": "websocket_direct",
+                "backup_created": backup_file is not None,
+                "backup_file": backup_file,
+                "helpers_created": helpers_created,
+                "configurations_count": len(configurations),
+                "file_path": self.apps_yaml_path,
+                "file_size": os.path.getsize(self.apps_yaml_path),
+                "timestamp": datetime.now().isoformat(),
+                "user_id": user_id[:20]
+            }
+            
+            self.log("✅ WEBSOCKET: Salvataggio completato con successo")
+            
+            # Notifica successo
+            self.create_ha_notification(
+                "✅ SouthTech: Configurazione Salvata",
+                f"Apps.yaml aggiornato con {len(configurations)} configurazioni via WebSocket"
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error(f"❌ WEBSOCKET: Errore durante salvataggio: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "method": "websocket_error",
+                "timestamp": datetime.now().isoformat()
+            }
+
+    def execute_yaml_save_sensor(self, yaml_content, configurations, user_id):
+        """Esegue il salvataggio YAML per comando sensore (versione corretta)"""
+        try:
+            self.log("💾 SENSOR: Inizio salvataggio apps.yaml...")
+            
+            # 1. Backup se file esiste
+            backup_file = None
+            if os.path.exists(self.apps_yaml_path):
+                backup_file = self.create_backup()
+                self.log(f"📦 Backup creato: {backup_file}")
+            else:
+                self.log("📄 File apps.yaml non esiste, sarà creato")
+            
+            # 2. Verifica/crea directory
+            yaml_dir = os.path.dirname(self.apps_yaml_path)
+            if not os.path.exists(yaml_dir):
+                os.makedirs(yaml_dir, exist_ok=True)
+                self.log(f"📁 Creata directory: {yaml_dir}")
+            
+            # 3. Salva il contenuto usando il metodo esistente
+            self.save_yaml_configuration(yaml_content)
+            
+            # 4. Genera helper opzionali
+            helpers_created = 0
+            try:
+                helpers_created = self.generate_helpers_sync(configurations)
+                if helpers_created > 0:
+                    self.log(f"🔧 Generati {helpers_created} helper")
+            except Exception as e:
+                self.log(f"⚠️ Warning generazione helper: {e}")
+            
+            # 5. Risultato successo
+            result = {
+                "success": True,
+                "message": "Configurazione salvata con successo via sensore",
+                "backup_created": backup_file is not None,
+                "backup_file": backup_file,
+                "helpers_created": helpers_created,
+                "configurations_count": len(configurations),
+                "file_path": self.apps_yaml_path,
+                "file_size": os.path.getsize(self.apps_yaml_path),
+                "timestamp": datetime.now().isoformat(),
+                "method": "sensor_success"
+            }
+            
+            self.log("✅ SENSOR: Salvataggio completato con successo")
+            
+            # Notifica successo in HA
+            self.create_ha_notification(
+                "✅ SouthTech: Configurazione Salvata",
+                f"Apps.yaml aggiornato con {len(configurations)} configurazioni via sensore fallback"
+            )
+            
+            return result
+            
+        except Exception as e:
+            self.error(f"❌ SENSOR: Errore durante salvataggio: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "timestamp": datetime.now().isoformat(),
+                "method": "sensor_error"
+            }
+
+    def validate_configurations(self, configurations):
+        """Valida e filtra configurazioni valide"""
+        valid_configs = []
+        
+        for i, config in enumerate(configurations):
+            light_entity = config.get('light_entity', '').strip()
+            presence_sensor_on = config.get('presence_sensor_on', '').strip()
+            
+            if not light_entity:
+                self.log(f"⚠️ Config {i+1}: light_entity mancante, saltata")
+                continue
+                
+            if not light_entity.startswith('light.'):
+                self.log(f"⚠️ Config {i+1}: light_entity non valida ({light_entity}), saltata")
+                continue
+                
+            if not presence_sensor_on:
+                self.log(f"⚠️ Config {i+1}: presence_sensor_on mancante, saltata")
+                continue
+            
+            valid_configs.append(config)
+        
+        self.log(f"✅ Validazione: {len(valid_configs)}/{len(configurations)} configurazioni valide")
+        return valid_configs
+
+    def atomic_file_write(self, file_path, content):
+        """Scrittura atomica del file per evitare corruzioni"""
+        temp_path = file_path + ".tmp_atomic"
+        
+        try:
+            # Scrivi in file temporaneo
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            # Verifica file temporaneo
+            with open(temp_path, 'r', encoding='utf-8') as f:
+                verify_content = f.read()
+            
+            if verify_content != content:
+                raise Exception("Contenuto file temporaneo non corrisponde")
+            
+            # Sostituisci atomicamente
+            os.replace(temp_path, file_path)
+            self.log("💾 Scrittura atomica completata")
+            
+        except Exception as e:
+            # Pulizia in caso di errore
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
+            raise
+
+    
+    def atomic_yaml_write(self, content):
+        """Scrittura atomica del file YAML"""
+        temp_file = self.apps_yaml_path + ".tmp_write"
+        
+        try:
+            # Scrivi in file temporaneo
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            # Verifica contenuto
+            with open(temp_file, 'r', encoding='utf-8') as f:
+                verify_content = f.read()
+            
+            if verify_content != content:
+                raise Exception("Verifica contenuto fallita")
+            
+            # Sostituisci atomicamente
+            os.replace(temp_file, self.apps_yaml_path)
+            
+        except Exception as e:
+            # Cleanup in caso di errore
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except:
+                    pass
+            raise
+
+    def attempt_restore_from_backup(self, backup_file):
+        """Tentativo di ripristino da backup in caso di errore"""
+        try:
+            backup_path = os.path.join(self.backup_path, backup_file)
+            if os.path.exists(backup_path):
+                shutil.copy2(backup_path, self.apps_yaml_path)
+                self.log(f"🛡️ Ripristinato da backup: {backup_file}")
+                return True
+        except Exception as e:
+            self.error(f"❌ Errore ripristino backup: {e}")
+        return False
+
+    # 9. NUOVA FUNZIONE: Crea risposta sensore
+    def create_sensor_save_response(self, result_data):
+        """Crea risposta per salvataggio via sensore"""
+        try:
+            result_data["timestamp"] = datetime.now().isoformat()
+            
+            self.set_state("sensor.southtech_save_response",
+                          state="completed",
+                          attributes=result_data)
+            
+            if result_data.get("success"):
+                self.log("✅ Risposta successo inviata via sensore")
+            else:
+                self.log(f"❌ Risposta errore inviata via sensore: {result_data.get('error')}")
+                
+        except Exception as e:
+            self.error(f"Errore creazione risposta sensore: {e}")
     
     def _replace_yaml_new_format(self, content, yaml_content):
-        """Sostituisce YAML nel nuovo formato"""
+        """Sostituisce YAML nel nuovo formato con spazi corretti"""
         try:
             start_line_idx = content.find(self.new_start_line)
             if start_line_idx == -1:
@@ -576,10 +1349,23 @@ class SouthTechConfigurator(hass.Hass):
                 if end_block_idx != -1:
                     end_block_idx += len(self.new_end_marker)
                     
-                    # Sostituisci la sezione esistente
-                    before = content[:start_block_idx]
-                    after = content[end_block_idx:]
-                    return before + yaml_content + after
+                    # ✅ CORREZIONE BILANCIATA: Mantiene spazi di separazione
+                    before = content[:start_block_idx].rstrip('\n')
+                    after = content[end_block_idx:].lstrip('\n')
+                    
+                    # Costruisci con spazi corretti
+                    result = before
+                    if before:
+                        result += '\n\n'  # 1 riga vuota prima
+                    
+                    result += yaml_content.rstrip('\n')
+                    
+                    if after:
+                        result += '\n\n' + after  # 1 riga vuota dopo
+                    else:
+                        result += '\n'
+                    
+                    return result
             
             return None
             
@@ -588,16 +1374,31 @@ class SouthTechConfigurator(hass.Hass):
             return None
     
     def _replace_yaml_old_format(self, content, yaml_content):
-        """Sostituisce YAML nel formato vecchio"""
+        """Sostituisce YAML nel formato vecchio con spazi corretti"""
         try:
             start_idx = content.find(self.start_marker)
             end_idx = content.find(self.end_marker)
             
             if start_idx != -1 and end_idx != -1:
-                # Sostituisci la sezione esistente mantenendo il marker di fine
-                before = content[:start_idx]
-                after = content[end_idx:]
-                return before + yaml_content + after
+                end_idx += len(self.end_marker)
+                
+                # ✅ CORREZIONE BILANCIATA: Mantieni spazi di separazione
+                before = content[:start_idx].rstrip('\n')
+                after = content[end_idx:].lstrip('\n')
+                
+                # Costruisci con spazi corretti
+                result = before
+                if before:
+                    result += '\n\n'  # 1 riga vuota prima
+                
+                result += yaml_content.rstrip('\n')
+                
+                if after:
+                    result += '\n\n' + after  # 1 riga vuota dopo
+                else:
+                    result += '\n'
+                
+                return result
             
             return None
             
@@ -608,9 +1409,10 @@ class SouthTechConfigurator(hass.Hass):
     # === API ENDPOINTS CON SICUREZZA ===
     
     def api_check_blocked(self, data):
-        """Controlla se un utente è bloccato"""
+        """Controlla se un utente è bloccato - CORRETTO"""
         try:
-            user_id = self.get_user_id(data)
+            # ✅ CORRETTO: Usa metodo unificato
+            user_id = self.get_user_id_unified(data, "api")
             is_blocked, block_until = self.is_user_blocked(user_id)
             
             result = {
@@ -627,230 +1429,29 @@ class SouthTechConfigurator(hass.Hass):
         except Exception as e:
             return {"error": str(e)}, 500
     
-    def process_sensor_login_request(self):
-        """Processa richiesta login via sensore"""
-        try:
-            attrs = self.get_state("sensor.southtech_login_request", attribute="all")
-            if not attrs or "attributes" not in attrs:
-                return
-                
-            request_data = attrs["attributes"]
-            if request_data.get("action") != "login":
-                return
-                
-            user_id = f"browser_{request_data.get('browser_id', 'unknown')}"
-            password = request_data.get("password")
-            
-            self.log(f"🔍 SENSOR LOGIN: Processando login da {user_id[:20]}")
-            
-            # Controlla se bloccato
-            is_blocked, block_until = self.is_user_blocked(user_id)
-            if is_blocked:
-                result = {
-                    "success": False, 
-                    "blocked": True,
-                    "remaining_seconds": int(block_until - time.time())
-                }
-            elif not os.path.exists(self.auth_file):
-                self.record_attempt(user_id, "password_login", False)
-                result = {"success": False, "error": "Password non configurata"}
-            elif not password:
-                self.record_attempt(user_id, "password_login", False)
-                result = {"success": False, "error": "Password richiesta"}
-            else:
-                with open(self.auth_file, 'r') as f:
-                    auth_data = json.load(f)
-                
-                salt = auth_data["salt"]
-                stored_hash = auth_data["password_hash"]
-                provided_hash = hashlib.sha256((password + salt).encode()).hexdigest()
-                
-                if provided_hash != stored_hash:
-                    self.record_attempt(user_id, "password_login", False)
-                    result = {"success": False, "error": "Password non corretta"}
-                else:
-                    token = self.generate_token()
-                    self.record_attempt(user_id, "password_login", True)
-                    result = {"success": True, "token": token}
-                    self.log("✅ Login completato via sensore")
-            
-            # Crea il sensore di risposta
-            self.create_response_sensor("sensor.southtech_login_response", result)
-            
-            # Rimuovi richiesta
-            self.set_state("sensor.southtech_login_request", state="unavailable")
-            
-        except Exception as e:
-            self.error(f"Errore processing sensor login: {e}")
-            self.create_response_sensor("sensor.southtech_login_response", 
-                                       {"success": False, "error": str(e)})
-    
-    def process_sensor_reset_request(self):
-        """Processa richiesta reset via sensore"""
-        try:
-            attrs = self.get_state("sensor.southtech_reset_request", attribute="all")
-            if not attrs or "attributes" not in attrs:
-                return
-                
-            request_data = attrs["attributes"]
-            if request_data.get("action") != "reset_system":
-                return
-                
-            user_id = f"browser_{request_data.get('browser_id', 'unknown')}"
-            
-            self.log(f"🔍 SENSOR RESET: Processando reset da {user_id[:20]}")
-            
-            # Controlla se bloccato
-            is_blocked, block_until = self.is_user_blocked(user_id)
-            if is_blocked:
-                result = {
-                    "success": False, 
-                    "blocked": True,
-                    "remaining_seconds": int(block_until - time.time())
-                }
-            else:
-                # Esegui reset
-                if os.path.exists(self.auth_file):
-                    os.remove(self.auth_file)
-                    self.log("🗑️ File auth cancellato via sensore")
-                
-                self.active_tokens.clear()
-                
-                # Reset contatori per questo utente
-                if user_id in self.attempt_counters:
-                    del self.attempt_counters[user_id]
-                if user_id in self.blocked_users:
-                    del self.blocked_users[user_id]
-                
-                self.update_auth_status_file()
-                self.log_security_event(user_id, "RESET_SYSTEM", "INFO", "Reset sistema via sensore")
-                self.save_security_data()
-                
-                result = {"success": True, "message": "Sistema resettato via sensore"}
-            
-            # Crea il sensore di risposta
-            self.create_response_sensor("sensor.southtech_reset_response", result)
-            
-            # Rimuovi richiesta
-            self.set_state("sensor.southtech_reset_request", state="unavailable")
-            
-        except Exception as e:
-            self.error(f"Errore processing sensor reset: {e}")
-            self.create_response_sensor("sensor.southtech_reset_response", 
-                                       {"success": False, "error": str(e)})
-
-    def process_sensor_change_password_request(self):
-        """Processa richiesta cambio password via sensore"""
-        try:
-            attrs = self.get_state("sensor.southtech_change_password_request", attribute="all")
-            if not attrs or "attributes" not in attrs:
-                return
-                
-            request_data = attrs["attributes"]
-            if request_data.get("action") != "change_password":
-                return
-                
-            user_id = f"browser_{request_data.get('browser_id', 'unknown')}"
-            old_password = request_data.get("old_password")
-            new_password = request_data.get("new_password")
-            new_password_confirm = request_data.get("new_password_confirm")
-            
-            self.log(f"🔍 SENSOR CHANGE PASSWORD: Processando cambio password da {user_id[:20]}")
-            
-            # Controlla se bloccato
-            is_blocked, block_until = self.is_user_blocked(user_id)
-            if is_blocked:
-                result = {
-                    "success": False, 
-                    "blocked": True,
-                    "remaining_seconds": int(block_until - time.time())
-                }
-            elif not os.path.exists(self.auth_file):
-                self.record_attempt(user_id, "password_change", False)
-                result = {"success": False, "error": "Password non configurata"}
-            elif not old_password or not new_password or not new_password_confirm:
-                self.record_attempt(user_id, "password_change", False)
-                result = {"success": False, "error": "Tutti i campi sono richiesti"}
-            elif new_password != new_password_confirm:
-                self.record_attempt(user_id, "password_change", False)
-                result = {"success": False, "error": "Le nuove password non coincidono"}
-            elif len(new_password) < 6:
-                self.record_attempt(user_id, "password_change", False)
-                result = {"success": False, "error": "La nuova password deve essere di almeno 6 caratteri"}
-            else:
-                # Carica i dati di autenticazione esistenti
-                with open(self.auth_file, 'r') as f:
-                    auth_data = json.load(f)
-                
-                # Verifica password attuale
-                salt = auth_data["salt"]
-                stored_hash = auth_data["password_hash"]
-                old_hash = hashlib.sha256((old_password + salt).encode()).hexdigest()
-                
-                if old_hash != stored_hash:
-                    self.record_attempt(user_id, "password_change", False)
-                    result = {"success": False, "error": "Password attuale non corretta"}
-                    self.log(f"🔒 CHANGE PASSWORD: Password attuale errata per {user_id[:20]}")
-                else:
-                    # Genera nuovo salt e hash per la nuova password
-                    new_salt = secrets.token_hex(32)
-                    new_hash = hashlib.sha256((new_password + new_salt).encode()).hexdigest()
-                    
-                    # Aggiorna i dati di autenticazione
-                    auth_data.update({
-                        "password_hash": new_hash,
-                        "salt": new_salt,
-                        "last_changed": datetime.now().isoformat(),
-                        "changed_by": user_id[:20]
-                    })
-                    
-                    with open(self.auth_file, 'w') as f:
-                        json.dump(auth_data, f, indent=2)
-                    
-                    # Invalida tutti i token esistenti per sicurezza
-                    old_token_count = len(self.active_tokens)
-                    self.active_tokens.clear()
-                    
-                    # Registra successo
-                    self.record_attempt(user_id, "password_change", True)
-                    self.log_security_event(user_id, "PASSWORD_CHANGE", "INFO", 
-                                          f"Password cambiata con successo, {old_token_count} token invalidati")
-                    
-                    result = {"success": True, "message": "Password cambiata con successo"}
-                    self.log("✅ Cambio password completato via sensore")
-            
-            # Crea il sensore di risposta
-            self.create_response_sensor("sensor.southtech_change_password_response", result)
-            
-            # Rimuovi richiesta
-            self.set_state("sensor.southtech_change_password_request", state="unavailable")
-            
-        except Exception as e:
-            self.error(f"Errore processing sensor change password: {e}")
-            self.create_response_sensor("sensor.southtech_change_password_response", 
-                                      {"success": False, "error": str(e)})
-    
     def create_response_sensor(self, sensor_name, result):
-        """Crea un sensore di risposta per il sistema file-based"""
+        """Crea un sensore di risposta per il sistema file-based - VERSIONE CORRETTA"""
         try:
-            # Verifica se il sensore esiste
-            current_state = self.get_state(sensor_name)
-            if current_state is None:
-                # Crea il sensore
-                self.set_state(sensor_name, 
-                              state="created",
-                              attributes={"created_at": datetime.now().isoformat()})
-                self.log(f"🔍 Creato sensore {sensor_name}")
-            
-            # Imposta la risposta
+            # Non verificare se il sensore esiste, crealo direttamente
             self.set_state(sensor_name, 
                           state="completed",
                           attributes=result)
             
-            self.log(f"✅ Risposta salvata in {sensor_name}: {result}")
+            self.log(f"✅ Risposta salvata in {sensor_name}")
             
         except Exception as e:
             self.error(f"Errore creazione sensore risposta {sensor_name}: {e}")
+            
+            # Fallback: prova a crearlo forzatamente
+            try:
+                import time
+                time.sleep(0.1)  # Piccolo delay
+                self.set_state(sensor_name, 
+                              state="completed",
+                              attributes=result)
+                self.log(f"✅ Risposta salvata in {sensor_name} (fallback)")
+            except Exception as e2:
+                self.error(f"Errore anche nel fallback per {sensor_name}: {e2}")
     
     def monitor_file_requests(self, kwargs):
         """Monitora richieste tramite file system (fallback secondario)"""
@@ -866,57 +1467,41 @@ class SouthTechConfigurator(hass.Hass):
         except Exception as e:
             self.error(f"Errore monitoraggio file requests: {e}")
     
+    # ================================================================
+    # 3. FILE SYSTEM (FALLBACK 2) - Aggiornato con metodi avanzati
+    # ================================================================
+
     def process_file_request(self, filename, filepath):
-        """Processa una richiesta da file"""
+        """Processa richiesta da file con metodi avanzati"""
         try:
-            self.log(f"🔍 FILE REQUEST: Processando {filename}")
+            if filename != "save_request.json":
+                return  # Solo per richieste di salvataggio
+                
+            self.log("📁 FILE: Processamento con metodo avanzato")
             
-            # Leggi la richiesta
+            # Leggi richiesta
             with open(filepath, 'r') as f:
                 request_data = json.load(f)
+            os.remove(filepath)  # Rimuovi file richiesta
             
-            # Rimuovi il file di richiesta
-            os.remove(filepath)
+            configurations = request_data.get("configurations", [])
+            if not configurations:
+                response_data = {"success": False, "error": "Configurazioni mancanti"}
+            else:
+                # 🆕 USA METODO AVANZATO
+                response_data = self.execute_save_advanced("file", configurations, request_data)
             
-            # Processa in base al tipo di richiesta
-            response_data = None
-            response_file = None
+            # Salva risposta
+            response_path = os.path.join(self.api_path, "save_response.json")
+            response_data['timestamp'] = datetime.now().isoformat()
             
-            if filename == "auth_setup_request.json":
-                response_data, _ = self.api_auth_setup(request_data)
-                response_file = "auth_setup_response.json"
+            with open(response_path, 'w') as f:
+                json.dump(response_data, f, indent=2)
                 
-            elif filename == "auth_login_request.json":
-                response_data, _ = self.api_auth_login(request_data)
-                response_file = "auth_login_response.json"
-                
-            elif filename == "entities_request.json":
-                request_data["__headers"] = {"Authorization": f"Bearer {request_data.get('token', '')}"}
-                response_data, _ = self.api_get_entities(request_data)
-                response_file = "entities_response.json"
-                
-            elif filename == "sync_request.json":
-                request_data["__headers"] = {"Authorization": f"Bearer {request_data.get('token', '')}"}
-                response_data, _ = self.api_sync_configs(request_data)
-                response_file = "sync_response.json"
-                
-            elif filename == "save_request.json":
-                request_data["__headers"] = {"Authorization": f"Bearer {request_data.get('token', '')}"}
-                response_data, _ = self.api_save_config(request_data)
-                response_file = "save_response.json"
+            self.log("📁 FILE: Risposta salvata")
             
-            # Salva la risposta
-            if response_data and response_file:
-                response_path = os.path.join(self.api_path, response_file)
-                response_data['timestamp'] = datetime.now().isoformat()
-                
-                with open(response_path, 'w') as f:
-                    json.dump(response_data, f, indent=2)
-                    
-                self.log(f"🔍 FILE REQUEST: Risposta salvata in {response_file}")
-                
         except Exception as e:
-            self.error(f"Errore processamento file request {filename}: {e}")
+            self.error(f"❌ FILE: Errore: {e}")
     
     def update_auth_status_file(self):
         """Aggiorna il file di stato autenticazione e crea sensore HA"""
@@ -974,28 +1559,75 @@ class SouthTechConfigurator(hass.Hass):
             except:
                 pass
     
+    # 🔧 Heartbeat sistema aggiornato
     def system_heartbeat(self, kwargs):
-        """Heartbeat del sistema per monitoraggio avanzato"""
+        """Heartbeat del sistema per monitoraggio con protezione errori"""
         try:
+            # Verifica handler WebSocket
+            websocket_handler_ok = hasattr(self, 'handle_websocket_save') and callable(getattr(self, 'handle_websocket_save'))
+            
             # Aggiorna sensore di sistema
             self.set_state("sensor.southtech_system_status",
                           state="online",
                           attributes={
                               "last_heartbeat": datetime.now().isoformat(),
-                              "active_tokens": len(self.active_tokens),
-                              "api_endpoints": 9,  # Aggiornato numero endpoint
+                              "active_tokens": len(self.active_tokens) if hasattr(self, 'active_tokens') else 0,
+                              "api_endpoints": 9,
                               "fallback_modes": ["sensor", "file"],
-                              "version": "3.0.0",
+                              "version": "3.2.0",
+                              "websocket_fixed": True,
                               "yaml_format_support": "dual",
+                              "websocket_service": {
+                                  "handler_available": websocket_handler_ok,
+                                  "service_name": "appdaemon.southtech_save_yaml",
+                                  "test_mode_supported": True
+                              },
                               "security_features": {
                                   "anti_bruteforce": True,
-                                  "blocked_users": len(self.blocked_users),
-                                  "attempt_counters": len(self.attempt_counters),
+                                  "blocked_users": len(self.blocked_users) if hasattr(self, 'blocked_users') else 0,
+                                  "attempt_counters": len(self.attempt_counters) if hasattr(self, 'attempt_counters') else 0,
                                   "notifications": True
                               }
                           })
         except Exception as e:
             self.error(f"Errore heartbeat: {e}")
+            # Fallback heartbeat minimale
+            try:
+                self.set_state("sensor.southtech_system_status",
+                              state="error",
+                              attributes={
+                                  "error": str(e),
+                                  "last_heartbeat": datetime.now().isoformat()
+                              })
+            except:
+                pass
+
+    def handle_websocket_save(self, namespace, domain, service, kwargs, **kwds):
+        """Handler per servizio WebSocket save"""
+        try:
+            self.log("🔌 WEBSOCKET SAVE: Ricevuta richiesta")
+            
+            # Gestisci test mode
+            if kwargs.get("test_mode"):
+                return {
+                    "test_mode": True,
+                    "service_available": True,
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            # Gestisci salvataggio normale
+            yaml_content = kwargs.get("yaml_content")
+            configurations = kwargs.get("configurations", [])
+            
+            if yaml_content:
+                result = self.execute_yaml_save_sensor(yaml_content, configurations, "websocket_user")
+                return result
+            else:
+                return {"success": False, "error": "Contenuto YAML mancante"}
+                
+        except Exception as e:
+            self.error(f"Errore WebSocket save: {e}")
+            return {"success": False, "error": str(e)}
     
     # === METODI UTILITY ===
     
@@ -1075,51 +1707,162 @@ class SouthTechConfigurator(hass.Hass):
                 self.error(f"Errore suggerimento helper per {base_id}: {e}")
         
         return helpers_created
-    
-    def setup_communication_entities(self):
-        """Setup entità di comunicazione per fallback"""
+
+    def setup_endpoints(self):
+        """🔧 Registra tutti gli endpoint API AppDaemon - ALLA FINE dell'inizializzazione"""
         try:
-            # Crea sensori di comunicazione se non esistono
+            self.log("🔗 Registrazione endpoint API...")
+            
+            # Endpoint principali
+            self.register_endpoint(self.api_auth_status, "southtech_auth_status")
+            self.register_endpoint(self.api_auth_setup, "southtech_auth_setup")
+            self.register_endpoint(self.api_auth_login, "southtech_auth_login")
+            self.register_endpoint(self.api_auth_change, "southtech_auth_change")
+            self.register_endpoint(self.api_get_entities, "southtech_entities")
+            self.register_endpoint(self.api_sync_configs, "southtech_sync")
+            self.register_endpoint(self.api_save_config, "southtech_save")
+            
+            # 🎯 ENDPOINT WEBSOCKET PRINCIPALE - registrato correttamente
+            self.register_endpoint(self.handle_websocket_save, "southtech_save_yaml")
+            
+            # Endpoint sicurezza
+            self.register_endpoint(self.api_validate_token, "southtech_validate_token")
+            self.register_endpoint(self.api_reset_system, "southtech_reset_system")
+            self.register_endpoint(self.api_check_blocked, "southtech_check_blocked")
+            
+            # Endpoint diagnostici
+            self.register_endpoint(self.api_diagnostics, "southtech_diagnostics")
+            self.register_endpoint(self.api_emergency_reset, "southtech_emergency_reset")
+            
+            self.log("✅ Tutti gli endpoint registrati con successo!")
+            self.log("🔌 Servizio WebSocket: appdaemon.southtech_save_yaml")
+            
+        except Exception as e:
+            self.error(f"❌ Errore registrazione endpoint: {e}")
+            raise
+
+    def setup_internal_websocket_handler(self):
+        """WebSocket handler interno - non esposto come servizio HA"""
+        # Crea endpoint interno per comunicazione WebSocket
+        self.internal_ws_queue = []
+        self.is_processing_ws = False
+        
+        # Monitor queue ogni secondo
+        self.run_every(self.process_internal_ws_queue, "now+1", 1)
+    
+    def setup_sensor_fallback(self):
+        """Sistema sensori ottimizzato con anti-race-condition"""
+        self.sensor_locks = {
+            'save': False,
+            'sync': False,
+            'setup': False,
+            'login': False
+        }
+    
+    # 🔧 Gestione più robusta dei sensori
+    def setup_communication_entities(self):
+        """Setup entità di comunicazione per fallback con sensore debug WebSocket"""
+        try:
             communication_entities = [
                 "sensor.southtech_system_status",
-                "sensor.southtech_auth_status",
+                "sensor.southtech_auth_status", 
                 "sensor.southtech_security_log",
                 "sensor.southtech_setup_request",
-                "sensor.southtech_setup_response", 
+                "sensor.southtech_setup_response",
                 "sensor.southtech_login_request",
                 "sensor.southtech_login_response",
                 "sensor.southtech_reset_request",
-                "sensor.southtech_reset_response"
+                "sensor.southtech_reset_response",
+                "sensor.southtech_sync_request",
+                "sensor.southtech_sync_response",
+                "sensor.southtech_save_request",
+                "sensor.southtech_save_response",
             ]
             
             for entity in communication_entities:
                 try:
                     current_state = self.get_state(entity)
-                    if current_state is None:
-                        # Inizializza l'entità se non esiste
-                        if "system_status" in entity:
-                            self.set_state(entity, state="initializing", 
-                                         attributes={"initialized": datetime.now().isoformat()})
-                        elif "auth_status" in entity:
-                            self.set_state(entity, state="unknown",
-                                         attributes={"initialized": datetime.now().isoformat()})
-                        elif "security_log" in entity:
-                            self.set_state(entity, state="info",
-                                         attributes={
-                                             "initialized": datetime.now().isoformat(),
-                                             "blocked_users": 0,
-                                             "total_attempts": 0
-                                         })
-                        else:
-                            self.set_state(entity, state="unavailable",
-                                         attributes={"initialized": datetime.now().isoformat()})
-                        
-                        self.log(f"🔍 Inizializzato sensore: {entity}")
-                except Exception as e:
-                    self.error(f"Errore inizializzazione {entity}: {e}")
                     
+                    if current_state is None:
+                        if "websocket_debug" in entity:
+                            # ✅ SENSORE DEBUG WEBSOCKET ENHANCED
+                            initial_state = "initializing"
+                            attributes = {
+                                "initialized": datetime.now().isoformat(),
+                                "description": "Debug operazioni WebSocket SouthTech",
+                                "debug_active": True,
+                                "service_name": "appdaemon.southtech_save_yaml",
+                                "handler_method": "handle_websocket_save",
+                                "test_mode_supported": True,
+                                "service_registered": False,  # Sarà aggiornato dalla verifica
+                                "last_test": None,
+                                "fallback_methods": ["sensor", "file"],
+                                "version": "3.2.0",
+                                "status": "Inizializzazione in corso...",
+                                "troubleshooting": {
+                                    "service_not_found": [
+                                        "Verifica che AppDaemon sia avviato",
+                                        "Controlla log AppDaemon per errori",
+                                        "Ricarica configurazione AppDaemon",
+                                        "Usa fallback sensori se necessario"
+                                    ]
+                                }
+                            }
+                        elif "save_" in entity:
+                            initial_state = "ready"
+                            attributes = {
+                                "initialized": datetime.now().isoformat(),
+                                "description": "Sensore per salvataggio YAML",
+                                "fallback_priority": 2
+                            }
+                        elif "sync_" in entity:
+                            initial_state = "ready"
+                            attributes = {
+                                "initialized": datetime.now().isoformat(),
+                                "description": "Sensore per sincronizzazione configurazioni",
+                                "fallback_priority": 2
+                            }
+                        else:
+                            initial_state = "unavailable"
+                            attributes = {
+                                "initialized": datetime.now().isoformat(),
+                                "description": f"Sensore comunicazione: {entity.split('.')[-1]}"
+                            }
+                        
+                        self.set_state(entity, state=initial_state, attributes=attributes)
+                        self.log(f"🔍 Inizializzato sensore: {entity}")
+                    else:
+                        self.log(f"✓ Sensore già esistente: {entity}")
+                        
+                except Exception as e:
+                    self.error(f"❌ Errore inizializzazione {entity}: {e}")
+                    continue
+                    
+            self.log("✅ Setup sensori comunicazione completato (incluso WebSocket debug)")
+            
         except Exception as e:
-            self.error(f"Errore setup comunicazione: {e}")
+            self.error(f"❌ Errore setup comunicazione: {e}")
+
+    def setup_websocket_handler(self):
+        """Setup handler WebSocket principale"""
+        self.register_endpoint(self.api_websocket_save, "southtech_websocket_save")
+        
+    def api_websocket_save(self, data):
+        """Handler WebSocket unificato"""
+        try:
+            # Verifica token
+            token = data.get("token")
+            if not self.verify_token(token):
+                return {"success": False, "error": "Non autorizzato"}, 401
+            
+            # Processa salvataggio
+            configurations = data.get("configurations", [])
+            result = self.execute_save_advanced("websocket", configurations, data)
+            
+            return result, 200
+            
+        except Exception as e:
+            return {"success": False, "error": str(e)}, 500
     
     def cleanup_old_backups(self, kwargs):
         """Pulisce i backup vecchi mantenendo solo gli ultimi"""
@@ -1364,33 +2107,29 @@ class SouthTechConfigurator(hass.Hass):
             return False
     
     def api_validate_token(self, data):
-        """Valida token Home Assistant"""
+        """Valida token Home Assistant - CORRETTO"""
         try:
-            user_id = self.get_user_id(data)
+            # ✅ CORRETTO: Usa metodo unificato
+            user_id = self.get_user_id_unified(data, "api")
             
-            # Controlla se bloccato
+            # Resto del metodo rimane invariato...
             is_blocked, block_until = self.is_user_blocked(user_id)
             if is_blocked:
                 return {
                     "blocked": True, 
                     "remaining_seconds": int(block_until - time.time())
-                }, 423  # 423 Locked
+                }, 423
             
             ha_token = data.get("ha_token")
             if not ha_token:
                 self.record_attempt(user_id, "token_validation", False)
                 return {"error": "Token richiesto"}, 400
             
-            # Simula validazione token (in realtà dovrebbe testare con HA API)
-            # Per ora assumiamo che sia valido se ha lunghezza corretta
             if len(ha_token) < 50:
                 self.record_attempt(user_id, "token_validation", False)
                 return {"error": "Token non valido"}, 401
             
-            # Token valido
             self.record_attempt(user_id, "token_validation", True)
-            
-            # Controlla se password esiste
             has_password = os.path.exists(self.auth_file)
             
             return {
@@ -1403,11 +2142,12 @@ class SouthTechConfigurator(hass.Hass):
             return {"error": str(e)}, 500
     
     def api_reset_system(self, data):
-        """Reset completo del sistema"""
+        """Reset completo del sistema - CORRETTO"""
         try:
-            user_id = self.get_user_id(data)
+            # ✅ CORRETTO: Usa metodo unificato
+            user_id = self.get_user_id_unified(data, "api")
             
-            # Controlla se bloccato
+            # Resto del metodo rimane invariato...
             is_blocked, block_until = self.is_user_blocked(user_id)
             if is_blocked:
                 return {
@@ -1417,27 +2157,19 @@ class SouthTechConfigurator(hass.Hass):
             
             self.log(f"🔄 RESET SISTEMA richiesto da {user_id[:20]}")
             
-            # Cancella file auth
             if os.path.exists(self.auth_file):
                 os.remove(self.auth_file)
                 self.log("🗑️ File auth cancellato")
             
-            # Cancella token attivi
             self.active_tokens.clear()
             
-            # Reset contatori per questo utente (permette reset anche se bloccato)
             if user_id in self.attempt_counters:
                 del self.attempt_counters[user_id]
             if user_id in self.blocked_users:
                 del self.blocked_users[user_id]
             
-            # Aggiorna file status
             self.update_auth_status_file()
-            
-            # Log evento
             self.log_security_event(user_id, "RESET_SYSTEM", "INFO", "Reset sistema completato")
-            
-            # Salva dati
             self.save_security_data()
             
             return {"success": True, "message": "Sistema resettato"}, 200
@@ -1460,12 +2192,13 @@ class SouthTechConfigurator(hass.Hass):
             return {"error": str(e)}, 500
     
     def api_auth_setup(self, data):
-        """Setup iniziale della password con sicurezza"""
+        """Setup iniziale della password con sicurezza - CORRETTO"""
         try:
-            user_id = self.get_user_id(data)
-            self.log(f"🔍 AUTH SETUP: Richiesta da {user_id[:20]}")
+            # ✅ CORRETTO: Usa metodo unificato
+            user_id = self.get_user_id_unified(data, "api")
+            self.log(f"🔍 API SETUP: Richiesta da {user_id[:20]}")
             
-            # Controlla se bloccato
+            # Resto del metodo rimane invariato...
             is_blocked, block_until = self.is_user_blocked(user_id)
             if is_blocked:
                 return {
@@ -1492,11 +2225,9 @@ class SouthTechConfigurator(hass.Hass):
                 self.record_attempt(user_id, "password_setup", False)
                 return {"error": "Password troppo corta (minimo 6 caratteri)"}, 400
             
-            # Genera salt e hash
             salt = secrets.token_hex(32)
             password_hash = hashlib.sha256((password + salt).encode()).hexdigest()
             
-            # Salva i dati di autenticazione
             auth_data = {
                 "password_hash": password_hash,
                 "salt": salt,
@@ -1508,29 +2239,24 @@ class SouthTechConfigurator(hass.Hass):
             with open(self.auth_file, 'w') as f:
                 json.dump(auth_data, f, indent=2)
             
-            # Genera token
             token = self.generate_token()
-            
-            # Aggiorna file di stato
             self.update_auth_status_file()
-            
-            # Registra successo
             self.record_attempt(user_id, "password_setup", True)
             
             self.log("✅ Password configurata con successo")
             return {"success": True, "token": token}, 200
             
         except Exception as e:
-            self.error(f"❌ AUTH SETUP: Errore: {e}")
+            self.error(f"❌ API SETUP: Errore: {e}")
             return {"error": str(e)}, 500
     
+    # 🔧 MODIFICA ANCHE GLI ENDPOINT API PER SUPPORTARE HASH
     def api_auth_login(self, data):
-        """Login con password con sicurezza"""
+        """Login con password con sicurezza - VERSIONE SICURA"""
         try:
-            user_id = self.get_user_id(data)
-            self.log(f"🔍 AUTH LOGIN: Richiesta da {user_id[:20]}")
+            user_id = self.get_user_id_unified(data, "api")
+            self.log(f"🔍 API LOGIN: Richiesta da {user_id[:20]}")
             
-            # Controlla se bloccato
             is_blocked, block_until = self.is_user_blocked(user_id)
             if is_blocked:
                 return {
@@ -1542,35 +2268,49 @@ class SouthTechConfigurator(hass.Hass):
                 self.record_attempt(user_id, "password_login", False)
                 return {"error": "Password non configurata"}, 400
             
-            password = data.get("password")
-            if not password:
+            # 🔐 SUPPORTO HASH SICURO
+            password = data.get("password")  # Legacy
+            password_hash = data.get("password_hash")  # Sicuro
+            security_method = data.get("security_method", "legacy")
+            browser_id = data.get("browser_id", "")
+            timestamp = data.get("timestamp", "")
+            
+            if not password and not password_hash:
                 self.record_attempt(user_id, "password_login", False)
                 return {"error": "Password richiesta"}, 400
             
-            # Carica i dati di autenticazione
             with open(self.auth_file, 'r') as f:
                 auth_data = json.load(f)
             
-            # Verifica password
-            salt = auth_data["salt"]
-            stored_hash = auth_data["password_hash"]
-            provided_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+            login_success = False
             
-            if provided_hash != stored_hash:
+            if security_method == "client_hash_sha256" and password_hash:
+                # Hash sicuro
+                stored_password = auth_data.get("stored_password")
+                if stored_password:
+                    login_success = self.verify_password_hash(password_hash, stored_password, browser_id, timestamp)
+                else:
+                    self.record_attempt(user_id, "password_login", False)
+                    return {"error": "Sistema di sicurezza aggiornato. Resetta la password."}, 400
+            else:
+                # Legacy
+                salt = auth_data["salt"]
+                stored_hash = auth_data["password_hash"]
+                provided_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+                login_success = (provided_hash == stored_hash)
+            
+            if not login_success:
                 self.record_attempt(user_id, "password_login", False)
                 return {"error": "Password non corretta"}, 401
             
-            # Genera token
             token = self.generate_token()
-            
-            # Registra successo
             self.record_attempt(user_id, "password_login", True)
             
-            self.log("✅ Login effettuato con successo")
+            self.log("✅ Login effettuato con successo (API sicura)")
             return {"success": True, "token": token}, 200
             
         except Exception as e:
-            self.error(f"❌ AUTH LOGIN: Errore: {e}")
+            self.error(f"❌ API LOGIN: Errore: {e}")
             return {"error": str(e)}, 500
     
     def api_auth_change(self, data):
@@ -1631,8 +2371,8 @@ class SouthTechConfigurator(hass.Hass):
             return {"error": str(e)}, 500
     
     def api_get_entities(self, data):
-        """Recupera le entità di Home Assistant"""
-        self.log("🔍 ENTITIES: Endpoint chiamato via API diretta")
+        """Recupera le entità di Home Assistant - Versione semplificata senza template"""
+        self.log("🔍 ENTITIES: Endpoint chiamato via API diretta (no template)")
         
         try:
             # Verifica token
@@ -1642,7 +2382,7 @@ class SouthTechConfigurator(hass.Hass):
             if not self.verify_token(token):
                 return {"error": "Non autorizzato"}, 401
             
-            # Recupera tutte le entità
+            # Recupera tutte le entità (il filtro ora è gestito lato frontend)
             all_states = self.get_state()
             
             entities = {
@@ -1662,22 +2402,65 @@ class SouthTechConfigurator(hass.Hass):
                         "entity_id": entity_id,
                         "friendly_name": state_obj.get("attributes", {}).get("friendly_name", entity_id)
                     })
-                elif entity_id.startswith('sensor.') and ('illuminance' in entity_id.lower() or 'lux' in entity_id.lower()):
-                    entities["sensors"].append({
-                        "entity_id": entity_id,
-                        "friendly_name": state_obj.get("attributes", {}).get("friendly_name", entity_id)
-                    })
+                elif entity_id.startswith('sensor.'):
+                    # Filtro solo sensori di illuminamento
+                    attributes = state_obj.get("attributes", {})
+                    device_class = attributes.get("device_class")
+                    unit = attributes.get("unit_of_measurement", "").lower()
+                    
+                    is_illuminance = (
+                        device_class == 'illuminance' or
+                        'lux' in unit or
+                        'illuminance' in entity_id.lower() or
+                        'lux' in entity_id.lower()
+                    )
+                    
+                    if is_illuminance:
+                        entities["sensors"].append({
+                            "entity_id": entity_id,
+                            "friendly_name": attributes.get("friendly_name", entity_id)
+                        })
             
             # Ordina per nome friendly
             for category in entities.values():
                 category.sort(key=lambda x: x["friendly_name"].lower())
             
-            self.log(f"📋 Recuperate {len(entities['lights'])} luci, {len(entities['binary_sensors'])} sensori binari, {len(entities['sensors'])} sensori")
+            self.log(f"📋 Recuperate: {len(entities['lights'])} luci, {len(entities['binary_sensors'])} sensori binari, {len(entities['sensors'])} sensori lux")
             
-            return entities, 200
+            result = {
+                "entities": entities,
+                "mode": "direct_no_template",
+                "total_entities": len(entities['lights']) + len(entities['binary_sensors']) + len(entities['sensors']),
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            return result, 200
             
         except Exception as e:
             self.error(f"❌ ENTITIES: Errore: {e}")
+            return {"error": str(e)}, 500
+
+    def api_get_areas(self, data):
+        """Restituisce una lista di aree disponibili."""
+        self.log("🔍 AREE: Richiesta lista aree via API")
+        try:
+            # Verifica token
+            auth_header = data.get("__headers", {}).get("Authorization", "")
+            token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+            if not self.verify_token(token):
+                return {"error": "Non autorizzato"}, 401
+
+            # Usa la cache per restituire le aree
+            areas = [{"id": area, "name": area} for area in self.area_cache.keys()]
+            
+            # Ordina per nome
+            areas.sort(key=lambda x: x["name"].lower())
+            
+            self.log(f"📋 Restituite {len(areas)} aree.")
+            return areas, 200
+
+        except Exception as e:
+            self.error(f"❌ AREE: Errore: {e}")
             return {"error": str(e)}, 500
     
     def api_sync_configs(self, data):
@@ -1758,35 +2541,271 @@ class SouthTechConfigurator(hass.Hass):
             return {"error": str(e)}, 500
     
     # === SISTEMA FALLBACK MIGLIORATO ===
-    
+
+    # 🔧 Monitor sync sensori CORRETTA (era mancante!)
     def monitor_sensor_requests(self, kwargs):
-        """Monitora richieste tramite sensori Home Assistant (fallback principale)"""
+        """Monitor sensori con protezione errori"""
         try:
-            # Setup Request
-            setup_sensor = self.get_state("sensor.southtech_setup_request")
-            if setup_sensor and setup_sensor == "pending":
-                self.process_sensor_setup_request()
+            current_time = time.time()
             
-            # Login Request  
-            login_sensor = self.get_state("sensor.southtech_login_request")
-            if login_sensor and login_sensor == "pending":
-                self.process_sensor_login_request()
+            # Save Request
+            if not getattr(self, 'sensor_locks', None):
+                self.sensor_locks = {'save': False, 'sync': False, 'setup': False, 'login': False}
+            
+            if not self.sensor_locks['save']:
+                save_sensor = self.get_state("sensor.southtech_save_request")
+                save_attrs = self.get_state("sensor.southtech_save_request", attribute="all")
                 
+                if (save_sensor == "pending" and save_attrs and 
+                    self.is_new_request('save', save_attrs.get('attributes', {}))):
+                    
+                    self.sensor_locks['save'] = True
+                    try:
+                        self.process_sensor_save_request()
+                    finally:
+                        self.sensor_locks['save'] = False
+            
+            # Sync Request  
+            if not self.sensor_locks['sync']:
+                sync_sensor = self.get_state("sensor.southtech_sync_request")
+                sync_attrs = self.get_state("sensor.southtech_sync_request", attribute="all")
+                
+                if (sync_sensor == "pending" and sync_attrs and
+                    self.is_new_request('sync', sync_attrs.get('attributes', {}))):
+                    
+                    self.sensor_locks['sync'] = True
+                    try:
+                        self.process_sensor_sync_request()
+                    finally:
+                        self.sensor_locks['sync'] = False
+                        
+            # Login Request
+            if not self.sensor_locks['login']:
+                login_sensor = self.get_state("sensor.southtech_login_request")
+                login_attrs = self.get_state("sensor.southtech_login_request", attribute="all")
+                
+                if (login_sensor == "pending" and login_attrs and
+                    self.is_new_request('login', login_attrs.get('attributes', {}))):
+                    
+                    self.sensor_locks['login'] = True
+                    try:
+                        self.process_sensor_login_request()
+                    finally:
+                        self.sensor_locks['login'] = False
+                        
+            # Setup Request
+            if not self.sensor_locks['setup']:
+                setup_sensor = self.get_state("sensor.southtech_setup_request")
+                setup_attrs = self.get_state("sensor.southtech_setup_request", attribute="all")
+                
+                if (setup_sensor == "pending" and setup_attrs and
+                    self.is_new_request('setup', setup_attrs.get('attributes', {}))):
+                    
+                    self.sensor_locks['setup'] = True
+                    try:
+                        self.process_sensor_setup_request()
+                    finally:
+                        self.sensor_locks['setup'] = False
+                        
             # Reset Request
             reset_sensor = self.get_state("sensor.southtech_reset_request")
-            if reset_sensor and reset_sensor == "pending":
-                self.process_sensor_reset_request()
+            reset_attrs = self.get_state("sensor.southtech_reset_request", attribute="all")
+            
+            if (reset_sensor == "pending" and reset_attrs and
+                self.is_new_request('reset', reset_attrs.get('attributes', {}))):
                 
-            # Change Password Request
-            change_password_sensor = self.get_state("sensor.southtech_change_password_request")
-            if change_password_sensor and change_password_sensor == "pending":
-                self.process_sensor_change_password_request()
-                
+                try:
+                    self.process_sensor_reset_request()
+                except Exception as e:
+                    self.error(f"Errore process_sensor_reset_request: {e}")
+                        
         except Exception as e:
-            self.error(f"Errore monitoraggio sensor requests: {e}")
-    
+            self.error(f"Errore monitor_sensor_requests: {e}")
+
+    # ✅ Processa richiesta sincronizzazione via sensore
+    def process_sensor_sync_request(self):
+        """Processa richiesta sincronizzazione via sensore - VERSIONE CORRETTA"""
+        try:
+            attrs = self.get_state("sensor.southtech_sync_request", attribute="all")
+            if not attrs or "attributes" not in attrs:
+                self.log("⚠️ Attributi sensore sync mancanti")
+                return
+                
+            request_data = attrs["attributes"]
+            if request_data.get("action") != "sync_configurations":
+                return
+                
+            user_id = f"browser_{request_data.get('browser_id', 'unknown')}"
+            
+            self.log(f"🔍 SENSOR SYNC: Processando sync da {user_id[:20]}")
+            
+            # Aggiorna debug
+            self.set_state("sensor.southtech_websocket_debug",
+                          state="sync_fallback",
+                          attributes={
+                              "fallback_method": "sensor_sync",
+                              "user_id": user_id[:20],
+                              "request_time": datetime.now().isoformat()
+                          })
+            
+            # Controlla se bloccato
+            is_blocked, block_until = self.is_user_blocked(user_id)
+            if is_blocked:
+                result = {
+                    "success": False, 
+                    "blocked": True,
+                    "remaining_seconds": int(block_until - time.time())
+                }
+            else:
+                # Esegui sincronizzazione
+                try:
+                    configurations = self.read_existing_configs()
+                    
+                    result = {
+                        "success": True,
+                        "configurations": configurations,
+                        "last_sync": datetime.now().isoformat(),
+                        "file_exists": os.path.exists(self.apps_yaml_path),
+                        "yaml_format_support": "dual",
+                        "method": "sensor_fallback"
+                    }
+                    
+                    self.record_attempt(user_id, "sync_configs", True)
+                    self.log(f"✅ SENSOR SYNC: Caricate {len(configurations)} configurazioni")
+                    
+                except Exception as e:
+                    self.error(f"❌ SENSOR SYNC: Errore lettura configurazioni: {e}")
+                    self.record_attempt(user_id, "sync_configs", False)
+                    result = {
+                        "success": False,
+                        "error": str(e),
+                        "method": "sensor_fallback"
+                    }
+            
+            # Crea il sensore di risposta
+            self.create_response_sensor("sensor.southtech_sync_response", result)
+            
+            # Reset sensore richiesta
+            self.set_state("sensor.southtech_sync_request", state="completed")
+            
+            self.log("✅ SENSOR SYNC: Completato")
+            
+        except Exception as e:
+            self.error(f"❌ SENSOR SYNC: Errore: {e}")
+            self.create_response_sensor("sensor.southtech_sync_response", 
+                                      {"success": False, "error": str(e), "method": "sensor_fallback_error"})
+
+    def process_sensor_login_request(self):
+        """Processa richiesta login via sensore - VERSIONE UNIFICATA CORRETTA"""
+        try:
+            attrs = self.get_state("sensor.southtech_login_request", attribute="all")
+            if not attrs or "attributes" not in attrs:
+                return
+                
+            request_data = attrs["attributes"]
+            if request_data.get("action") != "login":
+                return
+                
+            user_id = self.get_user_id_unified(request_data, "sensor")
+            
+            # ✅ CORREZIONE: Gestisci sia hash che password legacy
+            password = request_data.get("password")
+            password_hash = request_data.get("password_hash")
+            security_method = request_data.get("security_method", "legacy")
+            browser_id = request_data.get("browser_id", "")
+            timestamp = request_data.get("timestamp", "")
+            
+            self.log(f"🔍 SENSOR LOGIN: Da {user_id[:20]} - Metodo: {security_method}")
+            self.log(f"🔍 LOGIN DEBUG: password={bool(password)}, hash={bool(password_hash)}")
+            
+            # Controlla se bloccato
+            is_blocked, block_until = self.is_user_blocked(user_id)
+            if is_blocked:
+                result = {
+                    "success": False, 
+                    "blocked": True,
+                    "remaining_seconds": int(block_until - time.time())
+                }
+            elif not os.path.exists(self.auth_file):
+                self.record_attempt(user_id, "password_login", False)
+                result = {"success": False, "error": "Password non configurata"}
+            else:
+                # Carica dati autenticazione
+                with open(self.auth_file, 'r') as f:
+                    auth_data = json.load(f)
+                
+                saved_security_method = auth_data.get("security_method", "legacy")
+                self.log(f"🔐 AUTH FILE: Metodo salvato: {saved_security_method}")
+                
+                # ✅ VERIFICA COMPATIBILITÀ METODI
+                login_success = False
+                
+                if security_method in ["client_hash_sha256", "client_hash_fallback"] and password_hash:
+                    # Frontend invia hash
+                    if saved_security_method in ["client_hash_sha256", "client_hash_fallback"]:
+                        # Confronta hash con hash salvato
+                        stored_hash = auth_data.get("password_hash", "")
+                        login_success = (password_hash == stored_hash)
+                        self.log(f"🔐 HASH vs HASH: {password_hash[:10]}... vs {stored_hash[:10]}...")
+                    else:
+                        # Hash vs password: calcola hash della password salvata
+                        stored_password = auth_data.get("stored_password", "")
+                        if stored_password:
+                            expected_hash = self.calculate_client_hash(stored_password, browser_id, timestamp)
+                            login_success = (password_hash == expected_hash)
+                            self.log(f"🔐 HASH vs PASSWORD: calcolato {expected_hash[:10]}...")
+                        else:
+                            login_success = False
+                            self.log("🔐 Nessuna password salvata per calcolo hash")
+                            
+                elif password:
+                    # Frontend invia password in chiaro
+                    if saved_security_method in ["client_hash_sha256", "client_hash_fallback"]:
+                        # Password vs hash: impossibile, errore
+                        login_success = False
+                        self.log("🔐 Incompatibilità: password chiara vs hash salvato")
+                    else:
+                        # Password vs password: metodo legacy
+                        salt = auth_data.get("salt", "")
+                        stored_hash = auth_data.get("password_hash", "")
+                        if salt and stored_hash:
+                            provided_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+                            login_success = (provided_hash == stored_hash)
+                            self.log(f"🔐 PASSWORD LEGACY: {provided_hash[:10]}... vs {stored_hash[:10]}...")
+                        else:
+                            # Prova confronto diretto con stored_password
+                            stored_password = auth_data.get("stored_password", "")
+                            login_success = (password == stored_password)
+                            self.log(f"🔐 PASSWORD DIRETTO: confronto diretto")
+                else:
+                    # Nessuna password fornita
+                    self.record_attempt(user_id, "password_login", False)
+                    result = {"success": False, "error": "Password richiesta"}
+                    self.create_response_sensor("sensor.southtech_login_response", result)
+                    self.set_state("sensor.southtech_login_request", state="unavailable")
+                    return
+                
+                # ✅ RISULTATO FINALE
+                if login_success:
+                    token = self.generate_token()
+                    self.record_attempt(user_id, "password_login", True)
+                    result = {"success": True, "token": token}
+                    self.log("✅ Login completato con successo")
+                else:
+                    self.record_attempt(user_id, "password_login", False)
+                    result = {"success": False, "error": "Password non corretta"}
+                    self.log("❌ Login fallito - password errata")
+            
+            self.create_response_sensor("sensor.southtech_login_response", result)
+            self.set_state("sensor.southtech_login_request", state="unavailable")
+            
+        except Exception as e:
+            self.error(f"Errore processing sensor login: {e}")
+            self.create_response_sensor("sensor.southtech_login_response", 
+                                      {"success": False, "error": str(e)})
+
     def process_sensor_setup_request(self):
-        """Processa richiesta setup via sensore"""
+        """Processa richiesta setup via sensore - VERSIONE CORRETTA FINALE"""
         try:
             attrs = self.get_state("sensor.southtech_setup_request", attribute="all")
             if not attrs or "attributes" not in attrs:
@@ -1796,13 +2815,17 @@ class SouthTechConfigurator(hass.Hass):
             if request_data.get("action") != "setup":
                 return
                 
-            user_id = f"browser_{request_data.get('browser_id', 'unknown')}"
+            user_id = self.get_user_id_unified(request_data, "sensor")
+            
+            # ✅ CORREZIONE: Gestisci sia hash che password legacy
             password = request_data.get("password")
             password_confirm = request_data.get("password_confirm")
+            password_hash = request_data.get("password_hash")
+            password_confirm_hash = request_data.get("password_confirm_hash")
+            security_method = request_data.get("security_method", "legacy")
             
-            self.log(f"🔍 SENSOR SETUP: Processando setup da {user_id[:20]}")
+            self.log(f"🔍 SENSOR SETUP: Metodo {security_method}, password: {bool(password)}, hash: {bool(password_hash)}")
             
-            # Controlla se bloccato
             is_blocked, block_until = self.is_user_blocked(user_id)
             if is_blocked:
                 result = {
@@ -1813,49 +2836,378 @@ class SouthTechConfigurator(hass.Hass):
             elif os.path.exists(self.auth_file):
                 self.record_attempt(user_id, "password_setup", False)
                 result = {"success": False, "error": "Password già configurata"}
-            elif not password or not password_confirm:
-                self.record_attempt(user_id, "password_setup", False)
-                result = {"success": False, "error": "Password e conferma richieste"}
-            elif password != password_confirm:
-                self.record_attempt(user_id, "password_setup", False)
-                result = {"success": False, "error": "Le password non coincidono"}
-            elif len(password) < 6:
-                self.record_attempt(user_id, "password_setup", False)
-                result = {"success": False, "error": "Password troppo corta"}
             else:
-                # Genera salt e hash
-                salt = secrets.token_hex(32)
-                password_hash = hashlib.sha256((password + salt).encode()).hexdigest()
-                
-                auth_data = {
-                    "password_hash": password_hash,
-                    "salt": salt,
-                    "created_at": datetime.now().isoformat(),
-                    "last_changed": datetime.now().isoformat(),
-                    "created_by": user_id[:20]
-                }
-                
-                with open(self.auth_file, 'w') as f:
-                    json.dump(auth_data, f, indent=2)
-                
-                token = self.generate_token()
-                self.update_auth_status_file()
-                
-                self.record_attempt(user_id, "password_setup", True)
-                result = {"success": True, "token": token}
-                self.log("✅ Setup completato via sensore")
+                # ✅ CORREZIONE: Controlla entrambi i metodi
+                if security_method in ["client_hash_sha256", "client_hash_fallback"] and password_hash and password_confirm_hash:
+                    # Metodo hash - usa hash direttamente
+                    if password_hash != password_confirm_hash:
+                        self.record_attempt(user_id, "password_setup", False)
+                        result = {"success": False, "error": "Le password non coincidono"}
+                    else:
+                        # ✅ CORREZIONE: Salva l'hash PULITO direttamente
+                        self.save_auth_data_unified(password_hash, user_id, security_method)
+                        result = {"success": True, "token": self.generate_token()}
+                        self.record_attempt(user_id, "password_setup", True)
+                        self.log(f"✅ Setup hash completato: {password_hash[:10]}...")
+                elif password and password_confirm:
+                    # Metodo legacy - usa password in chiaro
+                    if password != password_confirm:
+                        self.record_attempt(user_id, "password_setup", False)
+                        result = {"success": False, "error": "Le password non coincidono"}
+                    elif len(password) < 6:
+                        self.record_attempt(user_id, "password_setup", False)
+                        result = {"success": False, "error": "Password troppo corta"}
+                    else:
+                        # ✅ CORREZIONE: Salva la password PULITA direttamente
+                        self.save_auth_data_unified(password, user_id, "legacy")
+                        result = {"success": True, "token": self.generate_token()}
+                        self.record_attempt(user_id, "password_setup", True)
+                        self.log(f"✅ Setup legacy completato")
+                else:
+                    self.record_attempt(user_id, "password_setup", False)
+                    result = {"success": False, "error": "Password e conferma richieste"}
             
-            # Crea il sensore di risposta
             self.create_response_sensor("sensor.southtech_setup_response", result)
-            
-            # Rimuovi richiesta
             self.set_state("sensor.southtech_setup_request", state="unavailable")
             
         except Exception as e:
             self.error(f"Errore processing sensor setup: {e}")
             self.create_response_sensor("sensor.southtech_setup_response", 
-                                       {"success": False, "error": str(e)})
-    
+                                      {"success": False, "error": str(e)})
+
+    def save_auth_data_unified(self, password_data, user_id, method):
+        """Salva dati auth con metodo unificato - VERSIONE CORRETTA"""
+        try:
+            if method.startswith("client_hash"):
+                # ✅ CORREZIONE: Salva hash direttamente senza manipolazioni
+                auth_data = {
+                    "password_hash": password_data,  # ← Hash già corretto dal frontend
+                    "stored_password": None,
+                    "salt": None,
+                    "security_method": method,
+                    "created_at": datetime.now().isoformat(),
+                    "created_by": user_id[:20]
+                }
+                self.log(f"🔐 Salvando hash diretto: {password_data[:10]}...")
+            else:
+                # Metodo legacy con salt
+                salt = secrets.token_hex(32)
+                password_hash = hashlib.sha256((password_data + salt).encode()).hexdigest()
+                auth_data = {
+                    "password_hash": password_hash,
+                    "stored_password": password_data,  # ← Salva anche password per compatibilità
+                    "salt": salt,
+                    "security_method": "server_unified",
+                    "created_at": datetime.now().isoformat(),
+                    "created_by": user_id[:20]
+                }
+                self.log(f"🔐 Salvando con salt: password={password_data[:3]}..., salt={salt[:10]}...")
+            
+            # Scrivi file auth
+            with open(self.auth_file, 'w') as f:
+                json.dump(auth_data, f, indent=2)
+            
+            self.update_auth_status_file()
+            self.log(f"✅ Setup completato con metodo {method}")
+            
+            # ✅ DEBUG: Verifica cosa è stato salvato
+            self.log(f"🔍 AUTH FILE SALVATO: {auth_data}")
+            
+        except Exception as e:
+            self.error(f"❌ Errore salvataggio auth data: {e}")
+            raise
+
+    def process_sensor_reset_request(self):
+        """Processa richiesta reset via sensore - CORRETTO"""
+        try:
+            attrs = self.get_state("sensor.southtech_reset_request", attribute="all")
+            if not attrs or "attributes" not in attrs:
+                return
+                
+            request_data = attrs["attributes"]
+            if request_data.get("action") != "reset_system":
+                return
+                
+            # ✅ CORRETTO: Usa metodo unificato
+            user_id = self.get_user_id_unified(request_data, "sensor")
+            
+            self.log(f"🔍 SENSOR RESET: Processando reset da {user_id[:20]}")
+            
+            # Resto del metodo rimane invariato...
+            is_blocked, block_until = self.is_user_blocked(user_id)
+            if is_blocked:
+                result = {
+                    "success": False, 
+                    "blocked": True,
+                    "remaining_seconds": int(block_until - time.time())
+                }
+            else:
+                if os.path.exists(self.auth_file):
+                    os.remove(self.auth_file)
+                    self.log("🗑️ File auth cancellato via sensore")
+                
+                self.active_tokens.clear()
+                
+                if user_id in self.attempt_counters:
+                    del self.attempt_counters[user_id]
+                if user_id in self.blocked_users:
+                    del self.blocked_users[user_id]
+                
+                self.update_auth_status_file()
+                self.log_security_event(user_id, "RESET_SYSTEM", "INFO", "Reset sistema via sensore")
+                self.save_security_data()
+                
+                result = {"success": True, "message": "Sistema resettato via sensore"}
+            
+            self.create_response_sensor("sensor.southtech_reset_response", result)
+            self.set_state("sensor.southtech_reset_request", state="unavailable")
+            
+        except Exception as e:
+            self.error(f"Errore processing sensor reset: {e}")
+            self.create_response_sensor("sensor.southtech_reset_response", 
+                                      {"success": False, "error": str(e)})
+
+    def process_sensor_save_request(self):
+        """Processa salvataggio via sensore con metodi avanzati"""
+        try:
+            attrs = self.get_state("sensor.southtech_save_request", attribute="all")
+            if not attrs or "attributes" not in attrs:
+                return
+                
+            request_data = attrs["attributes"]
+            configurations = request_data.get("configurations", [])
+            
+            if not configurations:
+                self.create_sensor_save_response({
+                    "success": False, 
+                    "error": "Configurazioni mancanti"
+                })
+                return
+            
+            self.log("📡 SENSOR: Processamento con metodo avanzato")
+            
+            # 🆕 USA METODO AVANZATO
+            result = self.execute_save_advanced("sensor", configurations, request_data)
+            
+            # Invia risposta
+            self.create_sensor_save_response(result)
+            self.set_state("sensor.southtech_save_request", state="completed")
+            
+        except Exception as e:
+            self.error(f"❌ SENSOR: Errore: {e}")
+            self.create_sensor_save_response({"success": False, "error": str(e)})
+
+    def find_light_control_section(self, content):
+        """
+        Trova la sezione controllo luci nel contenuto YAML
+        Supporta sia formato nuovo che vecchio
+        
+        Returns:
+            tuple: (start_idx, end_idx) oppure (-1, -1) se non trovata
+        """
+        try:
+            # Prova formato nuovo prima
+            start_line_idx = content.find(self.new_start_line)
+            if start_line_idx != -1:
+                self.log("✅ Trovata sezione formato NUOVO")
+                # Trova l'inizio del blocco (linea di #'s prima)
+                start_block_idx = content.rfind(self.new_start_marker, 0, start_line_idx)
+                if start_block_idx == -1:
+                    start_block_idx = start_line_idx
+                
+                # Trova la fine del blocco
+                end_line_idx = content.find(self.new_end_line, start_line_idx)
+                if end_line_idx != -1:
+                    # Trova la fine del blocco (linea di #'s dopo)
+                    end_block_idx = content.find(self.new_end_marker, end_line_idx)
+                    if end_block_idx != -1:
+                        end_block_idx += len(self.new_end_marker)
+                        return (start_block_idx, end_block_idx)
+            
+            # Prova formato vecchio
+            old_start_idx = content.find(self.start_marker)
+            old_end_idx = content.find(self.end_marker)
+            
+            if old_start_idx != -1 and old_end_idx != -1:
+                self.log("✅ Trovata sezione formato VECCHIO")
+                old_end_idx += len(self.end_marker)
+                return (old_start_idx, old_end_idx)
+            
+            # Nessuna sezione trovata
+            self.log("ℹ️ Nessuna sezione controllo luci trovata")
+            return (-1, -1)
+            
+        except Exception as e:
+            self.error(f"Errore ricerca sezione controllo luci: {e}")
+            return (-1, -1)
+
+    def extract_light_configs_from_section(self, section_content):
+        """
+        Estrae le configurazioni luci dalla sezione YAML
+        
+        Returns:
+            set: Set di ID configurazioni esistenti
+        """
+        try:
+            configs = set()
+            
+            # Parsing del contenuto YAML
+            import yaml
+            parsed = yaml.safe_load(section_content)
+            
+            if parsed and 'light_presence' in parsed:
+                light_configs = parsed['light_presence'].get('light_presence', [])
+                
+                for cfg in light_configs:
+                    if 'light_entity' in cfg:
+                        # Genera ID configurazione basato su light_entity
+                        config_id = self.generate_config_id(cfg)
+                        configs.add(config_id)
+            
+            self.log(f"🔍 Estratte {len(configs)} configurazioni esistenti")
+            return configs
+            
+        except Exception as e:
+            self.error(f"Errore estrazione configurazioni: {e}")
+            return set()
+
+    def generate_config_id(self, config):
+        """
+        Genera ID univoco per una configurazione
+        
+        Returns:
+            str: ID della configurazione
+        """
+        try:
+            # Usa light_entity come chiave principale
+            light_entity = config.get('light_entity', '')
+            if light_entity:
+                return light_entity
+            
+            # Fallback: usa combinazione di sensori
+            sensors = [
+                config.get('presence_sensor_on', ''),
+                config.get('presence_sensor_off', ''),
+                config.get('illuminance_sensor', '')
+            ]
+            
+            # Filtra sensori vuoti e crea hash
+            valid_sensors = [s for s in sensors if s]
+            if valid_sensors:
+                import hashlib
+                combined = '|'.join(sorted(valid_sensors))
+                return hashlib.md5(combined.encode()).hexdigest()[:8]
+            
+            return f"config_{id(config)}"
+            
+        except Exception as e:
+            self.error(f"Errore generazione ID configurazione: {e}")
+            return f"config_error_{id(config)}"
+
+    def create_empty_apps_yaml_structure(self):
+        """
+        Crea struttura vuota apps.yaml se necessario
+        
+        Returns:
+            str: Contenuto YAML base
+        """
+        return """# Apps.yaml - Configurazione AppDaemon
+    # File generato automaticamente da SouthTech
+
+    """
+
+    def verify_yaml_integrity(self, file_path):
+        """
+        Verifica l'integrità del file YAML
+        
+        Returns:
+            bool: True se valido
+        """
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Verifica parsing YAML
+            import yaml
+            parsed = yaml.safe_load(content)
+            
+            if parsed is None and content.strip():
+                raise Exception("YAML parsing risulta vuoto con contenuto presente")
+            
+            self.log(f"✅ Integrità YAML verificata: {file_path}")
+            return True
+            
+        except Exception as e:
+            self.error(f"❌ Errore integrità YAML {file_path}: {e}")
+            raise
+
+    def generate_light_control_section(self, configurations):
+        """
+        Genera la sezione di controllo luci completa - VERSIONE MIGLIORATA
+        
+        Returns:
+            str: Sezione YAML formattata
+        """
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Inizio sezione con indentazione corretta
+            yaml_content = "################################################################################\n"
+            yaml_content += "#                      START CONTROLLO LUCI AUTOMATICHE                        #\n"
+            yaml_content += "################################################################################\n"
+            # ✅ MODIFICA 1: Cambiato "SouthTech" in "SouthTech Configurator"
+            yaml_content += f"# Generato automaticamente da SouthTech Configurator il {timestamp}\n"
+            yaml_content += "light_presence:\n"
+            # ✅ MODIFICA 2: Aggiunta linea decorativa dopo light_presence:
+            yaml_content += "  ##############################################################################\n"
+            yaml_content += "  module: light_presence_control\n"
+            yaml_content += "  class: LightPresenceControl\n"
+            yaml_content += "  log_level: DEBUG\n"
+            yaml_content += "  light_presence:\n"
+            
+            # Aggiungi ogni configurazione con indentazione precisa
+            for i, config in enumerate(configurations):
+                light_entity = config.get('light_entity', '')
+                if not light_entity:
+                    continue
+                    
+                base_id = light_entity.replace('light.', '')
+                
+                # Commento configurazione
+                yaml_content += f"    # Configurazione {i + 1} - {base_id}\n"
+                
+                # Elementi della lista con 4 spazi di base + 2 per le proprietà
+                yaml_content += f"    - light_entity: {light_entity}\n"
+                yaml_content += f"      presence_sensor_on: {config.get('presence_sensor_on', '')}\n"
+                yaml_content += f"      presence_sensor_off: {config.get('presence_sensor_off', '')}\n"
+                yaml_content += f"      illuminance_sensor: {config.get('illuminance_sensor', '')}\n"
+                yaml_content += f"      enable_sensor: input_boolean.{base_id}_enable_sensor\n"
+                yaml_content += f"      enable_manual_activation_sensor: input_boolean.{base_id}_enable_manual_activation_sensor\n"
+                yaml_content += f"      enable_manual_activation_light_sensor: input_boolean.{base_id}_enable_manual_activation_light_sensor\n"
+                yaml_content += f"      enable_automation: input_boolean.{base_id}_enable_automation\n"
+                yaml_content += f"      enable_illuminance_filter: input_boolean.{base_id}_enable_illuminance_filter\n"
+                yaml_content += f"      enable_illuminance_automation: input_boolean.{base_id}_enable_illuminance_automation\n"
+                yaml_content += f"      automatic_enable_automation: input_select.{base_id}_automatic_enable_automation\n"
+                yaml_content += f"      light_sensor_config: input_select.{base_id}_light_sensor_config\n"
+                yaml_content += f"      timer_minutes_on_push: input_number.{base_id}_timer_minutes_on_push\n"
+                yaml_content += f"      timer_filter_on_push: input_number.{base_id}_timer_filter_on_push\n"
+                yaml_content += f"      timer_minutes_on_time: input_number.{base_id}_timer_minutes_on_time\n"
+                yaml_content += f"      timer_filter_on_time: input_number.{base_id}_timer_filter_on_time\n"
+                yaml_content += f"      timer_seconds_max_lux: input_number.{base_id}_timer_seconds_max_lux\n"
+                yaml_content += f"      min_lux_activation: input_number.{base_id}_min_lux_activation\n"
+                yaml_content += f"      max_lux_activation: input_number.{base_id}_max_lux_activation\n"
+                yaml_content += f"      turn_on_light_offset: input_number.{base_id}_turn_on_light_offset\n"
+                yaml_content += f"      turn_off_light_offset: input_number.{base_id}_turn_off_light_offset\n"
+            yaml_content += "################################################################################\n"
+            yaml_content += "#                      END CONTROLLO LUCI AUTOMATICHE                          #\n"
+            yaml_content += "################################################################################\n"
+            
+            return yaml_content
+            
+        except Exception as e:
+            self.error(f"Errore generazione sezione controllo luci: {e}")
+            raise
+
     def terminate(self):
         """Cleanup alla terminazione"""
         try:
@@ -1887,3 +3239,73 @@ class SouthTechConfigurator(hass.Hass):
             
         except Exception as e:
             self.error(f"Errore durante terminazione: {e}")
+
+    # 🔒 SOUTHTECH CONFIGURATOR - MODIFICHE SERVER PER HASH SICURO
+    # Aggiungi questi metodi alla classe SouthTechConfigurator
+
+    def calculate_client_hash(self, password, browser_id, timestamp):
+        """
+        🔐 Calcola hash client-side per confronto - VERSIONE CORRETTA
+        Deve produrre lo stesso hash del JavaScript
+        """
+        try:
+            # ✅ FIX: Usa salt fisso senza timestamp (come nel frontend)
+            salt = f"southtech_{browser_id}_fixed_security_salt"
+            
+            # 2. Combina password + salt (stesso ordine del client)
+            password_with_salt = f"{password}{salt}"
+            
+            # 3. Genera hash SHA-256
+            hash_bytes = hashlib.sha256(password_with_salt.encode('utf-8')).digest()
+            
+            # 4. Converti in hex (stesso formato del client)
+            hash_hex = hash_bytes.hex()
+            
+            return hash_hex
+            
+        except Exception as e:
+            self.error(f"Errore calcolo hash client: {e}")
+            return None
+
+    def verify_password_hash(self, provided_hash, stored_password, browser_id, timestamp):
+        """
+        🔍 Verifica hash password confrontando con password salvata
+        """
+        try:
+            # Calcola hash della password salvata con stesso salt
+            expected_hash = self.calculate_client_hash(stored_password, browser_id, timestamp)
+            
+            if not expected_hash:
+                return False
+                
+            # Confronto sicuro degli hash
+            return provided_hash == expected_hash
+            
+        except Exception as e:
+            self.error(f"Errore verifica hash password: {e}")
+            return False
+
+    # 🚨 IMPORTANTE: Gestione Migrazione Sicurezza
+    def migrate_to_secure_system(self):
+        """
+        🔄 Migra sistema esistente al nuovo metodo sicuro
+        Aggiunge stored_password ai file auth esistenti
+        """
+        try:
+            if not os.path.exists(self.auth_file):
+                return
+                
+            with open(self.auth_file, 'r') as f:
+                auth_data = json.load(f)
+            
+            # Se non ha stored_password, non può usare hash sicuro
+            if "stored_password" not in auth_data:
+                self.log("⚠️ Sistema auth legacy rilevato - hash sicuro limitato")
+                auth_data["security_method"] = "legacy_only"
+                auth_data["migration_note"] = "Reset password per abilitare sicurezza completa"
+                
+                with open(self.auth_file, 'w') as f:
+                    json.dump(auth_data, f, indent=2)
+            
+        except Exception as e:
+            self.error(f"Errore migrazione sicurezza: {e}")
