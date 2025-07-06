@@ -1,0 +1,10 @@
+{
+  "has_password": true,
+  "last_update": "2025-06-30T23:34:52.317025",
+  "system_mode": "secure_dual_fallback",
+  "api_available": true,
+  "security_active": true,
+  "version": "3.0.0",
+  "directories_initialized": true,
+  "yaml_format_support": "dual"
+}
