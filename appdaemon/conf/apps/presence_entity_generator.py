@@ -62,7 +62,8 @@ class PresenceEntityGenerator(hass.Hass):
         ]
         
         for field in boolean_fields:
-            if field in cfg and cfg[field].startswith("input_boolean."):
+            # 🔧 FIX: Aggiunto str() per sicurezza
+            if field in cfg and str(cfg[field]).startswith("input_boolean."):
                 ib_ids.add(f"{base_id}_{field}")
 
         # Input Number entities
@@ -73,14 +74,16 @@ class PresenceEntityGenerator(hass.Hass):
         ]
         
         for field in number_fields:
-            if field in cfg and cfg[field].startswith("input_number."):
+            # 🔧 FIX: Aggiunto str() per sicurezza
+            if field in cfg and str(cfg[field]).startswith("input_number."):
                 in_ids.add(f"{base_id}_{field}")
 
         # Input Select entities
         select_fields = ["automatic_enable_automation", "light_sensor_config"]
         
         for field in select_fields:
-            if field in cfg and cfg[field].startswith("input_select."):
+            # 🔧 FIX: Aggiunto str() per sicurezza
+            if field in cfg and str(cfg[field]).startswith("input_select."):
                 is_ids.add(f"{base_id}_{field}")
 
     def process_yaml_file(self, path, entity_type, config_ids, presence_configs):
@@ -169,7 +172,8 @@ class PresenceEntityGenerator(hass.Hass):
         
         for field, friendly_name in boolean_fields:
             entity_id = f"{base_id}_{field}"
-            if entity_id in config_ids and field in cfg and cfg[field].startswith("input_boolean."):
+            # 🔧 FIX: Aggiunto str() per sicurezza
+            if entity_id in config_ids and field in cfg and str(cfg[field]).startswith("input_boolean."):
                 blocks.append(
                     f"{entity_id}:\n"
                     f"  name: {friendly_base} {friendly_name}"
@@ -221,7 +225,8 @@ class PresenceEntityGenerator(hass.Hass):
         
         for field, config in number_configs.items():
             entity_id = f"{base_id}_{field}"
-            if entity_id in config_ids and field in cfg and cfg[field].startswith("input_number."):
+            # 🔧 FIX: Aggiunto str() per sicurezza
+            if entity_id in config_ids and field in cfg and str(cfg[field]).startswith("input_number."):
                 blocks.append(
                     f"{entity_id}:\n"
                     f"  name: {friendly_base} {config['name']}\n"
@@ -252,7 +257,8 @@ class PresenceEntityGenerator(hass.Hass):
         
         for field, config in select_configs.items():
             entity_id = f"{base_id}_{field}"
-            if entity_id in config_ids and field in cfg and cfg[field].startswith("input_select."):
+            # 🔧 FIX: Aggiunto str() per sicurezza
+            if entity_id in config_ids and field in cfg and str(cfg[field]).startswith("input_select."):
                 options_str = "\n".join([f"    - \"{option}\"" for option in config['options']])
                 blocks.append(
                     f"{entity_id}:\n"

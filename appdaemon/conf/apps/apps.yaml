@@ -2,6 +2,15 @@
 #             automatica del codice.
 
 ################################################################################
+#                        SOUTHTECH CONFIGURATOR                                #
+################################################################################
+# SouthTech Configurator - Sistema di gestione automatismi luci
+southtech_configurator:
+  module: southtech_configurator
+  class: SouthTechConfigurator
+  log_level: DEBUG
+
+################################################################################
 #                        GENERATORI DI ENTITÀ                                 #
 ################################################################################
 
@@ -10,18 +19,11 @@ create_area_groups:
   module: create_area_groups
   class: CreateAreaGroups
 
-# Organizzatore entità per area
-entities_by_area:
-  module: entities_by_area
-  class: EntitiesByArea
-  log_level: INFO
-  # Cache lifetime in secondi (default: 300 = 5 minuti)
-  cache_lifetime: 300
-
 # Generatore sensori ambientali  
 create_environment_sensors:
   module: create_environment_sensors
   class: CreateEnvironmentSensors
+  log_level: INFO
 
 # Generatore sensori modello climatico
 create_climate_model_sensors:
@@ -50,17 +52,19 @@ presence_entity_generator:
     - light_presence
 
 ################################################################################
-#                        CONTROLLO LUCI AUTOMATICHE                           #
+#                      START CONTROLLO LUCI AUTOMATICHE                        #
 ################################################################################
+# Generato automaticamente da SouthTech Configurator il 2025-06-29 16:36:28
 light_presence:
+  ##############################################################################
   module: light_presence_control
   class: LightPresenceControl
-  log_level: INFO
+  log_level: DEBUG
   light_presence:
-    # Prima configurazione - RGB 03 02
+    # Configurazione 1 - rgb_03_02
     - light_entity: light.rgb_03_02
       presence_sensor_on: binary_sensor.presenza_01_presence
-      presence_sensor_off:
+      presence_sensor_off: 
       illuminance_sensor: sensor.presenza_01_illuminance
       enable_sensor: input_boolean.rgb_03_02_enable_sensor
       enable_manual_activation_sensor: input_boolean.rgb_03_02_enable_manual_activation_sensor
@@ -79,31 +83,29 @@ light_presence:
       max_lux_activation: input_number.rgb_03_02_max_lux_activation
       turn_on_light_offset: input_number.rgb_03_02_turn_on_light_offset
       turn_off_light_offset: input_number.rgb_03_02_turn_off_light_offset
-      
-    # Seconda configurazione - RGB 01 05  
-    - light_entity: light.rgb_01_05
+    # Configurazione 2 - board_01_rgb_05
+    - light_entity: light.board_01_rgb_05
       presence_sensor_on: binary_sensor.presenza_02_movimento
-      presence_sensor_off:
-      illuminance_sensor:
-      enable_sensor: input_boolean.rgb_01_05_enable_sensor
-      enable_manual_activation_sensor: input_boolean.rgb_01_05_enable_manual_activation_sensor
-      enable_manual_activation_light_sensor: input_boolean.rgb_01_05_enable_manual_activation_light_sensor
-      enable_automation: input_boolean.rgb_01_05_enable_automation
-      enable_illuminance_filter: input_boolean.rgb_01_05_enable_illuminance_filter
-      enable_illuminance_automation: input_boolean.rgb_01_05_enable_illuminance_automation
-      automatic_enable_automation: input_select.rgb_01_05_automatic_enable_automation
-      light_sensor_config: input_select.rgb_01_05_light_sensor_config
-      timer_minutes_on_push: input_number.rgb_01_05_timer_minutes_on_push
-      timer_filter_on_push: input_number.rgb_01_05_timer_filter_on_push
-      timer_minutes_on_time: input_number.rgb_01_05_timer_minutes_on_time
-      timer_filter_on_time: input_number.rgb_01_05_timer_filter_on_time
-      timer_seconds_max_lux: input_number.rgb_01_05_timer_seconds_max_lux
-      min_lux_activation: input_number.rgb_01_05_min_lux_activation
-      max_lux_activation: input_number.rgb_01_05_max_lux_activation
-      turn_on_light_offset: input_number.rgb_01_05_turn_on_light_offset
-      turn_off_light_offset: input_number.rgb_01_05_turn_off_light_offset
-      
-    # Terza configurazione - Shelly Plus 1PM
+      presence_sensor_off: 
+      illuminance_sensor: 
+      enable_sensor: input_boolean.board_01_rgb_05_enable_sensor
+      enable_manual_activation_sensor: input_boolean.board_01_rgb_05_enable_manual_activation_sensor
+      enable_manual_activation_light_sensor: input_boolean.board_01_rgb_05_enable_manual_activation_light_sensor
+      enable_automation: input_boolean.board_01_rgb_05_enable_automation
+      enable_illuminance_filter: input_boolean.board_01_rgb_05_enable_illuminance_filter
+      enable_illuminance_automation: input_boolean.board_01_rgb_05_enable_illuminance_automation
+      automatic_enable_automation: input_select.board_01_rgb_05_automatic_enable_automation
+      light_sensor_config: input_select.board_01_rgb_05_light_sensor_config
+      timer_minutes_on_push: input_number.board_01_rgb_05_timer_minutes_on_push
+      timer_filter_on_push: input_number.board_01_rgb_05_timer_filter_on_push
+      timer_minutes_on_time: input_number.board_01_rgb_05_timer_minutes_on_time
+      timer_filter_on_time: input_number.board_01_rgb_05_timer_filter_on_time
+      timer_seconds_max_lux: input_number.board_01_rgb_05_timer_seconds_max_lux
+      min_lux_activation: input_number.board_01_rgb_05_min_lux_activation
+      max_lux_activation: input_number.board_01_rgb_05_max_lux_activation
+      turn_on_light_offset: input_number.board_01_rgb_05_turn_on_light_offset
+      turn_off_light_offset: input_number.board_01_rgb_05_turn_off_light_offset
+    # Configurazione 3 - shellyplus1pm_80646fe3563c_switch_0
     - light_entity: light.shellyplus1pm_80646fe3563c_switch_0
       presence_sensor_on: binary_sensor.presenza_03_zone_1_occupancy
       presence_sensor_off: binary_sensor.presenza_03_zone_4_occupancy
@@ -125,15 +127,18 @@ light_presence:
       max_lux_activation: input_number.shellyplus1pm_80646fe3563c_switch_0_max_lux_activation
       turn_on_light_offset: input_number.shellyplus1pm_80646fe3563c_switch_0_turn_on_light_offset
       turn_off_light_offset: input_number.shellyplus1pm_80646fe3563c_switch_0_turn_off_light_offset
+################################################################################
+#                      END CONTROLLO LUCI AUTOMATICHE                          #
+################################################################################
 
 ################################################################################
-#                      CONFIGURAZIONE LUCI SMART                              #
+#                       CONFIGURAZIONE LUCI SMART                              #
 ################################################################################
 light_config:
   module: light_config_control
   class: LightConfigControl
   log_level: INFO
-  light_config:
+  light_config: 
     # Configurazione Smart 01 - Controllo relay Shelly
     - light_entity: Smart 01
       relay_light: light.shellyplus1pm_80646fe3563c_switch_0
