@@ -7,3 +7,6 @@ appdaemon/conf/.vscode
 
 # Ignora tutti i file `.log`
 *.log
+esphome/hardware/kc868_a8_01.yaml
+esphome/hardware/kc868_a8s_83.yaml
+esphome/software/boot.yaml
