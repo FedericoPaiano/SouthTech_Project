@@ -1,25 +1,31 @@
 import appdaemon.plugins.hass.hassapi as hass
+import re
 
 class CreateAreaGroups(hass.Hass):
 
     def initialize(self):
-        self.log("Inizializzazione dell'app CreateAreaGroups...")
+        self.log("Inizializzazione dell'app CreateAreaGroups (Versione Italiana)...")
         
-        # Ascolta l'evento homeassistant_start per eseguire lo script Python all'avvio
+        self.translation_map = {
+            'light': 'Luci',
+            'cover': 'Coperture',
+            'climate': 'Clima',
+            'temperature': 'Temperatura',
+            'humidity': 'Umidità',
+            'illuminance': 'Illuminazione',
+            'presence': 'Presenza',
+            'entities': 'Entità'
+        }
+        
         self.listen_event(self.handle_event, "homeassistant_start")
-        
-        # Ascolta i cambiamenti delle entità per aggiornare i gruppi quando necessario
-        # Invece di ascoltare sensori specifici, ascoltiamo gli eventi di area
         self.listen_event(self.handle_area_registry_update, "area_registry_updated")
         self.listen_event(self.handle_device_registry_update, "device_registry_updated")
         
         self.log("App configurata per ascoltare gli eventi di registry.")
-        
-        # Esegui un aggiornamento iniziale dei gruppi
         self.update_groups()
 
     def handle_event(self, event_name, data, kwargs):
-        self.log(f"Evento rilevato: {event_name} con dati: {data}.", level="DEBUG")
+        self.log(f"Evento rilevato: {event_name}", level="DEBUG")
         self.update_groups()
 
     def handle_area_registry_update(self, event_name, data, kwargs):
@@ -32,137 +38,130 @@ class CreateAreaGroups(hass.Hass):
 
     def get_entities_by_area_and_domain(self):
         """
-        Recupera tutte le entità raggruppate per area e dominio
-        Restituisce un dizionario: {area_name: {domain: [entity_ids]}}
+        Recupera tutte le entità, raggruppandole per area e dominio.
+        Le entità senza area vengono raggruppate sotto una chiave speciale.
         """
         self.log("Recupero entità per area e dominio...", level="DEBUG")
         
-        # Recupera tutte le entità
         all_entities = self.get_state()
-        
-        # Mappa area_name -> dominio -> lista entità
         area_domain_entities = {}
+        # Chiave speciale per le entità non assegnate
+        NO_AREA_KEY = "__SenzaArea__"
         
-        # Domini di interesse (corrispondenti ai sensori originali)
         domains_of_interest = {
-            'light': 'light',
-            'cover': 'cover', 
-            'climate': 'climate',
-            'sensor': ['temperature', 'humidity', 'illuminance'],  # sensori specifici
-            'binary_sensor': 'presence'  # sensori di presenza
+            'light', 'cover', 'climate', 'sensor', 'binary_sensor'
         }
         
         for entity_id in all_entities:
+            domain = entity_id.split('.')[0]
+            if domain not in domains_of_interest:
+                continue
+
             try:
-                area_name = self.area_name(entity_id)
-                if area_name:  # solo se è assegnata a un'area
-                    domain = entity_id.split('.')[0]
-                    
-                    # Filtra per domini di interesse
-                    if domain in domains_of_interest:
-                        if area_name not in area_domain_entities:
-                            area_domain_entities[area_name] = {}
+                # Assegna l'area o la chiave speciale se non trovata
+                area_name = self.area_name(entity_id) or NO_AREA_KEY
+                
+                if area_name not in area_domain_entities:
+                    area_domain_entities[area_name] = {}
+                
+                entity_type = None
+                
+                if domain == 'sensor':
+                    entity_state = self.get_state(entity_id, attribute="all")
+                    if entity_state and 'attributes' in entity_state:
+                        attrs = entity_state['attributes']
+                        device_class = attrs.get('device_class', '')
+                        unit = attrs.get('unit_of_measurement', '')
                         
-                        # Gestione speciale per i sensori
-                        if domain == 'sensor':
-                            # Controlla il device_class o il nome per categorizzare
-                            entity_state = self.get_state(entity_id, attribute="all")
-                            if entity_state and 'attributes' in entity_state:
-                                device_class = entity_state['attributes'].get('device_class', '')
-                                unit_of_measurement = entity_state['attributes'].get('unit_of_measurement', '')
-                                
-                                # Categorizza i sensori
-                                sensor_type = None
-                                if device_class == 'temperature' or '°C' in unit_of_measurement or '°F' in unit_of_measurement:
-                                    sensor_type = 'temperature'
-                                elif device_class == 'humidity' or '%' in unit_of_measurement:
-                                    sensor_type = 'humidity'
-                                elif device_class == 'illuminance' or 'lx' in unit_of_measurement or 'lux' in unit_of_measurement:
-                                    sensor_type = 'illuminance'
-                                
-                                if sensor_type:
-                                    if sensor_type not in area_domain_entities[area_name]:
-                                        area_domain_entities[area_name][sensor_type] = []
-                                    area_domain_entities[area_name][sensor_type].append(entity_id)
-                        
-                        elif domain == 'binary_sensor':
-                            # Controlla se è un sensore di presenza
-                            entity_state = self.get_state(entity_id, attribute="all")
-                            if entity_state and 'attributes' in entity_state:
-                                device_class = entity_state['attributes'].get('device_class', '')
-                                if device_class in ['motion', 'occupancy', 'presence'] or 'presence' in entity_id.lower() or 'motion' in entity_id.lower():
-                                    if 'presence' not in area_domain_entities[area_name]:
-                                        area_domain_entities[area_name]['presence'] = []
-                                    area_domain_entities[area_name]['presence'].append(entity_id)
-                        
-                        else:
-                            # Domini semplici (light, cover, climate)
-                            if domain not in area_domain_entities[area_name]:
-                                area_domain_entities[area_name][domain] = []
-                            area_domain_entities[area_name][domain].append(entity_id)
-                            
+                        if device_class == 'temperature' or '°' in unit:
+                            entity_type = 'temperature'
+                        elif device_class == 'humidity' or '%' in unit:
+                            entity_type = 'humidity'
+                        elif device_class == 'illuminance' or 'lx' in unit or 'lux' in unit:
+                            entity_type = 'illuminance'
+                
+                elif domain == 'binary_sensor':
+                    entity_state = self.get_state(entity_id, attribute="all")
+                    if entity_state and 'attributes' in entity_state:
+                        attrs = entity_state['attributes']
+                        device_class = attrs.get('device_class', '')
+                        if device_class in ['motion', 'occupancy', 'presence'] or 'presence' in entity_id.lower() or 'motion' in entity_id.lower():
+                            entity_type = 'presence'
+                
+                else: # light, cover, climate
+                    entity_type = domain
+
+                if entity_type:
+                    if entity_type not in area_domain_entities[area_name]:
+                        area_domain_entities[area_name][entity_type] = []
+                    area_domain_entities[area_name][entity_type].append(entity_id)
+
             except Exception as e:
-                self.log(f"Errore nel recuperare area per {entity_id}: {e}", level="WARNING")
+                self.log(f"Errore nel processare l'entità {entity_id}: {e}", level="WARNING")
         
         return area_domain_entities
+
+    def slugify(self, text):
+        """Converte una stringa in un formato 'slug' sicuro per gli ID."""
+        text = text.lower()
+        text = re.sub(r'[\s\W-]+', '_', text)
+        return text.strip('_')
 
     def update_groups(self):
         self.log("Avvio aggiornamento dei gruppi...", level="DEBUG")
         
-        # Ottieni le entità raggruppate per area e dominio
         area_domain_entities = self.get_entities_by_area_and_domain()
+        NO_AREA_KEY = "__SenzaArea__"
         
-        # Ottieni l'elenco dei gruppi esistenti
-        existing_groups = self.get_state('group.all_groups', attribute='attributes')
-        existing_groups = existing_groups.get('entity_id', []) if existing_groups else []
-        
-        # Mappa per tenere traccia di tutti i gruppi creati
-        created_groups = set()
-        
-        # Crea gruppi per ogni area e per ogni dominio
         for area_name, domains in area_domain_entities.items():
-            # Raccoglie tutte le entità dell'area per il gruppo generale
             all_area_entities = []
             
+            is_no_area_group = (area_name == NO_AREA_KEY)
+
             for domain, entities in domains.items():
-                if entities:  # solo se ci sono entità per questo dominio
-                    # Crea gruppo specifico per dominio
-                    domain_group_name = f"area_{area_name.lower().replace(' ', '_')}_{domain}"
-                    domain_service_data = {
-                        'object_id': domain_group_name,
-                        'name': f"{area_name.title()} - {domain.title()}",
-                        'entities': entities
-                    }
-                    
-                    self.log(f"Creazione/aggiornamento gruppo {domain_group_name} con {len(entities)} entità")
-                    self.call_service('group/set', **domain_service_data)
-                    created_groups.add(domain_group_name)
-                    
-                    # Aggiungi le entità al gruppo generale dell'area
+                if not entities:
+                    continue
+
+                italian_name = self.translation_map.get(domain, domain.title())
+                italian_slug = self.slugify(italian_name)
+                
+                if is_no_area_group:
+                    # Logica per entità SENZA area
+                    object_id = f"{italian_slug}_senza_area"
+                    friendly_name = f"Gruppo {italian_name} Senza Area"
+                else:
+                    # Logica per entità CON area
+                    area_slug = self.slugify(area_name)
+                    object_id = f"{italian_slug}_{area_slug}"
+                    friendly_name = f"Gruppo {italian_name} in {area_name.title()}"
+                
+                service_data = {
+                    'object_id': object_id,
+                    'name': friendly_name,
+                    'entities': entities
+                }
+                
+                self.log(f"Creazione/aggiornamento gruppo '{friendly_name}' (group.{object_id}) con {len(entities)} entità")
+                self.call_service('group/set', **service_data)
+                
+                if not is_no_area_group:
                     all_area_entities.extend(entities)
             
-            # Crea gruppo generale per l'area (tutte le entità)
-            if all_area_entities:
-                area_group_name = f"area_{area_name.lower().replace(' ', '_')}_entities"
+            # Crea il gruppo generale solo per le aree definite (escludendo "Senza Area")
+            if all_area_entities and not is_no_area_group:
+                area_slug = self.slugify(area_name)
+                entities_slug = self.slugify(self.translation_map['entities'])
+                
+                object_id = f"{entities_slug}_{area_slug}"
+                friendly_name = f"Gruppo {self.translation_map['entities']} in {area_name.title()}"
+                
                 area_service_data = {
-                    'object_id': area_group_name,
-                    'name': f"{area_name.title()} - Entities",
+                    'object_id': object_id,
+                    'name': friendly_name,
                     'entities': all_area_entities
                 }
                 
-                self.log(f"Creazione/aggiornamento gruppo generale {area_group_name} con {len(all_area_entities)} entità")
+                self.log(f"Creazione/aggiornamento gruppo generale '{friendly_name}' (group.{object_id}) con {len(all_area_entities)} entità")
                 self.call_service('group/set', **area_service_data)
-                created_groups.add(area_group_name)
-        
-        # Rimuove gruppi che non sono più necessari
-        # (solo quelli che seguono il pattern dei nostri gruppi area)
-        for group_name in existing_groups:
-            if (group_name.startswith('area_') and 
-                ('_entities' in group_name or '_light' in group_name or '_cover' in group_name or 
-                 '_climate' in group_name or '_temperature' in group_name or '_humidity' in group_name or 
-                 '_illuminance' in group_name or '_presence' in group_name) and
-                group_name not in created_groups):
-                self.log(f"Rimozione gruppo non più necessario: {group_name}")
-                self.call_service('group/remove', object_id=group_name)
-        
-        self.log(f"Aggiornamento gruppi completato. Creati/aggiornati {len(created_groups)} gruppi.")
+
+        self.log("Aggiornamento gruppi completato.")

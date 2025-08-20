@@ -25,6 +25,13 @@ class CreateEnvironmentSensors(hass.Hass):
                 'unit': 'lx'
             }
         }
+
+        # Mappa per tradurre i nomi dei sensori in italiano
+        self.sensor_type_map = {
+            'temperature': 'Temperatura',
+            'humidity': 'Umidità',
+            'illuminance': 'Illuminazione'
+        }
         
         # Avvio aggiornamento iniziale
         self.run_in(self.initial_setup, 2)
@@ -186,9 +193,10 @@ class CreateEnvironmentSensors(hass.Hass):
             avg_value = round_value(states[0])
             self.update_sensor_value(f"{clean_area}_{sensor_type}", avg_value, sensor_type, unit)
             
-            # Rimuovi eventuali sensori min/max se esistono
+            # Rimuovi eventuali sensori min/max/avg se esistono
             self.remove_sensor(f"{clean_area}_{sensor_type}_min")
             self.remove_sensor(f"{clean_area}_{sensor_type}_max")
+            self.remove_sensor(f"{clean_area}_{sensor_type}_avg")
             
         else:
             # Più sensori: aggiorna min, max e media
@@ -196,10 +204,14 @@ class CreateEnvironmentSensors(hass.Hass):
             max_value = round_value(max(states))
             avg_value = round_value(sum(states) / len(states))
 
-            # Aggiorna solo i valori che sono cambiati
+            # Rimuovi il sensore singolo (senza suffisso) se esiste, per evitare duplicati
+            self.remove_sensor(f"{clean_area}_{sensor_type}")
+
+            # Aggiorna i sensori min, max e avg
             self.update_sensor_value(f"{clean_area}_{sensor_type}_min", min_value, sensor_type, unit)
             self.update_sensor_value(f"{clean_area}_{sensor_type}_max", max_value, sensor_type, unit)
-            self.update_sensor_value(f"{clean_area}_{sensor_type}", avg_value, sensor_type, unit)
+            # *** MODIFICA: L'ID del sensore media ora ha il suffisso _avg ***
+            self.update_sensor_value(f"{clean_area}_{sensor_type}_avg", avg_value, sensor_type, unit)
 
     def update_sensor_value(self, object_id: str, new_value: float, sensor_type: str, unit: str):
         """Aggiorna direttamente il valore di un sensore esistente"""
@@ -208,16 +220,25 @@ class CreateEnvironmentSensors(hass.Hass):
         
         # Se il sensore non esiste, lo crea
         if current_state is None:
-            # Determina il nome in base al suffisso
+            italian_name = self.sensor_type_map.get(sensor_type, sensor_type.title())
+            
+            # *** MODIFICA: Logica per la creazione del friendly_name gestisce anche _avg ***
             if object_id.endswith('_min'):
-                name = f"Min {sensor_type.title()} in {object_id.split('_')[0].replace('_', ' ').title()}"
+                area_part = '_'.join(object_id.split('_')[:-2])
+                area_name = area_part.replace('_', ' ').title()
+                name = f"Min {italian_name} in {area_name}"
             elif object_id.endswith('_max'):
-                name = f"Max {sensor_type.title()} in {object_id.split('_')[0].replace('_', ' ').title()}"
+                area_part = '_'.join(object_id.split('_')[:-2])
+                area_name = area_part.replace('_', ' ').title()
+                name = f"Max {italian_name} in {area_name}"
+            elif object_id.endswith('_avg'):
+                area_part = '_'.join(object_id.split('_')[:-2])
+                area_name = area_part.replace('_', ' ').title()
+                name = f"{italian_name} in {area_name}"
             else:
                 area_part = '_'.join(object_id.split('_')[:-1])
                 area_name = area_part.replace('_', ' ').title()
-                prefix = "Avg" if any(f"{area_part}_{sensor_type}_min" in s for s in self.created_sensors) else ""
-                name = f"{prefix} {sensor_type.title()} in {area_name}".strip()
+                name = f"{italian_name} in {area_name}"
             
             self.create_sensor(object_id, name, new_value, sensor_type, unit)
             return
@@ -246,7 +267,6 @@ class CreateEnvironmentSensors(hass.Hass):
         for entity in entities:
             raw_state = self.get_state(entity)
             
-            # Filtra stati non validi
             if raw_state in [None, "unknown", "unavailable", "null"]:
                 self.log(f"Entità {entity} ignorata per stato non valido: {raw_state}", level="DEBUG")
                 continue
@@ -263,6 +283,8 @@ class CreateEnvironmentSensors(hass.Hass):
 
         clean_area = area.lower().replace(' ', '_').replace('-', '_')
         unit = self.sensor_criteria[sensor_type]['unit']
+        
+        italian_name = self.sensor_type_map.get(sensor_type, sensor_type.title())
 
         # Funzione per arrotondare in base al tipo
         def round_value(val):
@@ -273,16 +295,17 @@ class CreateEnvironmentSensors(hass.Hass):
             avg_value = round_value(states[0])
             self.create_sensor(
                 f"{clean_area}_{sensor_type}",
-                f"{sensor_type.title()} in {area}",
+                f"{italian_name} in {area}", # Nome in italiano
                 avg_value,
                 sensor_type,
                 unit
             )
             self.log(f"Creato sensore singolo per {area} - {sensor_type}: {avg_value}", level="INFO")
             
-            # Rimuovi eventuali sensori min/max esistenti
+            # Rimuovi eventuali sensori min/max/avg esistenti
             self.remove_sensor(f"{clean_area}_{sensor_type}_min")
             self.remove_sensor(f"{clean_area}_{sensor_type}_max")
+            self.remove_sensor(f"{clean_area}_{sensor_type}_avg")
             
         else:
             # Più sensori: crea min, max e media
@@ -290,23 +313,27 @@ class CreateEnvironmentSensors(hass.Hass):
             max_value = round_value(max(states))
             avg_value = round_value(sum(states) / len(states))
 
+            # Rimuovi il sensore singolo (senza suffisso) se esiste, per evitare duplicati
+            self.remove_sensor(f"{clean_area}_{sensor_type}")
+
             self.create_sensor(
                 f"{clean_area}_{sensor_type}_min",
-                f"Min {sensor_type.title()} in {area}",
+                f"Min {italian_name} in {area}", # Nome in italiano
                 min_value,
                 sensor_type,
                 unit
             )
             self.create_sensor(
                 f"{clean_area}_{sensor_type}_max",
-                f"Max {sensor_type.title()} in {area}",
+                f"Max {italian_name} in {area}", # Nome in italiano
                 max_value,
                 sensor_type,
                 unit
             )
+            # *** MODIFICA: L'ID del sensore media ora ha il suffisso _avg ***
             self.create_sensor(
-                f"{clean_area}_{sensor_type}",
-                f"Avg {sensor_type.title()} in {area}",
+                f"{clean_area}_{sensor_type}_avg",
+                f"{italian_name} in {area}", # Nome in italiano, senza prefisso
                 avg_value,
                 sensor_type,
                 unit
@@ -359,12 +386,13 @@ class CreateEnvironmentSensors(hass.Hass):
             self.log(f"Aggiornato sensore '{name}': {current_state} → {state}", level="DEBUG")
 
     def remove_sensor(self, object_id: str):
-        """Rimuove un sensore se exists"""
+        """Rimuove un sensore se esiste"""
         full_entity_id = f"sensor.{object_id}"
         current_state = self.get_state(full_entity_id)
         
         if current_state is not None:
-            self.set_state(full_entity_id, state="unavailable")
+            # Invece di rimuovere, imposta lo stato a non disponibile per evitare errori
+            self.set_state(full_entity_id, state="unavailable", attributes={"friendly_name": f"{object_id} (rimosso)"})
             # Rimuovi dal set dei sensori creati
             self.created_sensors.discard(full_entity_id)
-            self.log(f"Rimosso sensore {full_entity_id}", level="DEBUG")
+            self.log(f"Sensore {full_entity_id} contrassegnato come non disponibile.", level="DEBUG")
