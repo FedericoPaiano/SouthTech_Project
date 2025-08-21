@@ -21,7 +21,7 @@ class LightPresenceControl(hass.Hass):
         self.manual_activation_sequence = {}  # Traccia la sequenza per ogni luce
         self.cooldown_flags = {}  # Cooldown post-attivazione
 
-        config = self.args["light_presence"]
+        config = self.args.get("light_presence", [])
         self.initialize_light_configurations(config)
 
     def initialize_light_configurations(self, config):
