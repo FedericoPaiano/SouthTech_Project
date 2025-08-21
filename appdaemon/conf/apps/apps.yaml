@@ -31,9 +31,9 @@ light_template_generator:
   log_level: INFO
 
 # Generatore entità presenza
-presence_entity_generator:
-  module: presence_entity_generator
-  class: PresenceEntityGenerator
+light_presence_entity_generator:
+  module: light_presence_entity_generator
+  class: LightPresenceEntityGenerator
   log_level: INFO
   # Configurazioni del generatore
   config_path: "/homeassistant/www/configurations"

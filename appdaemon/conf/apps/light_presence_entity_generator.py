@@ -3,7 +3,7 @@ import os
 import re
 from datetime import datetime
 
-class PresenceEntityGenerator(hass.Hass):
+class LightPresenceEntityGenerator(hass.Hass):
     def initialize(self):
         self.log("Attendo inizializzazione di LightPresenceControl...", level="INFO")
         self.run_in(self.try_generate, 1)
