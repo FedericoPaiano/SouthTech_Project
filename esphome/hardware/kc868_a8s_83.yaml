@@ -1,0 +1,1837 @@
+################################################################################
+#                           S U B S T I T U T I O N S                          #
+################################################################################
+substitutions:
+  ############################### S E C R E T S ################################
+  mqtt_user: !secret mqtt_user
+  mqtt_pass: !secret mqtt_pass
+  broker_ip: !secret mqtt_host
+  broker_port: !secret broker_port
+  static_ip: !secret static_ip_03
+  gateway: !secret gateway
+  subnet: !secret subnet
+  web_server_user: !secret web_server_user
+  web_server_pass: !secret web_server_pass
+  ############################ C O N N E C T I O N #############################
+  ethernet_type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk_mode: GPIO17_OUT
+  phy_addr: "0"
+  remote_receiver_pin: "16"
+  ########################## I / O   E X P A N D E R ###########################
+  sda: "4"
+  scl: "5"
+  pcf8574_in: "0x22"
+  pcf8574_out: "0x24"
+  ################################## G P I O ###################################
+  gpio_analog_01: GPIO36
+  gpio_analog_02: GPIO39
+  gpio_analog_03: GPIO34
+  gpio_analog_04: GPIO35
+  #  gpio_sens_01:
+  #  gpio_sens_02:
+  #  gpio_sens_03:
+  #  gpio_sens_04:
+  gpio_led: GPIO12
+  gpio_buzzer: GPIO2
+  ################################# P O R T S ##################################
+  web_server_port: "80"
+
+################################################################################
+#                              C O N N E C T I O N                             #
+################################################################################
+ethernet:
+##############################################################################
+  type: ${ethernet_type}
+  mdc_pin: ${mdc_pin}
+  mdio_pin: ${mdio_pin}
+  clk_mode: ${clk_mode}
+  phy_addr: ${phy_addr}
+  manual_ip:
+    static_ip: ${static_ip}
+    gateway: ${gateway}
+    subnet: ${subnet}
+################################################################################
+#wifi:
+################################################################################
+#  ssid: !secret wifi_ssid
+#  password: !secret wifi_password
+#  manual_ip:
+#    static_ip: ${static_ip}
+#    gateway: ${gateway}
+#    subnet: ${subnet}
+
+web_server:
+  port: ${web_server_port}
+  auth:
+    username: ${web_server_user}
+    password: ${web_server_pass}
+
+remote_receiver:
+  pin: ${remote_receiver_pin}
+  dump:
+    - rc_switch
+  tolerance: 50%
+  filter: 250us
+  idle: 2ms
+  buffer_size: 2kb
+
+################################################################################
+#                                    M Q T T                                   #
+################################################################################
+mqtt:
+  ##############################################################################
+  broker: ${broker_ip}
+  port: ${broker_port}
+  username: ${mqtt_user}
+  password: ${mqtt_pass}
+  birth_message:
+    topic: board-03/availability/status
+    payload: online
+  will_message:
+    topic: board-03/availability/status
+    payload: offline
+  on_message:
+    ############################################################################
+    - topic: board-03/light/relay_01/state
+      payload: "on"
+      then:
+        - if:
+            condition:
+              lambda: |-
+                if (!id(silent_light_01).state && !id(mqtt_light_01) && id(input_01).state) {
+                  return true;
+                } else {
+                  return false;
+                }
+            then:
+              - light.turn_off: light_01
+              - delay: !lambda "return id(repeat_command_light_01);"
+              - light.turn_on: light_01
+            else:
+              - light.turn_on: light_01
+              - globals.set:
+                  id: mqtt_light_01
+                  value: !lambda |-
+                    return true;
+    - topic: board-03/light/relay_01/state
+      payload: "off"
+      then:
+        - if:
+            condition:
+              lambda: |-
+                if (!id(silent_light_01).state) {
+                  return true;
+                } else {
+                  return false;
+                }
+            then:
+              - light.turn_off: light_01
+            else:
+              - globals.set:
+                  id: mqtt_light_01
+                  value: !lambda |-
+                    return false;
+
+    ############################################################################
+    - topic: board-03/light/relay_02/state
+      payload: "on"
+      then:
+        - if:
+            condition:
+              lambda: |-
+                if (!id(silent_light_02).state && !id(mqtt_light_02) && id(input_02).state) {
+                  return true;
+                } else {
+                  return false;
+                }
+            then:
+              - light.turn_off: light_02
+              - delay: !lambda "return id(repeat_command_light_02);"
+              - light.turn_on: light_02
+            else:
+              - light.turn_on: light_02
+              - globals.set:
+                  id: mqtt_light_02
+                  value: !lambda |-
+                    return true;
+    - topic: board-03/light/relay_02/state
+      payload: "off"
+      then:
+        - if:
+            condition:
+              lambda: |-
+                if (!id(silent_light_02).state) {
+                  return true;
+                } else {
+                  return false;
+                }
+            then:
+              - light.turn_off: light_02
+            else:
+              - globals.set:
+                  id: mqtt_light_02
+                  value: !lambda |-
+                    return false;
+
+    ############################################################################
+    - topic: board-03/light/relay_05/state
+      payload: "on"
+      then:
+        - if:
+            condition:
+              lambda: |-
+                if (!id(silent_light_05).state && !id(mqtt_light_05) && id(input_05).state) {
+                  return true;
+                } else {
+                  return false;
+                }
+            then:
+              - light.turn_off: light_05
+              - delay: !lambda "return id(repeat_command_light_05);"
+              - light.turn_on: light_05
+            else:
+              - light.turn_on: light_05
+              - globals.set:
+                  id: mqtt_light_05
+                  value: !lambda |-
+                    return true;
+    - topic: board-03/light/relay_05/state
+      payload: "off"
+      then:
+        - if:
+            condition:
+              lambda: |-
+                if (!id(silent_light_05).state) {
+                  return true;
+                } else {
+                  return false;
+                }
+            then:
+              - light.turn_off: light_05
+            else:
+              - globals.set:
+                  id: mqtt_light_05
+                  value: !lambda |-
+                    return false;
+
+################################################################################
+#                               B L U E T O O T H                              #
+################################################################################
+#bluetooth_proxy:
+################################################################################
+
+################################################################################
+#                            I / O   E X P A N D E R                           #
+################################################################################
+i2c:
+  ##############################################################################
+  sda: ${sda}
+  scl: ${scl}
+  scan: true
+  id: bus_a
+
+pcf8574:
+  - id: "pcf8574_hub_output"
+    address: ${pcf8574_out}
+  - id: "pcf8574_hub_input"
+    address: ${pcf8574_in}
+
+################################################################################
+#                                 G L O B A L S                                #
+################################################################################
+globals:
+  ################################ L I G H T S #################################
+  - id: command_light_01
+    type: int
+    restore_value: true
+    initial_value: "200"
+
+  - id: command_light_02
+    type: int
+    restore_value: true
+    initial_value: "200"
+
+  - id: command_light_05
+    type: int
+    restore_value: true
+    initial_value: "200"
+    ############################################################################
+  - id: repeat_command_light_01
+    type: int
+    restore_value: true
+    initial_value: "500"
+
+  - id: repeat_command_light_02
+    type: int
+    restore_value: true
+    initial_value: "500"
+
+  - id: repeat_command_light_05
+    type: int
+    restore_value: true
+    initial_value: "500"
+
+  ########################## T I M E R   L I G H T S ###########################
+  - id: total_time_light_01
+    type: int
+    restore_value: true
+    initial_value: "30"
+
+  - id: total_time_light_02
+    type: int
+    restore_value: true
+    initial_value: "30"
+
+  - id: total_time_light_05
+    type: int
+    restore_value: true
+    initial_value: "30"
+
+    ############################################################################
+  - id: residue_time_light_01
+    type: int
+    restore_value: true
+    initial_value: "30"
+
+  - id: residue_time_light_02
+    type: int
+    restore_value: true
+    initial_value: "30"
+
+  - id: residue_time_light_05
+    type: int
+    restore_value: true
+    initial_value: "30"
+
+    ############################################################################
+  - id: timer_light_off_01
+    type: bool
+    restore_value: true
+    initial_value: "false"
+
+  - id: timer_light_off_02
+    type: bool
+    restore_value: true
+    initial_value: "false"
+
+  - id: timer_light_off_05
+    type: bool
+    restore_value: true
+    initial_value: "false"
+
+    ############################################################################
+  - id: timer_type_light_01
+    type: bool
+    restore_value: true
+    initial_value: "true"
+
+  - id: timer_type_light_02
+    type: bool
+    restore_value: true
+    initial_value: "true"
+
+  - id: timer_type_light_05
+    type: bool
+    restore_value: true
+    initial_value: "true"
+
+  ################################ C O V E R S #################################
+  - id: time_cover_up_03_04
+    type: int
+    restore_value: true
+    initial_value: "30000"
+
+  - id: time_cover_down_03_04
+    type: int
+    restore_value: true
+    initial_value: "30000"
+
+  - id: time_cover_up_07_08
+    type: int
+    restore_value: true
+    initial_value: "30000"
+
+  - id: time_cover_down_07_08
+    type: int
+    restore_value: true
+    initial_value: "30000"
+
+  ################################## M Q T T ###################################
+  - id: mqtt_light_01
+    type: bool
+    restore_value: yes
+    initial_value: "false"
+
+  - id: mqtt_light_02
+    type: bool
+    restore_value: yes
+    initial_value: "false"
+
+  - id: mqtt_light_05
+    type: bool
+    restore_value: yes
+    initial_value: "false"
+
+################################################################################
+#                                  L I G H T S                                 #
+################################################################################
+light:
+  ##############################################################################
+  - platform: binary
+    id: light_01
+    name: "Relay 01"
+    icon: mdi:lightbulb-outline
+    output: output_01
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      then:
+        - if:
+            condition:
+              lambda: "return id(timer_light_01).state;"
+            then:
+              - script.execute: timer_script_light_01
+    on_turn_off:
+      then:
+        - if:
+            condition:
+              lambda: |-
+                if (id(timer_script_light_01).is_running() && id(residue_time_light_01) > 0 && id(input_01).state) {
+                  return true;
+                } else {
+                  return false;
+                }
+            then:
+              - if:
+                  condition:
+                    lambda: "return id(timer_light_01).state == 1 && id(timer_light_off_01) == 0;"
+                  then:
+                    - light.turn_on: light_01
+                  else:
+                    - script.stop: timer_script_light_01
+                    - lambda: id(residue_time_light_01) = id(total_time_light_01);
+        - if:
+            condition:
+              lambda: "return id(timer_light_01).state == 1 && id(timer_type_light_01) == 0 && !id(input_01).state;"
+            then:
+              - switch.turn_off: timer_light_01
+
+  - platform: binary
+    id: light_02
+    name: "Relay 02"
+    icon: mdi:lightbulb-outline
+    output: output_02
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      then:
+        - if:
+            condition:
+              lambda: "return id(timer_light_02).state;"
+            then:
+              - script.execute: timer_script_light_02
+    on_turn_off:
+      then:
+        - if:
+            condition:
+              lambda: |-
+                if (id(timer_script_light_02).is_running() && id(residue_time_light_02) > 0 && id(input_02).state) {
+                  return true;
+                } else {
+                  return false;
+                }
+            then:
+              - if:
+                  condition:
+                    lambda: "return id(timer_light_02).state == 1 && id(timer_light_off_02) == 0;"
+                  then:
+                    - light.turn_on: light_02
+                  else:
+                    - script.stop: timer_script_light_02
+                    - lambda: id(residue_time_light_02) = id(total_time_light_02);
+        - if:
+            condition:
+              lambda: "return id(timer_light_02).state == 1 && id(timer_type_light_02) == 0 && !id(input_02).state;"
+            then:
+              - switch.turn_off: timer_light_02
+
+  - platform: binary
+    id: light_05
+    name: "Relay 05"
+    icon: mdi:lightbulb-outline
+    output: output_05
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      then:
+        - if:
+            condition:
+              lambda: "return id(timer_light_05).state;"
+            then:
+              - script.execute: timer_script_light_05
+    on_turn_off:
+      then:
+        - if:
+            condition:
+              lambda: |-
+                if (id(timer_script_light_05).is_running() && id(residue_time_light_05) > 0 && id(input_05).state) {
+                  return true;
+                } else {
+                  return false;
+                }
+            then:
+              - if:
+                  condition:
+                    lambda: "return id(timer_light_05).state == 1 && id(timer_light_off_05) == 0;"
+                  then:
+                    - light.turn_on: light_05
+                  else:
+                    - script.stop: timer_script_light_05
+                    - lambda: id(residue_time_light_05) = id(total_time_light_05);
+        - if:
+            condition:
+              lambda: "return id(timer_light_05).state == 1 && id(timer_type_light_05) == 0 && !id(input_05).state;"
+            then:
+              - switch.turn_off: timer_light_05
+
+  - platform: neopixelbus
+    id: light_board
+    name: "Led Scheda"
+    icon: mdi:led-strip-variant
+    type: GRB
+    variant: WS2812X
+    pin: ${gpio_led} # Pin Define connected with LED strip
+    internal: true
+    num_leds: 1
+    effects:
+      - pulse:
+      - random:
+      - strobe:
+      - flicker:
+      - addressable_rainbow:
+      - addressable_color_wipe:
+      - addressable_scan:
+      - addressable_twinkle:
+      - addressable_random_twinkle:
+      - addressable_fireworks:
+      - addressable_flicker:
+
+################################################################################
+#                                  C O V E R S                                 #
+################################################################################
+cover:
+  ##############################################################################
+  - platform: time_based
+    id: cover_03_04
+    name: "Relay 03 04"
+    open_action:
+      - if:
+          condition:
+            lambda: |-
+              if (id(input_04).state && !id(switch_04).state && id(cover_03_04).position == COVER_CLOSED) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - cover.stop: cover_03_04
+          else:
+            - if:
+                condition:
+                  lambda: |-
+                    if (id(input_04).state && !id(switch_04).state && id(cover_03_04).position != COVER_CLOSED) {
+                      return true;
+                    } else {
+                      return false;
+                    }
+                then:
+                  - cover.close: cover_03_04
+                else:
+                  - if:
+                      condition:
+                        lambda: |-
+                          if (!id(input_03).state) {
+                            return true;
+                          } else {
+                            return false;
+                          }
+                      then:
+                        - switch.turn_on: switch_03
+      - switch.turn_off: switch_04
+    open_duration: 30s
+    close_action:
+      - if:
+          condition:
+            lambda: |-
+              if (id(input_03).state && !id(switch_03).state && id(cover_03_04).position == COVER_OPEN) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - cover.stop: cover_03_04
+          else:
+            - if:
+                condition:
+                  lambda: |-
+                    if (id(input_03).state && !id(switch_03).state && id(cover_03_04).position != COVER_OPEN) {
+                      return true;
+                    } else {
+                      return false;
+                    }
+                then:
+                  - cover.open: cover_03_04
+                else:
+                  - if:
+                      condition:
+                        lambda: |-
+                          if (!id(input_04).state) {
+                            return true;
+                          } else {
+                            return false;
+                          }
+                      then:
+                        - switch.turn_on: switch_04
+      - switch.turn_off: switch_03
+    close_duration: 30s
+    stop_action:
+      - if:
+          condition:
+            lambda: |-
+              if (id(switch_03).state) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - switch.turn_off: switch_03
+          else:
+            - if:
+                condition:
+                  lambda: |-
+                    if (id(switch_04).state) {
+                      return true;
+                    } else {
+                      return false;
+                    }
+                then:
+                  - switch.turn_off: switch_04
+                else:
+                  - if:
+                      condition:
+                        lambda: |-
+                          if (id(input_03).state && !id(input_04).state) {
+                            return true;
+                          } else {
+                            return false;
+                          }
+                      then:
+                        - cover.open: cover_03_04
+                      else:
+                        - if:
+                            condition:
+                              lambda: |-
+                                if (id(input_04).state && !id(input_03).state) {
+                                  return true;
+                                } else {
+                                  return false;
+                                }
+                            then:
+                              - cover.close: cover_03_04
+
+  - platform: time_based
+    id: cover_07_08
+    name: "Relay 07 08"
+    open_action:
+      - if:
+          condition:
+            lambda: |-
+              if (id(input_08).state && !id(switch_08).state && id(cover_07_08).position == COVER_CLOSED) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - cover.stop: cover_07_08
+          else:
+            - if:
+                condition:
+                  lambda: |-
+                    if (id(input_08).state && !id(switch_08).state && id(cover_07_08).position != COVER_CLOSED) {
+                      return true;
+                    } else {
+                      return false;
+                    }
+                then:
+                  - cover.close: cover_07_08
+                else:
+                  - if:
+                      condition:
+                        lambda: |-
+                          if (!id(input_07).state) {
+                            return true;
+                          } else {
+                            return false;
+                          }
+                      then:
+                        - switch.turn_on: switch_07
+      - switch.turn_off: switch_08
+    open_duration: 30s
+    close_action:
+      - if:
+          condition:
+            lambda: |-
+              if (id(input_07).state && !id(switch_07).state && id(cover_07_08).position == COVER_OPEN) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - cover.stop: cover_07_08
+          else:
+            - if:
+                condition:
+                  lambda: |-
+                    if (id(input_07).state && !id(switch_07).state && id(cover_07_08).position != COVER_OPEN) {
+                      return true;
+                    } else {
+                      return false;
+                    }
+                then:
+                  - cover.open: cover_07_08
+                else:
+                  - if:
+                      condition:
+                        lambda: |-
+                          if (id(input_07).state && id(cover_07_08).position != COVER_OPEN) {
+                            return true;
+                          } else {
+                            return false;
+                          }
+                      then:
+                        - cover.open: cover_07_08
+                      else:
+                        - if:
+                            condition:
+                              lambda: |-
+                                if (!id(input_08).state) {
+                                  return true;
+                                } else {
+                                  return false;
+                                }
+                            then:
+                              - switch.turn_on: switch_08
+      - switch.turn_off: switch_07
+    close_duration: 30s
+    stop_action:
+      - if:
+          condition:
+            lambda: |-
+              if (id(switch_07).state) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - switch.turn_off: switch_07
+          else:
+            - if:
+                condition:
+                  lambda: |-
+                    if (id(switch_08).state) {
+                      return true;
+                    } else {
+                      return false;
+                    }
+                then:
+                  - switch.turn_off: switch_08
+                else:
+                  - if:
+                      condition:
+                        lambda: |-
+                          if (id(input_07).state && !id(input_08).state) {
+                            return true;
+                          } else {
+                            return false;
+                          }
+                      then:
+                        - cover.open: cover_07_08
+                      else:
+                        - if:
+                            condition:
+                              lambda: |-
+                                if (id(input_08).state && !id(input_07).state) {
+                                  return true;
+                                } else {
+                                  return false;
+                                }
+                            then:
+                              - cover.close: cover_07_08
+
+################################################################################
+#                                  S W I T C H                                 #
+################################################################################
+switch:
+  ##############################################################################
+  - platform: gpio
+    id: switch_01
+    name: "Relè 01"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_output
+      # Use pin number 0
+      number: 0
+      # One of INPUT or OUTPUT
+      mode: OUTPUT
+      inverted: true
+
+  - platform: gpio
+    id: switch_02
+    name: "Relè 02"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_output
+      # Use pin number 0
+      number: 1
+      # One of INPUT or OUTPUT
+      mode: OUTPUT
+      inverted: true
+
+  - platform: gpio
+    id: switch_03
+    name: "Presa 03"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_output
+      # Use pin number 0
+      number: 2
+      # One of INPUT or OUTPUT
+      mode: OUTPUT
+      inverted: true
+
+  - platform: gpio
+    id: switch_04
+    name: "Presa 04"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_output
+      # Use pin number 0
+      number: 3
+      # One of INPUT or OUTPUT
+      mode: OUTPUT
+      inverted: true
+
+  - platform: gpio
+    id: switch_05
+    name: "Presa 05"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_output
+      # Use pin number 0
+      number: 4
+      # One of INPUT or OUTPUT
+      mode: OUTPUT
+      inverted: true
+
+  - platform: gpio
+    id: switch_06
+    name: "Presa 06"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_output
+      # Use pin number 0
+      number: 5
+      # One of INPUT or OUTPUT
+      mode: OUTPUT
+      inverted: true
+
+  - platform: gpio
+    id: switch_07
+    name: "Presa 07"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_output
+      # Use pin number 0
+      number: 6
+      # One of INPUT or OUTPUT
+      mode: OUTPUT
+      inverted: true
+
+  - platform: gpio
+    id: switch_08
+    name: "Presa 08"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_output
+      # Use pin number 0
+      number: 7
+      # One of INPUT or OUTPUT
+      mode: OUTPUT
+      inverted: true
+  ##############################################################################
+  #                                  L I G H T S                               #
+  ##############################################################################
+  - platform: template
+    id: silent_light_01
+    name: "Silent Light 01"
+    internal: false
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: template
+    id: silent_light_02
+    name: "Silent Light 02"
+    internal: false
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: template
+    id: silent_light_05
+    name: "Silent Light 05"
+    internal: false
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+  ##############################################################################
+  #                                  T I M E R S                               #
+  ##############################################################################
+  - platform: template
+    id: timer_light_01
+    name: "Timer Relay 01"
+    internal: false
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: template
+    id: timer_light_02
+    name: "Timer Relay 02"
+    internal: false
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: template
+    id: timer_light_05
+    name: "Timer Relay 05"
+    internal: false
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+  ##############################################################################
+  #                                 R E S T A R T                              #
+  ##############################################################################
+  - platform: restart
+    name: "Restart"
+
+################################################################################
+#                                   R E S E T                                  #
+################################################################################
+button:
+  - platform: factory_reset
+    name: Factory Reset
+
+################################################################################
+#                                   I N P U T                                  #
+################################################################################
+binary_sensor:
+  ##############################################################################
+  - platform: gpio
+    id: input_01
+    name: "Ingresso 01"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_input
+      # Use pin number 0
+      number: 0
+      # One of INPUT or OUTPUT
+      mode: INPUT
+      inverted: true
+    on_press:
+      then:
+        - light.turn_on: light_01
+    on_release:
+      then:
+        - if:
+            condition:
+              lambda: |-
+                if (!id(mqtt_light_01)) {
+                  return true;
+                } else {
+                  return false;
+                }
+            then:
+              - light.turn_off: light_01
+              - delay: !lambda "return id(repeat_command_light_01);"
+              - light.turn_on: light_01
+              - globals.set:
+                  id: mqtt_light_01
+                  value: !lambda |-
+                    return true;
+            else:
+              - light.turn_off: light_01
+
+  - platform: gpio
+    id: input_02
+    name: "Ingresso 02"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_input
+      # Use pin number 0
+      number: 1
+      # One of INPUT or OUTPUT
+      mode: INPUT
+      inverted: true
+    on_press:
+      then:
+        - light.turn_on: light_02
+    on_release:
+      then:
+        - if:
+            condition:
+              lambda: |-
+                if (!id(mqtt_light_02)) {
+                  return true;
+                } else {
+                  return false;
+                }
+            then:
+              - light.turn_off: light_02
+              - delay: !lambda "return id(repeat_command_light_02);"
+              - light.turn_on: light_02
+              - globals.set:
+                  id: mqtt_light_02
+                  value: !lambda |-
+                    return true;
+            else:
+              - light.turn_off: light_02
+
+  - platform: gpio
+    id: input_03
+    internal: true
+    name: "Ingresso 03"
+    pin:
+      pcf8574: pcf8574_hub_input
+      # Use pin number 0
+      number: 2
+      # One of INPUT or OUTPUT
+      mode: INPUT
+      inverted: true
+    on_press:
+      - if:
+          condition:
+            lambda: |-
+              if (id(input_04).state && !id(switch_03).state) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - cover.stop: cover_03_04
+          else:
+            - if:
+                condition:
+                  lambda: |-
+                    if (!id(switch_03).state) {
+                      return true;
+                    } else {
+                      return false;
+                    }
+                then:
+                  - cover.open: cover_03_04
+    on_release:
+      - if:
+          condition:
+            lambda: |-
+              if (!id(switch_04).state) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - cover.stop: cover_03_04
+
+  - platform: gpio
+    id: input_04
+    name: "Ingresso 04"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_input
+      # Use pin number 0
+      number: 3
+      # One of INPUT or OUTPUT
+      mode: INPUT
+      inverted: true
+    on_press:
+      - if:
+          condition:
+            lambda: |-
+              if (id(input_03).state && !id(switch_04).state) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - cover.stop: cover_03_04
+          else:
+            - if:
+                condition:
+                  lambda: |-
+                    if (!id(switch_04).state) {
+                      return true;
+                    } else {
+                      return false;
+                    }
+                then:
+                  - cover.close: cover_03_04
+    on_release:
+      - if:
+          condition:
+            lambda: |-
+              if (!id(switch_03).state) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - cover.stop: cover_03_04
+
+  - platform: gpio
+    id: input_05
+    name: "Ingresso 05"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_input
+      # Use pin number 0
+      number: 4
+      # One of INPUT or OUTPUT
+      mode: INPUT
+      inverted: true
+    on_press:
+      then:
+        - light.turn_on: light_05
+    on_release:
+      then:
+        - light.turn_off: light_05
+
+  - platform: gpio
+    id: input_06
+    name: "Ingresso 06"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_input
+      # Use pin number 0
+      number: 5
+      # One of INPUT or OUTPUT
+      mode: INPUT
+      inverted: true
+
+  - platform: gpio
+    id: input_07
+    name: "Ingresso 07"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_input
+      # Use pin number 0
+      number: 6
+      # One of INPUT or OUTPUT
+      mode: INPUT
+      inverted: true
+    on_press:
+      - if:
+          condition:
+            lambda: |-
+              if (id(input_08).state && !id(switch_07).state) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - cover.stop: cover_07_08
+          else:
+            - if:
+                condition:
+                  lambda: |-
+                    if (!id(switch_07).state) {
+                      return true;
+                    } else {
+                      return false;
+                    }
+                then:
+                  - cover.open: cover_07_08
+    on_release:
+      - if:
+          condition:
+            lambda: |-
+              if (!id(switch_08).state) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - cover.stop: cover_07_08
+
+  - platform: gpio
+    id: input_08
+    name: "Ingresso 08"
+    internal: true
+    pin:
+      pcf8574: pcf8574_hub_input
+      # Use pin number 0
+      number: 7
+      # One of INPUT or OUTPUT
+      mode: INPUT
+      inverted: true
+    on_press:
+      - if:
+          condition:
+            lambda: |-
+              if (id(input_07).state && !id(switch_08).state) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - cover.stop: cover_07_08
+          else:
+            - if:
+                condition:
+                  lambda: |-
+                    if (!id(switch_08).state) {
+                      return true;
+                    } else {
+                      return false;
+                    }
+                then:
+                  - cover.close: cover_07_08
+    on_release:
+      - if:
+          condition:
+            lambda: |-
+              if (!id(switch_07).state) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - cover.stop: cover_07_08
+
+  - platform: gpio
+    id: pir_01
+    name: "PIR 01"
+    device_class: motion
+    pin:
+      number: ${gpio_analog_01}
+      mode: INPUT
+
+  - platform: gpio
+    id: pir_02
+    name: "PIR 02"
+    device_class: motion
+    pin:
+      number: ${gpio_analog_02}
+      mode: INPUT
+
+  - platform: gpio
+    id: pir_03
+    name: "PIR 03"
+    device_class: motion
+    pin:
+      number: ${gpio_analog_03}
+      mode: INPUT
+
+  - platform: gpio
+    id: pir_04
+    name: "PIR 04"
+    device_class: motion
+    pin:
+      number: ${gpio_analog_04}
+      mode: INPUT
+
+################################################################################
+#                                   O U T P U T                                #
+################################################################################
+output:
+  ################################ L I G H T S #################################
+  - platform: template
+    type: binary
+    id: output_01
+    write_action:
+      - if:
+          condition:
+            lambda: |-
+              if (!id(input_01).state && id(light_01).current_values.is_on()) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - switch.turn_on: switch_01
+            - delay: !lambda "return id(command_light_01);"
+            - switch.turn_off: switch_01
+            - if:
+                condition:
+                  binary_sensor.is_off: input_01
+                then:
+                  - light.turn_off: light_01
+      - if:
+          condition:
+            lambda: |-
+              if (!id(timer_script_light_01).is_running()) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - if:
+                condition:
+                  lambda: |-
+                    if (id(input_01).state && !id(light_01).current_values.is_on()) {
+                      return true;
+                    } else {
+                      return false;
+                    }
+                then:
+                  - switch.turn_on: switch_01
+                  - delay: !lambda "return id(command_light_01);"
+                  - switch.turn_off: switch_01
+                  - if:
+                      condition:
+                        binary_sensor.is_on: input_01
+                      then:
+                        - light.turn_on: light_01
+          else:
+            - lambda: id(residue_time_light_01) = id(total_time_light_01);
+
+  - platform: template
+    type: binary
+    id: output_02
+    write_action:
+      - if:
+          condition:
+            lambda: |-
+              if (!id(input_02).state && id(light_02).current_values.is_on()) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - switch.turn_on: switch_02
+            - delay: !lambda "return id(command_light_02);"
+            - switch.turn_off: switch_02
+            - if:
+                condition:
+                  binary_sensor.is_off: input_02
+                then:
+                  light.turn_off: light_02
+      - if:
+          condition:
+            lambda: |-
+              if (!id(timer_script_light_02).is_running()) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - if:
+                condition:
+                  lambda: |-
+                    if (id(input_02).state && !id(light_02).current_values.is_on()) {
+                      return true;
+                    } else {
+                      return false;
+                    }
+                then:
+                  - switch.turn_on: switch_02
+                  - delay: !lambda "return id(command_light_02);"
+                  - switch.turn_off: switch_02
+                  - if:
+                      condition:
+                        binary_sensor.is_on: input_02
+                      then:
+                        light.turn_on: light_02
+
+  - platform: template
+    type: binary
+    id: output_05
+    write_action:
+      - if:
+          condition:
+            lambda: |-
+              if (!id(input_05).state && id(light_05).current_values.is_on()) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - switch.turn_on: switch_05
+            - delay: !lambda "return id(command_light_05);"
+            - switch.turn_off: switch_05
+            - if:
+                condition:
+                  binary_sensor.is_off: input_05
+                then:
+                  light.turn_off: light_05
+      - if:
+          condition:
+            lambda: |-
+              if (!id(timer_script_light_05).is_running()) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - if:
+                condition:
+                  lambda: |-
+                    if (id(input_05).state && !id(light_05).current_values.is_on()) {
+                      return true;
+                    } else {
+                      return false;
+                    }
+                then:
+                  - switch.turn_on: switch_05
+                  - delay: !lambda "return id(command_light_05);"
+                  - switch.turn_off: switch_05
+                  - if:
+                      condition:
+                        binary_sensor.is_on: input_05
+                      then:
+                        light.turn_on: light_05
+
+  ################################ B U Z Z E R #################################
+  - platform: ledc
+    pin: ${gpio_buzzer}
+    id: board_buzzer
+
+################################################################################
+#                                  S E N S O R                                 #
+################################################################################
+sensor:
+  ##############################################################################
+
+  ##############################################################################
+  #                               V A R I A B L E S                            #
+  ##############################################################################
+
+  ################################ L I G H T S #################################
+  - platform: homeassistant
+    id: light_command_01
+    entity_id: input_number.light_command_01_01
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_command_01).state != id(command_light_01);"
+          then:
+            - globals.set:
+                id: command_light_01
+                value: !lambda "return id(light_command_01).state;"
+
+  - platform: homeassistant
+    id: light_command_02
+    entity_id: input_number.light_command_01_02
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_command_02).state != id(command_light_02);"
+          then:
+            - globals.set:
+                id: command_light_02
+                value: !lambda "return id(light_command_02).state;"
+
+  - platform: homeassistant
+    id: light_command_05
+    entity_id: input_number.light_command_01_05
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_command_05).state != id(command_light_05);"
+          then:
+            - globals.set:
+                id: command_light_05
+                value: !lambda "return id(light_command_05).state;"
+
+  ##############################################################################
+  - platform: homeassistant
+    id: light_repeat_command_01
+    entity_id: input_number.light_repeat_command_01_01
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_repeat_command_01).state != id(repeat_command_light_01);"
+          then:
+            - globals.set:
+                id: repeat_command_light_01
+                value: !lambda "return id(light_repeat_command_01).state;"
+
+  - platform: homeassistant
+    id: light_repeat_command_02
+    entity_id: input_number.light_repeat_command_01_02
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_repeat_command_02).state != id(repeat_command_light_02);"
+          then:
+            - globals.set:
+                id: repeat_command_light_02
+                value: !lambda "return id(light_repeat_command_02).state;"
+
+  - platform: homeassistant
+    id: light_repeat_command_05
+    entity_id: input_number.light_repeat_command_01_05
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_repeat_command_05).state != id(repeat_command_light_05);"
+          then:
+            - globals.set:
+                id: repeat_command_light_05
+                value: !lambda "return id(light_repeat_command_05).state;"
+  ##############################################################################
+  - platform: homeassistant
+    id: light_time_01
+    entity_id: sensor.light_time_01_01
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_time_01).state != id(total_time_light_01);"
+          then:
+            - globals.set:
+                id: total_time_light_01
+                value: !lambda "return id(light_time_01).state;"
+            - globals.set:
+                id: residue_time_light_01
+                value: !lambda "return id(light_time_01).state;"
+
+  - platform: homeassistant
+    id: light_time_02
+    entity_id: sensor.light_time_01_02
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_time_02).state != id(total_time_light_02);"
+          then:
+            - globals.set:
+                id: total_time_light_02
+                value: !lambda "return id(light_time_02).state;"
+            - globals.set:
+                id: residue_time_light_02
+                value: !lambda "return id(light_time_02).state;"
+
+  - platform: homeassistant
+    id: light_time_05
+    entity_id: sensor.light_time_01_05
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_time_05).state != id(total_time_light_05);"
+          then:
+            - globals.set:
+                id: total_time_light_05
+                value: !lambda "return id(light_time_05).state;"
+            - globals.set:
+                id: residue_time_light_05
+                value: !lambda "return id(light_time_05).state;"
+
+  ##############################################################################
+  - platform: homeassistant
+    id: light_off_timer_01
+    entity_id: sensor.light_off_timer_01_01
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_off_timer_01).state != id(timer_light_off_01);"
+          then:
+            - globals.set:
+                id: timer_light_off_01
+                value: !lambda "return id(light_off_timer_01).state;"
+
+  - platform: homeassistant
+    id: light_off_timer_02
+    entity_id: sensor.light_off_timer_01_02
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_off_timer_02).state != id(timer_light_off_02);"
+          then:
+            - globals.set:
+                id: timer_light_off_02
+                value: !lambda "return id(light_off_timer_02).state;"
+
+  - platform: homeassistant
+    id: light_off_timer_05
+    entity_id: sensor.light_off_timer_01_05
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_off_timer_05).state != id(timer_light_off_05);"
+          then:
+            - globals.set:
+                id: timer_light_off_05
+                value: !lambda "return id(light_off_timer_05).state;"
+  ##############################################################################
+  - platform: homeassistant
+    id: light_timer_type_01
+    entity_id: sensor.light_timer_type_01_01
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_timer_type_01).state != id(timer_type_light_01);"
+          then:
+            - globals.set:
+                id: timer_type_light_01
+                value: !lambda "return id(light_timer_type_01).state;"
+
+  - platform: homeassistant
+    id: light_timer_type_02
+    entity_id: sensor.light_timer_type_01_02
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_timer_type_02).state != id(timer_type_light_02);"
+          then:
+            - globals.set:
+                id: timer_type_light_02
+                value: !lambda "return id(light_timer_type_02).state;"
+
+  - platform: homeassistant
+    id: light_timer_type_05
+    entity_id: sensor.light_timer_type_01_05
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(light_timer_type_05).state != id(timer_type_light_05);"
+          then:
+            - globals.set:
+                id: timer_type_light_05
+                value: !lambda "return id(light_timer_type_05).state;"
+
+  ################################ C O V E R S #################################
+  - platform: homeassistant
+    id: cover_up_time_03_04
+    entity_id: sensor.cover_up_time_01_03_04
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(cover_up_time_03_04).state != id(time_cover_up_03_04);"
+          then:
+            - globals.set:
+                id: time_cover_up_03_04
+                value: !lambda "return id(cover_up_time_03_04).state;"
+            - lambda: id(cover_03_04)->set_open_duration(id(time_cover_up_03_04));
+
+  - platform: homeassistant
+    id: cover_down_time_03_04
+    entity_id: sensor.cover_down_time_01_03_04
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(cover_down_time_03_04).state != id(time_cover_down_03_04);"
+          then:
+            - globals.set:
+                id: time_cover_down_03_04
+                value: !lambda "return id(cover_down_time_03_04).state;"
+            - lambda: id(cover_03_04)->set_open_duration(id(time_cover_down_03_04));
+
+  - platform: homeassistant
+    id: cover_up_time_07_08
+    entity_id: sensor.cover_up_time_01_07_08
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(cover_up_time_07_08).state != id(time_cover_up_07_08);"
+          then:
+            - globals.set:
+                id: time_cover_up_07_08
+                value: !lambda "return id(cover_up_time_07_08).state;"
+            - lambda: id(cover_03_04)->set_open_duration(id(time_cover_up_07_08));
+
+  - platform: homeassistant
+    id: cover_down_time_07_08
+    entity_id: sensor.cover_down_time_01_07_08
+    on_value:
+      then:
+        if:
+          condition:
+            lambda: "return id(cover_down_time_07_08).state != id(time_cover_down_07_08);"
+          then:
+            - globals.set:
+                id: time_cover_down_07_08
+                value: !lambda "return id(cover_down_time_07_08).state;"
+            - lambda: id(cover_03_04)->set_open_duration(id(time_cover_down_07_08));
+
+################################################################################
+#                             T E X T   S E N S O R                            #
+################################################################################
+text_sensor:
+  ################################ L I G H T S #################################
+  - platform: template
+    id: timer_light_sensor_01
+    name: "Timer Relay 01"
+    icon: mdi:timer-outline
+    lambda: |-
+      auto value = id(residue_time_light_01);
+      int min = value / 60;
+      int sec = value % 60;
+      std::string str_min = to_string(min);
+      std::string str_sec = to_string(sec);
+      { return str_min + ":" + str_sec; }
+    update_interval: never
+
+  - platform: template
+    id: timer_light_sensor_02
+    name: "Timer Relay 02"
+    icon: mdi:timer-outline
+    lambda: |-
+      auto value = id(residue_time_light_02);
+      int min = value / 60;
+      int sec = value % 60;
+      std::string str_min = to_string(min);
+      std::string str_sec = to_string(sec);
+      { return str_min + ":" + str_sec; }
+    update_interval: never
+
+  - platform: template
+    id: timer_light_sensor_05
+    name: "Timer Relay 05"
+    icon: mdi:timer-outline
+    lambda: |-
+      auto value = id(residue_time_light_05);
+      int min = value / 60;
+      int sec = value % 60;
+      std::string str_min = to_string(min);
+      std::string str_sec = to_string(sec);
+      { return str_min + ":" + str_sec; }
+    update_interval: never
+
+################################################################################
+#                                I N T E R V A L                               #
+################################################################################
+interval:
+  ##############################################################################
+  - interval: 1sec
+    then:
+      - if:
+          condition:
+            lambda: "return id(timer_light_01).state == 1;"
+          then:
+            - component.update: timer_light_sensor_01
+
+  - interval: 1sec
+    then:
+      - if:
+          condition:
+            lambda: "return id(timer_light_02).state == 1;"
+          then:
+            - component.update: timer_light_sensor_02
+
+  - interval: 1sec
+    then:
+      - if:
+          condition:
+            lambda: "return id(timer_light_05).state == 1;"
+          then:
+            - component.update: timer_light_sensor_05
+
+################################################################################
+#                                  S C R I P T                                 #
+################################################################################
+script:
+  ################################# T I M E R ##################################
+  - id: timer_script_light_01
+    mode: single
+    then:
+      - while:
+          condition:
+            lambda: |-
+              if (id(residue_time_light_01) > 0) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - lambda: id(residue_time_light_01) -= 1;
+            - delay: 1s
+      - if:
+          condition:
+            lambda: |-
+              if (id(residue_time_light_01) <= 0) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - light.turn_off: light_01
+            - lambda: id(residue_time_light_01) = id(total_time_light_01);
+
+  - id: timer_script_light_02
+    mode: queued
+    then:
+      - while:
+          condition:
+            lambda: |-
+              if (id(residue_time_light_02) > 0) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - lambda: id(residue_time_light_02) -= 1;
+            - delay: 1s
+      - if:
+          condition:
+            lambda: |-
+              if (id(residue_time_light_02) <= 0) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - light.turn_off: light_02
+            - lambda: id(residue_time_light_02) = id(total_time_light_02);
+
+  - id: timer_script_light_05
+    mode: queued
+    then:
+      - while:
+          condition:
+            lambda: |-
+              if (id(residue_time_light_05) > 0) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - lambda: id(residue_time_light_05) -= 1;
+            - delay: 1s
+      - if:
+          condition:
+            lambda: |-
+              if (id(residue_time_light_05) <= 0) {
+                return true;
+              } else {
+                return false;
+              }
+          then:
+            - light.turn_off: light_05
+            - lambda: id(residue_time_light_05) = id(total_time_light_05);
+
+################################################################################
+#                                  B U Z Z E R                                 #
+################################################################################
+rtttl:
+  ##############################################################################
+  output: board_buzzer

@@ -1,0 +1,4 @@
+on_boot:
+  then:
+    - rtttl.play: "long:d=1,o=5,b=100:e6"
+    - light.turn_off: light_board
