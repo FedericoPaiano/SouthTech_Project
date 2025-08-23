@@ -43,7 +43,7 @@ Questo progetto è costruito sull'incredibile lavoro delle comunità open-source
 * **Prerequisiti:** (Es: "È necessario avere un'istanza di Home Assistant attiva.")
 * **Assemblaggio Hardware:** (Es: "Schemi elettrici e guide per l'assemblaggio dei quadri AION.")
 * **Installazione Componenti:** (Es: "Schema di collegamento dei dispositivi ESP all'interno del quadro.")
-* **Configurazione Software:** (Es: "1. Caricare il file di configurazione `aion_device.yaml` sul dispositivo tramite ESPHome. 2. Aggiungere l'integrazione al pannello di Home Assistant.")
+* **Configurazione Software:** (Es: "Verrà eseguita attraverso un webserver che sarà inserito in una versione preconfigurata di Home Assistant")
 
 ---
 
