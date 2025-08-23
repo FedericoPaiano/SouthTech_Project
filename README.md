@@ -40,8 +40,6 @@ Questo progetto è costruito sull'incredibile lavoro delle comunità open-source
 
 ## Installazione e Utilizzo
 
-**(NOTA: Questa sezione è un segnaposto da compilare con le istruzioni specifiche del tuo progetto.)**
-
 * **Prerequisiti:** (Es: "È necessario avere un'istanza di Home Assistant attiva.")
 * **Assemblaggio Hardware:** (Es: "Schemi elettrici e guide per l'assemblaggio dei quadri AION.")
 * **Installazione Componenti:** (Es: "Schema di collegamento dei dispositivi ESP all'interno del quadro.")
