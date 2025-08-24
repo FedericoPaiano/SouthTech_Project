@@ -1,0 +1,97 @@
+
+################################################################################
+#                              START ORGANIZATION                              #
+################################################################################
+homeassistant:
+  customize: !include www/configurations/customize.yaml
+  customize_domain: !include www/configurations/customize_domain.yaml
+
+automation: !include automations.yaml
+scene: !include scenes.yaml
+script: !include scripts.yaml
+template: !include www/configurations/templates.yaml
+sensor: !include www/configurations/sensors.yaml
+binary_sensor: !include www/configurations/binary_sensors.yaml
+light: !include www/configurations/lights.yaml
+group: !include www/configurations/groups.yaml
+media_player: !include www/configurations/media_players.yaml
+camera: !include www/configurations/camera.yaml
+input_boolean: !include www/configurations/input_boolean.yaml
+input_number: !include www/configurations/input_number.yaml
+input_select: !include www/configurations/input_select.yaml
+input_text: !include www/configurations/input_text.yaml
+switch: !include www/configurations/switches.yaml
+lock: !include www/configurations/locks.yaml
+notify: !include www/configurations/notifications.yaml
+climate: !include www/configurations/climates.yaml
+timer: !include www/configurations/timers.yaml
+input_datetime: !include www/configurations/input_datetime.yaml
+counter: !include www/configurations/counters.yaml
+mqtt: !include www/configurations/mqtt.yaml
+google_assistant: !include www/configurations/googlehome.yaml
+recorder: !include www/configurations/recorder.yaml
+################################################################################
+#                               END ORGANIZATION                               #
+################################################################################
+
+#------------------------------------------------------------------------------#
+
+################################################################################
+#                               START DASHBOARDS                               #
+################################################################################
+lovelace:
+  mode: yaml
+  resources: !include www/configurations/ui-lovelace-resource.yaml
+  dashboards:
+    lovelace-elements-position:
+      mode: yaml
+      title: Posizione Icone
+      icon: mdi:floor-plan
+      filename: ui-lovelace-icons-position.yaml
+      show_in_sidebar: true
+    light-presence:
+      mode: yaml
+      title: "SouthTech - Light Presence Monitor"
+      icon: mdi:lightbulb-on
+      filename: southtech/dashboards/ui-lovelace-light-presence.yaml
+      show_in_sidebar: true
+################################################################################
+#                                END DASHBOARDS                                #
+################################################################################
+
+#------------------------------------------------------------------------------#
+
+################################################################################
+#                                 START THEMES                                 #
+################################################################################
+frontend:
+  themes: !include_dir_merge_named themes
+#  extra_module_url:
+#    - /local/card-mod.js
+#    - /local/custom_style.css
+#----------------------------------#
+################################################################################
+#                                  END THEMES                                  #
+################################################################################
+
+#------------------------------------------------------------------------------#
+
+#----------------------------------#
+logger:
+  default: INFO
+
+# Text to speech
+tts:
+  - platform: google_translate
+    language: it
+#----------------------------------#
+
+# Configure a default setup of Home Assistant (frontend, api, etc)
+default_config:
+#----------------------------------#
+
+# CloudFlare
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 172.30.33.0/24
