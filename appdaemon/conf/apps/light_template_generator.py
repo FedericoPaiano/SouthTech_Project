@@ -245,12 +245,9 @@ class LightTemplateGenerator(hass.Hass):
         new_section.append(start_marker)
         new_section.append(start_comment)
         new_section.append(start_marker)
-        
+        a
         # Aggiungi i blocchi delle entità
-        for i, block in enumerate(new_blocks):
-            if i > 0:
-                new_section.append("")  # Riga vuota tra i blocchi
-            
+        for i, block in enumerate(new_blocks):            
             lines = block.split("\n")
             for line in lines:
                 if line.strip():

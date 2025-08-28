@@ -101,59 +101,68 @@ class CreateClimateModelSensors(hass.Hass):
             for area_name, climate_entities in area_climate_entities.items():
                 self.log(f"Processando area: {area_name} con {len(climate_entities)} entità climate", level="DEBUG")
                 
-                # Trova i sensori di temperatura per questa area
-                temperature_sensors = self.find_temperature_sensors_for_area(area_name)
+                # Trova TUTTI i sensori di temperatura per questa area
+                all_temperature_sensors_in_area = self.find_temperature_sensors_for_area(area_name)
                 
-                if not temperature_sensors:
+                if not all_temperature_sensors_in_area:
                     self.log(f"Nessun sensore di temperatura trovato per l'area {area_name}. Saltando...", level="WARNING")
                     continue
-                
-                # Usa il primo sensore di temperatura disponibile per l'area
-                primary_temp_sensor = temperature_sensors[0]
-                self.log(f"Usando sensore di temperatura primario per {area_name}: {primary_temp_sensor}", level="DEBUG")
-                
-                # Per ogni entità climate nell'area
-                for climate_entity in climate_entities:
-                    climate_sensor_id = self.generate_sensor_id(climate_entity)
-                    if not climate_sensor_id:
-                        self.log(f"Impossibile creare un sensore per {climate_entity}. Saltando...", level="ERROR")
-                        continue
 
-                    temperature_state = self.get_validated_temperature(primary_temp_sensor)
+                # Costruisci l'ID del sensore da escludere
+                safe_area_name = area_name.lower().replace(' ', '_')
+                excluded_sensor_id = f"sensor.temperature_in_{safe_area_name}"
+                
+                primary_temp_sensor = None
+                # Cerca il primo sensore di temperatura disponibile che NON abbia l'ID escluso
+                for sensor_id in all_temperature_sensors_in_area:
+                    if sensor_id != excluded_sensor_id:
+                        primary_temp_sensor = sensor_id
+                        self.log(f"Trovato sensore sorgente valido '{self.friendly_name(sensor_id)}' con entity_id: {primary_temp_sensor}", level="INFO")
+                        break
 
-                    # Crea il sensore climate e inizia ad ascoltare i cambiamenti di stato
-                    sensor_name = f"Temperature for {climate_entity} in {area_name}"
-                    self.create_sensor(climate_sensor_id, sensor_name, temperature_state)
-                    
-                    # Rimuovi eventuali listener precedenti per evitare duplicati
-                    if climate_sensor_id in self.climate_sensors_created:
-                        self.cancel_listen_state(self.climate_sensors_created[climate_sensor_id])
-                    
-                    # Crea nuovo listener e salva l'handle
-                    listen_handle = self.listen_state(
-                        self.update_climate_sensor, 
-                        primary_temp_sensor, 
-                        climate_sensor_id=climate_sensor_id, 
-                        name=sensor_name
-                    )
-                    self.climate_sensors_created[climate_sensor_id] = listen_handle
+                if not primary_temp_sensor:
+                    self.log(f"Nessun sensore di temperatura valido trovato nell'area {area_name} (escluso l'ID '{excluded_sensor_id}'). Saltando...", level="WARNING")
+                    continue
+                
+                # Usa la prima entità climate nell'area per generare sia l'ID che il nome
+                first_climate_entity = climate_entities[0]
+                digits = re.findall(r'\d+', first_climate_entity)
+                
+                if not digits:
+                    self.log(f"Nessun numero trovato nell'ID dell'entità {first_climate_entity}. Impossibile creare il sensore. Saltando...", level="WARNING")
+                    continue
+
+                # --- NUOVA LOGICA PER ID E NOME ---
+                # ID del sensore: es. "sensor.temperature_01_06"
+                climate_sensor_id = f"sensor.temperature_{'_'.join(digits)}"
+
+                # Nome del sensore: recupera il friendly_name dell'entità climate e aggiunge l'area
+                # es. "Temperatura Termostato in Ingresso"
+                climate_friendly_name = self.friendly_name(first_climate_entity)
+                sensor_name = f"Temperatura {climate_friendly_name} in {area_name}"
+                
+                # --- FINE NUOVA LOGICA ---
+
+                temperature_state = self.get_validated_temperature(primary_temp_sensor)
+
+                # Crea il sensore e inizia ad ascoltare i cambiamenti di stato
+                self.create_sensor(climate_sensor_id, sensor_name, temperature_state)
+                
+                # Rimuovi eventuali listener precedenti per evitare duplicati
+                if climate_sensor_id in self.climate_sensors_created:
+                    self.cancel_listen_state(self.climate_sensors_created[climate_sensor_id])
+                
+                # Crea un nuovo listener e salva l'handle
+                listen_handle = self.listen_state(
+                    self.update_climate_sensor, 
+                    primary_temp_sensor, 
+                    climate_sensor_id=climate_sensor_id, 
+                    name=sensor_name
+                )
+                self.climate_sensors_created[climate_sensor_id] = listen_handle
         
         except Exception as e:
             self.log(f"Errore durante la creazione dei sensori climate: {str(e)}", level="ERROR")
-
-    def generate_sensor_id(self, entity):
-        """Genera un ID univoco per il sensore basato sull'entità climate"""
-        # Rimuovi il prefixo "climate." e sostituisci caratteri non validi
-        clean_entity = entity.replace('climate.', '')
-        
-        # Cerca cifre nell'entity ID
-        digits = re.findall(r'\d+', clean_entity)
-        if digits:
-            return f"sensor.temperature_climate_{'_'.join(digits)}"
-        
-        # Se non ci sono cifre, usa l'ID pulito
-        safe_entity = re.sub(r'[^a-zA-Z0-9]', '_', clean_entity)
-        return f"sensor.temperature_climate_{safe_entity}" if safe_entity else None
 
     def get_validated_temperature(self, sensor_id: str):
         """Ottiene e valida lo stato del sensore di temperatura"""
@@ -191,7 +200,7 @@ class CreateClimateModelSensors(hass.Hass):
     def create_sensor(self, object_id: str, name: str, state):
         """Crea o aggiorna un sensore di temperatura"""
         attributes = {
-            "friendly_name": name,
+            "friendly_name": name, # Usiamo friendly_name che è l'attributo corretto
             "unit_of_measurement": "°C",
             "device_class": "temperature",
             "state_class": "measurement"
@@ -200,6 +209,6 @@ class CreateClimateModelSensors(hass.Hass):
 
         try:
             self.set_state(object_id, state=sensor_state, attributes=attributes)
-            self.log(f"Creato/aggiornato sensore '{name}' con stato '{sensor_state}'", level="INFO")
+            self.log(f"Creato/aggiornato sensore '{name}' ({object_id}) con stato '{sensor_state}'", level="INFO")
         except Exception as e:
             self.log(f"Errore durante la creazione del sensore '{object_id}': {str(e)}", level="ERROR")
