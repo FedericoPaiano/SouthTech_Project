@@ -327,7 +327,7 @@ class SouthTechConfiguratorCommunication:
             self.configurator.error(f"Errore monitor_sensor_requests: {e}")
 
     def process_sensor_save_request(self):
-        """Processa salvataggio via sensore con metodi avanzati"""
+        """Processa salvataggio via sensore con metodi avanzati - VERSIONE CORRETTA"""
         try:
             attrs = self.configurator.get_state("sensor.southtech_save_request", attribute="all")
             if not attrs or "attributes" not in attrs:
@@ -336,24 +336,28 @@ class SouthTechConfiguratorCommunication:
             request_data = attrs["attributes"]
             configurations = request_data.get("configurations", [])
             
-            if not configurations:
-                self.create_sensor_save_response({
-                    "success": False, 
-                    "error": "Configurazioni mancanti"
-                })
-                return
-            
             # RICONOSCIMENTO MODALITÀ COMPLETA
             action = request_data.get("action", "save_yaml")
             generate_dashboard = request_data.get("generate_dashboard", False)
             generate_templates = request_data.get("generate_templates", False)
 
+            # --- INIZIO LOGICA MODIFICATA ---
             if action == "save_complete" or generate_dashboard or generate_templates:
-                self.configurator.log("✨ SENSOR: Richiesta SALVATAGGIO COMPLETO rilevata")
+                # Per un salvataggio/pulizia completo, una lista vuota è valida.
+                self.configurator.log("✨ SENSOR: Richiesta SALVATAGGIO COMPLETO/PULIZIA rilevata")
                 result = self.configurator.yaml.execute_complete_save_advanced("sensor", configurations, request_data)
             else:
+                # Per un salvataggio standard, le configurazioni sono necessarie.
+                if not configurations:
+                    self.create_sensor_save_response({
+                        "success": False, 
+                        "error": "Configurazioni mancanti per un salvataggio standard."
+                    })
+                    return
+
                 self.configurator.log("📡 SENSOR: Richiesta salvataggio STANDARD")
                 result = self.configurator.yaml.execute_save_advanced("sensor", configurations, request_data)
+            # --- FINE LOGICA MODIFICATA ---
             
             # Invia risposta
             self.create_sensor_save_response(result)
@@ -707,10 +711,10 @@ class SouthTechConfiguratorCommunication:
             self.configurator.error(f"Errore monitoraggio file requests: {e}")
 
     def process_file_request(self, filename, filepath):
-        """Processa richiesta da file con metodi avanzati"""
+        """Processa richiesta da file con metodi avanzati - VERSIONE CORRETTA"""
         try:
             if filename != "save_request.json":
-                return  # Solo per richieste di salvataggio
+                return  # Gestisce solo richieste di salvataggio
                 
             self.configurator.log("📁 FILE: Processamento con metodo avanzato")
             
@@ -719,24 +723,26 @@ class SouthTechConfiguratorCommunication:
                 request_data = json.load(f)
             os.remove(filepath)  # Rimuovi file richiesta
             
-            # AGGIUNGI QUESTA RIGA MANCANTE:
             configurations = request_data.get("configurations", [])
-            if not configurations:
-                response_data = {"success": False, "error": "Configurazioni mancanti"}
-            else:
-                # RICONOSCIMENTO MODALITÀ COMPLETA
-                action = request_data.get("action", "save_yaml")
-                generate_dashboard = request_data.get("generate_dashboard", False)
-                generate_templates = request_data.get("generate_templates", False)
+            
+            # RICONOSCIMENTO MODALITÀ COMPLETA
+            action = request_data.get("action", "save_yaml")
+            generate_dashboard = request_data.get("generate_dashboard", False)
+            generate_templates = request_data.get("generate_templates", False)
 
-                if action == "save_complete" or generate_dashboard or generate_templates:
-                    # AGGIUNGI QUESTO LOG MANCANTE:
-                    self.configurator.log("✨ FILE: Richiesta SALVATAGGIO COMPLETO")
-                    response_data = self.configurator.yaml.execute_complete_save_advanced("file", configurations, request_data)
+            # --- INIZIO LOGICA MODIFICATA ---
+            if action == "save_complete" or generate_dashboard or generate_templates:
+                # Per un salvataggio/pulizia completo, una lista vuota è valida.
+                self.configurator.log("✨ FILE: Richiesta SALVATAGGIO COMPLETO/PULIZIA rilevata")
+                response_data = self.configurator.yaml.execute_complete_save_advanced("file", configurations, request_data)
+            else:
+                # Per un salvataggio standard, le configurazioni sono necessarie.
+                if not configurations:
+                    response_data = {"success": False, "error": "Configurazioni mancanti per un salvataggio standard."}
                 else:
-                    # AGGIUNGI QUESTO LOG MANCANTE:
                     self.configurator.log("📁 FILE: Richiesta salvataggio STANDARD")
                     response_data = self.configurator.yaml.execute_save_advanced("file", configurations, request_data)
+            # --- FINE LOGICA MODIFICATA ---
             
             # Salva risposta
             response_path = os.path.join(self.configurator.api_path, "save_response.json")

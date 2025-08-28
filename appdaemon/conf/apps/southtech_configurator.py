@@ -37,7 +37,7 @@ class SouthTechConfigurator(hass.Hass):
         
         # Path aggiuntivi per dashboard e templates
         self.dashboard_path = os.path.join(self.www_path, "dashboards")
-        self.light_configs_path = os.path.join(self.dashboard_path, "light_configs")
+        self.lights_config_path = os.path.join(self.dashboard_path, "lights_config")
         self.templates_file = "/homeassistant/www/configurations/templates.yaml"
         self.configuration_yaml_path = "/homeassistant/configuration.yaml"
         
@@ -351,7 +351,7 @@ class SouthTechConfigurator(hass.Hass):
                 self.backup_path, 
                 self.api_path,
                 self.dashboard_path,
-                self.light_configs_path,
+                self.lights_config_path,
                 os.path.dirname(self.templates_file)
             ]
             
@@ -415,7 +415,7 @@ class SouthTechConfigurator(hass.Hass):
                 self.backup_path, 
                 self.api_path,
                 self.dashboard_path,
-                self.light_configs_path
+                self.lights_config_path
             ]
             
             for directory in gitkeep_dirs:
@@ -438,7 +438,7 @@ class SouthTechConfigurator(hass.Hass):
                 self.backup_path, 
                 self.api_path,
                 self.dashboard_path,
-                self.light_configs_path
+                self.lights_config_path
             ]
             
             for directory in test_dirs:
@@ -814,12 +814,12 @@ class SouthTechConfigurator(hass.Hass):
                 ]
                 
                 # Aggiungi file light_config esistenti
-                if os.path.exists(self.light_configs_path):
-                    for filename in os.listdir(self.light_configs_path):
+                if os.path.exists(self.lights_config_path):
+                    for filename in os.listdir(self.lights_config_path):
                         if filename.endswith('.yaml'):
                             base_name = filename.replace('.yaml', '.bkp')
                             potential_files.append({
-                                "source_path": os.path.join(self.light_configs_path, filename),
+                                "source_path": os.path.join(self.lights_config_path, filename),
                                 "backup_name": base_name,
                                 "type": "light_config"
                             })

@@ -100,9 +100,9 @@ class SouthTechConfiguratorYaml:
             config_data = yaml.safe_load(yaml_content)
             
             if config_data and 'light_presence' in config_data:
-                light_configs = config_data['light_presence'].get('light_presence', [])
+                lights_config = config_data['light_presence'].get('light_presence', [])
                 
-                for cfg in light_configs:
+                for cfg in lights_config:
                     # Estrai solo i parametri base per l'interfaccia
                     configurations.append({
                         'light_entity': cfg.get('light_entity', ''),
@@ -368,25 +368,27 @@ class SouthTechConfiguratorYaml:
 
     def process_apps_yaml_advanced(self, new_configurations, skip_backup=False):
         """
-        🎯 METODO CORE: Processamento avanzato apps.yaml - CON BACKUP CONDIZIONALE
-        Funziona identicamente per WebSocket, Sensori e File System
+        🎯 METODO CORE MODIFICATO: Processamento avanzato apps.yaml
+        Gestisce correttamente il caso di una lista di configurazioni vuota (pulizia).
         """
         try:
-            self.configurator.log("🔧 CORE: Inizio processamento intelligente apps.yaml") # Correzione qui
+            self.configurator.log("🔧 CORE: Inizio processamento intelligente apps.yaml")
             
-            # 1. Validazione configurazioni
-            if not new_configurations:
-                return {"success": False, "error": "Nessuna configurazione fornita"}
-            
+            # --- INIZIO LOGICA MODIFICATA ---
+            # 1. Validazione configurazioni (non blocca se la lista è vuota)
             valid_configs = self.validate_configurations(new_configurations)
-            if not valid_configs:
-                return {"success": False, "error": "Nessuna configurazione valida"}
             
+            # Se c'erano configurazioni in input ma nessuna è risultata valida, allora è un errore.
+            if new_configurations and not valid_configs:
+                return {"success": False, "error": "Le configurazioni fornite non sono valide"}
+            # Se la lista è vuota dall'inizio (richiesta di pulizia), si procede.
+            # --- FINE LOGICA MODIFICATA ---
+
             # BACKUP CONDIZIONALE: Solo se non skip_backup
             backup_info = {"backup_created": False, "backup_skipped": skip_backup}
             
             if not skip_backup and os.path.exists(self.configurator.apps_yaml_path):
-                self.configurator.log("📦 Backup apps.yaml...") # Correzione qui
+                self.configurator.log("📦 Backup apps.yaml...")
                 try:
                     backup_files = [{
                         "source_path": self.configurator.apps_yaml_path,
@@ -400,7 +402,7 @@ class SouthTechConfiguratorYaml:
                     )
                     
                     if backup_result.get("success"):
-                        self.configurator.log(f"✅ Backup apps.yaml completato: {backup_result.get('backup_folder')}") # Correzione qui
+                        self.configurator.log(f"✅ Backup apps.yaml completato: {backup_result.get('backup_folder')}")
                         backup_info = {
                             "backup_created": True,
                             "backup_folder": backup_result.get("backup_folder"),
@@ -409,7 +411,7 @@ class SouthTechConfiguratorYaml:
                             "backup_skipped": False
                         }
                     else:
-                        self.configurator.log(f"⚠️ Backup apps.yaml fallito: {backup_result.get('error')}") # Correzione qui
+                        self.configurator.log(f"⚠️ Backup apps.yaml fallito: {backup_result.get('error')}")
                         backup_info = {
                             "backup_created": False, 
                             "backup_error": backup_result.get("error"),
@@ -417,27 +419,27 @@ class SouthTechConfiguratorYaml:
                         }
                         
                 except Exception as backup_error:
-                    self.configurator.error(f"❌ Errore backup apps.yaml: {backup_error}") # Correzione qui
+                    self.configurator.error(f"❌ Errore backup apps.yaml: {backup_error}")
                     backup_info = {
                         "backup_created": False,
                         "backup_error": str(backup_error),
                         "backup_skipped": False
                     }
             elif skip_backup:
-                self.configurator.log("⏭️ Backup apps.yaml saltato (skip_backup=True)") # Correzione qui
+                self.configurator.log("⏭️ Backup apps.yaml saltato (skip_backup=True)")
             else:
                 backup_info = {"backup_created": False, "reason": "file_not_exists", "backup_skipped": False}
-                self.configurator.log("ℹ️ File apps.yaml non esiste, nessun backup necessario") # Correzione qui
+                self.configurator.log("ℹ️ File apps.yaml non esiste, nessun backup necessario")
             
             # 2. Leggi contenuto esistente
             existing_content = ""
             if os.path.exists(self.configurator.apps_yaml_path):
                 with open(self.configurator.apps_yaml_path, 'r', encoding='utf-8') as f:
                     existing_content = f.read()
-                self.configurator.log(f"📖 File esistente: {len(existing_content)} caratteri") # Correzione qui
+                self.configurator.log(f"📖 File esistente: {len(existing_content)} caratteri")
             else:
                 existing_content = self.create_empty_apps_yaml_structure()
-                self.configurator.log("📄 Creato template file vuoto") # Correzione qui
+                self.configurator.log("📄 Creato template file vuoto")
             
             # 3. Analisi sezione esistente
             start_idx, end_idx = self.find_light_control_section(existing_content)
@@ -445,15 +447,15 @@ class SouthTechConfiguratorYaml:
             
             if start_idx != -1 and end_idx != -1:
                 section_content = existing_content[start_idx:end_idx]
-                existing_configs = self.extract_light_configs_from_section(section_content)
-                self.configurator.log(f"🔍 Configurazioni esistenti: {len(existing_configs)}") # Correzione qui
+                existing_configs = self.extract_lights_config_from_section(section_content)
+                self.configurator.log(f"🔍 Configurazioni esistenti: {len(existing_configs)}")
             
             # 4. Calcola differenze
             new_config_ids = {self.generate_config_id(cfg) for cfg in valid_configs}
             configs_to_add = new_config_ids - existing_configs
             configs_to_remove = existing_configs - new_config_ids
             
-            self.configurator.log(f"📊 Operazioni: +{len(configs_to_add)} -{len(configs_to_remove)}") # Correzione qui
+            self.configurator.log(f"📊 Operazioni: +{len(configs_to_add)} -{len(configs_to_remove)}")
             
             # 5. Ottimizzazione: se identiche, non fare nulla
             if not configs_to_add and not configs_to_remove and start_idx != -1:
@@ -465,7 +467,7 @@ class SouthTechConfiguratorYaml:
                     **backup_info
                 }
             
-            # 6. Genera nuova sezione
+            # 6. Genera nuova sezione (qui `generate_light_control_section` riceverà la lista vuota e si comporterà correttamente)
             new_section = self.generate_light_control_section(valid_configs)
             
             # 7. Ricostruisci file completo
@@ -496,15 +498,15 @@ class SouthTechConfiguratorYaml:
             }
             
             backup_msg = f"Backup: {backup_info.get('backup_folder', 'saltato' if skip_backup else 'N/A')}"
-            self.configurator.log(f"✅ Apps.yaml processato con successo - {backup_msg}") # Correzione qui
+            self.configurator.log(f"✅ Apps.yaml processato con successo - {backup_msg}")
             return result
             
         except Exception as e:
-            self.configurator.error(f"❌ CORE: Errore processamento avanzato: {e}") # Correzione qui
+            self.configurator.error(f"❌ CORE: Errore processamento avanzato: {e}")
             
             # Tentativo di ripristino da backup se disponibile
             if 'backup_info' in locals() and backup_info.get("backup_created"):
-                self.configurator.log("🛡️ Tentativo ripristino da backup in corso...") # Correzione qui
+                self.configurator.log("🛡️ Tentativo ripristino da backup in corso...")
                 # TODO: Implementare ripristino automatico se necessario
             
             return {
@@ -646,7 +648,7 @@ class SouthTechConfiguratorYaml:
                         "templates": {"success": False, "error": f"Exception: {error_msg}"},
                         "configuration": {"success": False, "error": f"Exception: {error_msg}"},
                         "dashboard": {"success": False, "error": f"Exception: {error_msg}"},
-                        "light_configs": {"success": False, "error": f"Exception: {error_msg}"}
+                        "lights_config": {"success": False, "error": f"Exception: {error_msg}"}
                     }
                 }
             
@@ -1209,7 +1211,7 @@ class SouthTechConfiguratorYaml:
             self.configurator.error(f"Errore ricerca sezione controllo luci: {e}") # Correzione qui
             return (-1, -1)
 
-    def extract_light_configs_from_section(self, section_content):
+    def extract_lights_config_from_section(self, section_content):
         """
         Estrae le configurazioni luci dalla sezione YAML
         
@@ -1223,9 +1225,9 @@ class SouthTechConfiguratorYaml:
             parsed = yaml.safe_load(section_content)
             
             if parsed and 'light_presence' in parsed:
-                light_configs = parsed['light_presence'].get('light_presence', [])
+                lights_config = parsed['light_presence'].get('light_presence', [])
                 
-                for cfg in light_configs:
+                for cfg in lights_config:
                     if 'light_entity' in cfg:
                         # Genera ID configurazione basato su light_entity
                         config_id = self.generate_config_id(cfg)
@@ -1309,10 +1311,8 @@ class SouthTechConfiguratorYaml:
 
     def generate_light_control_section(self, configurations):
         """
-        Genera la sezione di controllo luci completa - VERSIONE MIGLIORATA
-        
-        Returns:
-            str: Sezione YAML formattata
+        Genera la sezione di controllo luci completa - VERSIONE MODIFICATA
+        Gestisce il caso in cui non ci siano configurazioni.
         """
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1327,41 +1327,47 @@ class SouthTechConfiguratorYaml:
             yaml_content += "  module: light_presence_control\n"
             yaml_content += "  class: LightPresenceControl\n"
             yaml_content += "  log_level: DEBUG\n"
-            yaml_content += "  light_presence:\n"
             
-            # Aggiungi ogni configurazione con indentazione precisa
-            for i, config in enumerate(configurations):
-                light_entity = config.get('light_entity', '')
-                if not light_entity:
-                    continue
+            # --- INIZIO LOGICA MODIFICATA ---
+            if not configurations:
+                # Se non ci sono configurazioni, inserisci una lista vuota
+                self.configurator.log("ℹ️ Nessuna configurazione luci fornita. Genero sezione con lista vuota.")
+                yaml_content += "  light_presence: []\n"
+            else:
+                # Se ci sono configurazioni, procedi come prima
+                yaml_content += "  light_presence:\n"
+                for i, config in enumerate(configurations):
+                    light_entity = config.get('light_entity', '')
+                    if not light_entity:
+                        continue
+                        
+                    base_id = light_entity.replace('light.', '')
                     
-                base_id = light_entity.replace('light.', '')
-                
-                # Commento configurazione
-                yaml_content += f"    # Configurazione {i + 1} - {base_id}\n"
-                
-                # Elementi della lista con 4 spazi di base + 2 per le proprietà
-                yaml_content += f"    - light_entity: {light_entity}\n"
-                yaml_content += f"      presence_sensor_on: {config.get('presence_sensor_on', '')}\n"
-                yaml_content += f"      presence_sensor_off: {config.get('presence_sensor_off', '')}\n"
-                yaml_content += f"      illuminance_sensor: {config.get('illuminance_sensor', '')}\n"
-                yaml_content += f"      enable_sensor: input_boolean.{base_id}_enable_sensor\n"
-                yaml_content += f"      enable_manual_activation_sensor: input_boolean.{base_id}_enable_manual_activation_sensor\n"
-                yaml_content += f"      enable_manual_activation_light_sensor: input_boolean.{base_id}_enable_manual_activation_light_sensor\n"
-                yaml_content += f"      enable_automation: input_boolean.{base_id}_enable_automation\n"
-                yaml_content += f"      enable_illuminance_filter: input_boolean.{base_id}_enable_illuminance_filter\n"
-                yaml_content += f"      enable_illuminance_automation: input_boolean.{base_id}_enable_illuminance_automation\n"
-                yaml_content += f"      automatic_enable_automation: input_select.{base_id}_automatic_enable_automation\n"
-                yaml_content += f"      light_sensor_config: input_select.{base_id}_light_sensor_config\n"
-                yaml_content += f"      timer_minutes_on_push: input_number.{base_id}_timer_minutes_on_push\n"
-                yaml_content += f"      timer_filter_on_push: input_number.{base_id}_timer_filter_on_push\n"
-                yaml_content += f"      timer_minutes_on_time: input_number.{base_id}_timer_minutes_on_time\n"
-                yaml_content += f"      timer_filter_on_time: input_number.{base_id}_timer_filter_on_time\n"
-                yaml_content += f"      timer_seconds_max_lux: input_number.{base_id}_timer_seconds_max_lux\n"
-                yaml_content += f"      min_lux_activation: input_number.{base_id}_min_lux_activation\n"
-                yaml_content += f"      max_lux_activation: input_number.{base_id}_max_lux_activation\n"
-                yaml_content += f"      turn_on_light_offset: input_number.{base_id}_turn_on_light_offset\n"
-                yaml_content += f"      turn_off_light_offset: input_number.{base_id}_turn_off_light_offset\n"
+                    yaml_content += f"    # Configurazione {i + 1} - {base_id}\n"
+                    yaml_content += f"    - light_entity: {light_entity}\n"
+                    yaml_content += f"      presence_sensor_on: {config.get('presence_sensor_on', '')}\n"
+                    yaml_content += f"      presence_sensor_off: {config.get('presence_sensor_off', '')}\n"
+                    yaml_content += f"      illuminance_sensor: {config.get('illuminance_sensor', '')}\n"
+                    # Parametri helper
+                    yaml_content += f"      enable_sensor: input_boolean.{base_id}_enable_sensor\n"
+                    yaml_content += f"      enable_manual_activation_sensor: input_boolean.{base_id}_enable_manual_activation_sensor\n"
+                    yaml_content += f"      enable_manual_activation_light_sensor: input_boolean.{base_id}_enable_manual_activation_light_sensor\n"
+                    yaml_content += f"      enable_automation: input_boolean.{base_id}_enable_automation\n"
+                    yaml_content += f"      enable_illuminance_filter: input_boolean.{base_id}_enable_illuminance_filter\n"
+                    yaml_content += f"      enable_illuminance_automation: input_boolean.{base_id}_enable_illuminance_automation\n"
+                    yaml_content += f"      automatic_enable_automation: input_select.{base_id}_automatic_enable_automation\n"
+                    yaml_content += f"      light_sensor_config: input_select.{base_id}_light_sensor_config\n"
+                    yaml_content += f"      timer_minutes_on_push: input_number.{base_id}_timer_minutes_on_push\n"
+                    yaml_content += f"      timer_filter_on_push: input_number.{base_id}_timer_filter_on_push\n"
+                    yaml_content += f"      timer_minutes_on_time: input_number.{base_id}_timer_minutes_on_time\n"
+                    yaml_content += f"      timer_filter_on_time: input_number.{base_id}_timer_filter_on_time\n"
+                    yaml_content += f"      timer_seconds_max_lux: input_number.{base_id}_timer_seconds_max_lux\n"
+                    yaml_content += f"      min_lux_activation: input_number.{base_id}_min_lux_activation\n"
+                    yaml_content += f"      max_lux_activation: input_number.{base_id}_max_lux_activation\n"
+                    yaml_content += f"      turn_on_light_offset: input_number.{base_id}_turn_on_light_offset\n"
+                    yaml_content += f"      turn_off_light_offset: input_number.{base_id}_turn_off_light_offset\n"
+            # --- FINE LOGICA MODIFICATA ---
+
             yaml_content += "################################################################################\n"
             yaml_content += "#                      END CONTROLLO LUCI AUTOMATICHE                          #\n"
             yaml_content += "################################################################################\n"
@@ -1369,7 +1375,7 @@ class SouthTechConfiguratorYaml:
             return yaml_content
             
         except Exception as e:
-            self.configurator.error(f"Errore generazione sezione controllo luci: {e}") # Correzione qui
+            self.configurator.error(f"Errore generazione sezione controllo luci: {e}")
             raise
 
     def validate_yaml_safely(self, content):
