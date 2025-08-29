@@ -1034,6 +1034,56 @@ class SouthTechConfiguratorSecurity:
             return False
 
     # ===============================================================
+    # API ENDPOINTS - NUOVO ENDPOINT PER ANTEPRIMA
+    # ===============================================================
+
+    def api_preview_config(self, data):
+        """
+        [NUOVO METODO]
+        Genera un'anteprima "a secco" delle configurazioni senza salvarle.
+        Questa è la nuova fonte di verità per l'anteprima del frontend.
+        """
+        self.configurator.log("🔍 PREVIEW: Richiesta anteprima configurazione via API")
+        try:
+            # 1. Verifica token di sessione
+            auth_header = data.get("__headers", {}).get("Authorization", "")
+            token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+            
+            if not self.verify_token(token):
+                return {"error": "Non autorizzato"}, 401
+
+            # 2. Estrai le configurazioni inviate dal frontend
+            configurations = data.get("configurations", [])
+            self.configurator.log(f"🔍 PREVIEW: Ricevute {len(configurations)} configurazioni per l'anteprima.")
+
+            # 3. Chiama i metodi di generazione del backend per creare il codice
+            #    Questi sono gli stessi metodi usati per il salvataggio finale.
+            apps_yaml_preview = self.configurator.yaml.generate_light_control_section(configurations)
+            templates_yaml_preview = self.configurator.dashboard.create_templates_content(configurations)
+            
+            # Per la dashboard, generiamo sia il file principale che un esempio di file singolo
+            main_dashboard_preview = self.configurator.dashboard.create_main_dashboard_content(configurations)
+            
+            # 4. Assembla la risposta JSON
+            response_data = {
+                "success": True,
+                "previews": {
+                    "apps_yaml": apps_yaml_preview,
+                    "templates_yaml": templates_yaml_preview,
+                    "dashboard_yaml": main_dashboard_preview
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            return response_data, 200
+
+        except Exception as e:
+            self.configurator.error(f"❌ PREVIEW: Errore durante la generazione dell'anteprima: {e}")
+            import traceback
+            self.configurator.error(traceback.format_exc())
+            return {"error": str(e)}, 500
+
+    # ===============================================================
     # SETUP ENDPOINTS
     # ===============================================================
     
@@ -1050,6 +1100,7 @@ class SouthTechConfiguratorSecurity:
             self.configurator.register_endpoint(self.api_get_entities, "southtech_entities")
             self.configurator.register_endpoint(self.api_sync_configs, "southtech_sync")
             self.configurator.register_endpoint(self.api_save_config, "southtech_save")
+            self.configurator.register_endpoint(self.api_preview_config, "southtech_preview_config")
             
             # Endpoint WebSocket principale
             self.configurator.register_endpoint(self.configurator.communication.handle_websocket_save, "southtech_save_yaml")

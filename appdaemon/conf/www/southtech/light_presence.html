@@ -2086,14 +2086,17 @@
         }
         
         // ✅ VALIDAZIONE CONFIGURAZIONE
+        /**
+        * 🎯 FUNZIONE DI VALIDAZIONE MODIFICATA
+        * Non considera più un elenco vuoto come un errore.
+        * Valida solo il contenuto delle configurazioni se presenti.
+        */
         function validateConfiguration() {
             let errors = [];
             let warnings = [];
-            
-            if (configurations.length === 0) {
-                errors.push('Nessuna configurazione presente');
-            }
-            
+
+            // La logica che considerava configurations.length === 0 come un errore è stata rimossa.
+
             configurations.forEach((config, index) => {
                 const num = index + 1;
                 
@@ -2101,7 +2104,6 @@
                 if (!config.light_entity) {
                     errors.push(`Configurazione ${num}: Luce non selezionata`);
                 }
-                
                 if (!config.presence_sensor_on) {
                     errors.push(`Configurazione ${num}: Sensore accensione non selezionato`);
                 }
@@ -2110,7 +2112,6 @@
                 if (!config.presence_sensor_off) {
                     warnings.push(`Configurazione ${num}: Nessun sensore spegnimento configurato`);
                 }
-                
                 if (!config.illuminance_sensor) {
                     warnings.push(`Configurazione ${num}: Nessun controllo luminosità configurato`);
                 }
@@ -2126,22 +2127,18 @@
                 }
             });
             
-            // Mostra risultati
-            let message = '';
-            if (errors.length > 0) {
-                message += `❌ ERRORI:\n${errors.join('\n')}\n\n`;
+            // Mostra risultati solo se ci sono errori o avvisi
+            if (errors.length > 0 || warnings.length > 0) {
+                let message = '';
+                if (errors.length > 0) {
+                    message += `❌ ERRORI:\n${errors.join('\n')}\n\n`;
+                }
+                if (warnings.length > 0) {
+                    message += `⚠️ AVVISI:\n${warnings.join('\n')}\n\n`;
+                }
+                const alertType = errors.length > 0 ? 'error' : 'warning';
+                SouthTechUI.showAlert(message, alertType);
             }
-            if (warnings.length > 0) {
-                message += `⚠️ AVVISI:\n${warnings.join('\n')}\n\n`;
-            }
-            if (errors.length === 0 && warnings.length === 0) {
-                message += '✅ Tutte le configurazioni sono perfette!';
-            } else if (errors.length === 0) {
-                message += '✅ Configurazioni valide (con alcuni avvisi opzionali)';
-            }
-            
-            const alertType = errors.length > 0 ? 'error' : (warnings.length > 0 ? 'warning' : 'success');
-            SouthTechUI.showAlert(message, alertType);
             
             return errors.length === 0;
         }
@@ -2499,60 +2496,6 @@
         function generateYAML() {
             console.log('🔄 Redirezione a generazione completa...');
             generateYAMLAndDashboard();
-        }
-        
-        // 📝 GENERA CONTENUTO YAML
-        function generateYAMLContent() {
-            const timestamp = new Date().toISOString();
-            
-            let yaml = `################################################################################\n`;
-            yaml += `#                      START CONTROLLO LUCI AUTOMATICHE                        #\n`;
-            yaml += `################################################################################\n`;
-            yaml += `light_presence:\n`;
-            yaml += `  module: light_presence_control\n`;
-            yaml += `  class: LightPresenceControl\n`;
-            yaml += `  log_level: DEBUG\n`;
-            yaml += `  light_presence:\n`;
-            
-            configurations.forEach((config, index) => {
-                const lightEntity = config.light_entity;
-                const baseId = lightEntity.replace('light.', '');
-                
-                yaml += `    # Configurazione ${index + 1} - ${baseId}\n`;
-                yaml += `    - light_entity: ${lightEntity}\n`;
-                yaml += `      presence_sensor_on: ${config.presence_sensor_on || ''}\n`;
-                yaml += `      presence_sensor_off: ${config.presence_sensor_off || ''}\n`;
-                yaml += `      illuminance_sensor: ${config.illuminance_sensor || ''}\n`;
-                
-                // Parametri aggiuntivi auto-generati
-                yaml += `      enable_sensor: input_boolean.${baseId}_enable_sensor\n`;
-                yaml += `      enable_manual_activation_sensor: input_boolean.${baseId}_enable_manual_activation_sensor\n`;
-                yaml += `      enable_manual_activation_light_sensor: input_boolean.${baseId}_enable_manual_activation_light_sensor\n`;
-                yaml += `      enable_automation: input_boolean.${baseId}_enable_automation\n`;
-                yaml += `      enable_illuminance_filter: input_boolean.${baseId}_enable_illuminance_filter\n`;
-                yaml += `      enable_illuminance_automation: input_boolean.${baseId}_enable_illuminance_automation\n`;
-                yaml += `      automatic_enable_automation: input_select.${baseId}_automatic_enable_automation\n`;
-                yaml += `      light_sensor_config: input_select.${baseId}_light_sensor_config\n`;
-                yaml += `      timer_minutes_on_push: input_number.${baseId}_timer_minutes_on_push\n`;
-                yaml += `      timer_filter_on_push: input_number.${baseId}_timer_filter_on_push\n`;
-                yaml += `      timer_minutes_on_time: input_number.${baseId}_timer_minutes_on_time\n`;
-                yaml += `      timer_filter_on_time: input_number.${baseId}_timer_filter_on_time\n`;
-                yaml += `      timer_seconds_max_lux: input_number.${baseId}_timer_seconds_max_lux\n`;
-                yaml += `      min_lux_activation: input_number.${baseId}_min_lux_activation\n`;
-                yaml += `      max_lux_activation: input_number.${baseId}_max_lux_activation\n`;
-                yaml += `      turn_on_light_offset: input_number.${baseId}_turn_on_light_offset\n`;
-                yaml += `      turn_off_light_offset: input_number.${baseId}_turn_off_light_offset\n`;
-                
-                if (index < configurations.length - 1) {
-                    yaml += '\n';
-                }
-            });
-            
-            yaml += `################################################################################\n`;
-            yaml += `#                      END CONTROLLO LUCI AUTOMATICHE                          #\n`;
-            yaml += `################################################################################\n`;
-            
-            return yaml;
         }
         
         // 📋 COPIA YAML
@@ -3609,83 +3552,11 @@
         // ====================================================================
 
         /**
-        * 🎯 FUNZIONE PRINCIPALE: Genera YAML + Dashboard + Templates con 4 Tab
-        * Implementa sistema backup con rotazione (max 5) e visualizzazione completa di tutti i file
-        */
+         * [MODIFICATA] - Ora non genera più nulla, ma chiama la nuova funzione
+         * per richiedere l'anteprima al backend.
+         */
         async function generateYAMLAndDashboard() {
-            console.log('✨ Inizio generazione configurazione completa con 4 tab...');
-            
-            try {
-                // 1. ✅ VALIDAZIONE CONFIGURAZIONI
-                if (!validateConfiguration()) {
-                    SouthTechUI.showAlert('❌ Correggi gli errori prima di generare la configurazione completa', 'error');
-                    return;
-                }
-                
-                if (configurations.length === 0) {
-                    SouthTechUI.showAlert('⚠️ Aggiungi almeno una configurazione prima di generare', 'warning');
-                    return;
-                }
-                
-                console.log(`📋 Generazione per ${configurations.length} configurazioni...`);
-                SouthTechUI.showAlert('🔄 Generazione file YAML in corso...', 'info', 3000);
-                
-                // 2. 📝 GENERA TUTTI I CONTENUTI YAML
-                const yamlContents = await generateAllYAMLContents();
-                
-                if (!yamlContents.apps || !yamlContents.dashboard || !yamlContents.templates) {
-                    throw new Error('Errore generazione uno o più file YAML');
-                }
-                
-                console.log('📄 Tutti i YAML generati:', {
-                    apps: yamlContents.apps.length,
-                    dashboard: yamlContents.dashboard.length, 
-                    templates: yamlContents.templates.length
-                });
-                
-                // 3. 🎨 POPOLA TUTTI I TAB
-                await populateAllTabs(yamlContents);
-                
-                // 4. 📊 MOSTRA INTERFACCIA OUTPUT
-                const yamlOutputElement = document.getElementById('yamlOutput');
-                if (yamlOutputElement) {
-                    yamlOutputElement.style.display = 'block';
-                    console.log('✅ Interfaccia output con 4 tab mostrata');
-                    
-                    // 5. 📜 SCROLL VERSO OUTPUT
-                    yamlOutputElement.scrollIntoView({ 
-                        behavior: 'smooth', 
-                        block: 'start',
-                        inline: 'nearest'
-                    });
-                } else {
-                    console.warn('⚠️ Elemento yamlOutput non trovato');
-                }
-                
-                // 6. 🎉 NOTIFICA SUCCESSO
-                const totalSensors = configurations.length * 4;
-                const totalFiles = configurations.length + 1; // dashboard principale + file individuali
-                
-                SouthTechUI.showAlert(
-                    `✨ Configurazione completa generata!\n` +
-                    `📋 ${configurations.length} configurazioni luci\n` +
-                    `🎨 ${totalFiles} file dashboard\n` +
-                    `🧩 ${totalSensors} template sensors\n` +
-                    `📄 3 file YAML pronti per il salvataggio`, 
-                    'success',
-                    6000
-                );
-                
-                console.log('✅ Generazione configurazione completa terminata con successo');
-                
-            } catch (error) {
-                console.error('❌ Errore durante generazione configurazione completa:', error);
-                SouthTechUI.showAlert(
-                    `❌ Errore generazione configurazione: ${error.message}`,
-                    'error',
-                    8000
-                );
-            }
+            await requestAndDisplayPreviews();
         }
 
         /**
@@ -3712,131 +3583,6 @@
                 
             } catch (error) {
                 console.error('❌ Errore generazione contenuti YAML:', error);
-                throw error;
-            }
-        }
-
-        /**
-        * 🎨 Genera contenuto Dashboard.yaml (ui-lovelace-light-presence.yaml)
-        */
-        function generateDashboardYAML() {
-            console.log('🎨 Generazione Dashboard.yaml...');
-            
-            try {
-                const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-                
-                let content = `# Dashboard Configurazione Luci Automatiche\n`;
-                content += `# Generato automaticamente da SouthTech Configurator il ${timestamp}\n\n`;
-                content += `title: Configurazione Luci Automatiche\n`;
-                content += `icon: mdi:lightbulb-outline\n\n`;
-                content += `views:\n`;
-                
-                // Genera view per ogni configurazione
-                configurations.forEach((config, index) => {
-                    const lightEntity = config.light_entity;
-                    if (!lightEntity) return;
-                    
-                    const baseId = lightEntity.replace('light.', '');
-                    const friendlyName = createEntityDisplayName(lightEntity, lightEntity.split('.')[1]).replace(/\s*\([^)]*\)/g, ''); // Rimuovi area dal nome
-                    
-                    content += `  - title: ${friendlyName}\n`;
-                    content += `    path: opzioni_${baseId}\n`;
-                    content += `    type: custom:grid-layout\n`;
-                    content += `    layout:\n`;
-                    content += `      grid-template-columns: 1fr 1fr\n`;
-                    content += `      grid-gap: 16px\n`;
-                    content += `      mediaquery:\n`;
-                    content += `        '(max-width: 800px)':\n`;
-                    content += `          grid-template-columns: 1fr\n`;
-                    content += `    cards: !include light_configs/${baseId}.yaml\n\n`;
-                });
-                
-                console.log(`✅ Dashboard.yaml generato: ${content.length} caratteri, ${configurations.length} views`);
-                return content;
-                
-            } catch (error) {
-                console.error('❌ Errore generazione Dashboard.yaml:', error);
-                throw error;
-            }
-        }
-
-        /**
-        * 🧩 Genera contenuto Templates.yaml
-        */
-        function generateTemplatesYAML() {
-            console.log('🧩 Generazione Templates.yaml...');
-            
-            try {
-                const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-                
-                let content = `################################################################################\n`;
-                content += `#                    START SENSORI TEMPLATE LUCI AUTOMATICHE                   #\n`;
-                content += `################################################################################\n`;
-                content += `# Generato automaticamente da SouthTech Configurator il ${timestamp}\n`;
-                content += `template:\n`;
-                content += `  - sensor:\n`;
-                
-                // Placeholder iniziale
-                content += `    - unique_id: placeholder\n`;
-                content += `      name: PlaceHolder\n`;
-                content += `      state: ""\n\n`;
-                
-                // Genera sensori per ogni configurazione
-                configurations.forEach(config => {
-                    const lightEntity = config.light_entity;
-                    const presenceSensor = config.presence_sensor_on;
-                    
-                    if (!lightEntity || !presenceSensor) return;
-                    
-                    const baseId = lightEntity.replace('light.', '');
-                    const friendlyName = baseId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    
-                    // 4 sensori per ogni configurazione
-                    const sensors = [
-                        {
-                            name: `Presenza Luce ${friendlyName}`,
-                            uniqueId: `presenza_luce_${baseId}`,
-                            condition: `is_state('${presenceSensor}', 'on') and is_state('${lightEntity}', 'on')`
-                        },
-                        {
-                            name: `Solo Presenza ${friendlyName}`,
-                            uniqueId: `solo_presenza_${baseId}`,
-                            condition: `is_state('${presenceSensor}', 'on') and is_state('${lightEntity}', 'off')`
-                        },
-                        {
-                            name: `Solo Luce ${friendlyName}`,
-                            uniqueId: `solo_luce_${baseId}`,
-                            condition: `is_state('${presenceSensor}', 'off') and is_state('${lightEntity}', 'on')`
-                        },
-                        {
-                            name: `Vuoto ${friendlyName}`,
-                            uniqueId: `vuoto_${baseId}`,
-                            condition: `is_state('${presenceSensor}', 'off') and is_state('${lightEntity}', 'off')`
-                        }
-                    ];
-                    
-                    sensors.forEach(sensor => {
-                        content += `    - name: "${sensor.name}"\n`;
-                        content += `      unique_id: ${sensor.uniqueId}\n`;
-                        content += `      state: >\n`;
-                        content += `        {% if ${sensor.condition} %}\n`;
-                        content += `          1\n`;
-                        content += `        {% else %}\n`;
-                        content += `          0\n`;
-                        content += `        {% endif %}\n\n`;
-                    });
-                });
-                
-                content += `################################################################################\n`;
-                content += `#                     END SENSORI TEMPLATE LUCI AUTOMATICHE                    #\n`;
-                content += `################################################################################\n`;
-                
-                const totalSensors = configurations.length * 4 + 1; // +1 per placeholder
-                console.log(`✅ Templates.yaml generato: ${content.length} caratteri, ${totalSensors} sensori`);
-                return content;
-                
-            } catch (error) {
-                console.error('❌ Errore generazione Templates.yaml:', error);
                 throw error;
             }
         }
@@ -4061,50 +3807,78 @@
         /**
         * 🎨 Popola tutti i 4 tab con i contenuti generati
         */
-        async function populateAllTabs(yamlContents) {
-            console.log('🎨 Popolamento tutti i 4 tab...');
+        async function populateAllTabs(previews) {
+            console.log('🎨 Popolamento tab con anteprime dal backend...');
             
             try {
-                // 1. 📝 Tab Apps.yaml
+                // 1. Tab Apps.yaml
                 const yamlCodeElement = document.getElementById('yamlCode');
-                if (yamlCodeElement) {
-                    yamlCodeElement.textContent = yamlContents.apps;
-                    console.log('✅ Tab Apps.yaml popolato');
+                const yamlStatsElement = document.getElementById('yamlStats');
+                if (yamlCodeElement && yamlStatsElement) {
+                    const content = previews.apps_yaml || '';
+                    yamlCodeElement.textContent = content;
                     
-                    // Aggiungi statistiche per Apps.yaml
-                    const yamlStatsElement = document.getElementById('yamlStats');
-                    if (yamlStatsElement) {
-                        const lines = yamlContents.apps.split('\n').length;
-                        const size = (yamlContents.apps.length / 1024).toFixed(1);
-                        const configs = configurations.length;
-                        
-                        yamlStatsElement.innerHTML = `
-                            <div class="small text-muted mt-2">
-                                📄 <strong>${lines}</strong> righe • 
-                                💾 <strong>${size} KB</strong> • 
-                                ⚙️ <strong>${configs}</strong> configurazioni
-                            </div>
-                        `;
-                    }
+                    const lines = content.split('\n').length;
+                    const size = (content.length / 1024).toFixed(1);
+                    const configCount = configurations.length;
+                    
+                    yamlStatsElement.innerHTML = `
+                        <div class="small text-muted mt-2">
+                            📄 <strong>${lines}</strong> righe • 
+                            💾 <strong>${size} KB</strong> • 
+                            ⚙️ <strong>${configCount}</strong> configurazioni
+                        </div>
+                    `;
                 }
                 
-                // 2. 🎨 Tab Dashboard.yaml  
-                await populateDashboardYamlTab(yamlContents.dashboard);
+                // 2. Tab Dashboard.yaml  
+                const dashboardYamlElement = document.getElementById('dashboardYamlCode');
+                const dashboardStatsElement = document.getElementById('dashboardYamlStats');
+                if (dashboardYamlElement && dashboardStatsElement) {
+                    const content = previews.dashboard_yaml || '';
+                    dashboardYamlElement.textContent = content;
+
+                    const lines = content.split('\n').length;
+                    const size = (content.length / 1024).toFixed(1);
+                    const views = configurations.length + 1; // +1 per il riepilogo
+
+                    dashboardStatsElement.innerHTML = `
+                        <div class="small text-muted mt-2">
+                            📄 <strong>${lines}</strong> righe • 
+                            💾 <strong>${size} KB</strong> • 
+                            🎨 <strong>${views}</strong> viste (1 riepilogo + ${configurations.length} luci)
+                        </div>
+                    `;
+                }
                 
-                // 3. 🧩 Tab Templates.yaml
-                await populateTemplatesYamlTab(yamlContents.templates);
+                // 3. Tab Templates.yaml
+                const templatesYamlElement = document.getElementById('templatesYamlCode');
+                const templatesStatsElement = document.getElementById('templatesYamlStats');
+                if (templatesYamlElement && templatesStatsElement) {
+                    const content = previews.templates_yaml || '';
+                    templatesYamlElement.textContent = content;
+
+                    const lines = content.split('\n').length;
+                    const size = (content.length / 1024).toFixed(1);
+                    const sensors = configurations.length * 4 + 1; // 4 per luce + 1 placeholder
+
+                    templatesStatsElement.innerHTML = `
+                        <div class="small text-muted mt-2">
+                            📄 <strong>${lines}</strong> righe • 
+                            💾 <strong>${size} KB</strong> • 
+                            🧩 <strong>${sensors}</strong> sensori template
+                        </div>
+                    `;
+                }
                 
-                // 4. 📊 Tab Preview Dashboard
+                // 4. Tab Preview Dashboard (logica invariata, è solo HTML)
                 await populateDashboardPreview();
                 
-                // 5. 🧩 Popola anche la grafica del tab Templates (info tab)
-                populateTemplatesInfo();
-                
-                console.log('✅ Tutti i 4 tab popolati con successo');
+                console.log('✅ Tutti i tab popolati con successo');
                 
             } catch (error) {
                 console.error('❌ Errore popolamento tab:', error);
-                throw error;
+                throw error; // Propaga l'errore alla funzione chiamante
             }
         }
 
@@ -4187,7 +3961,8 @@
         }
 
         /**
-        * 💾 Salvataggio configurazione completa con backup
+        * 💾 FUNZIONE DI SALVATAGGIO MODIFICATA
+        * Utilizza la funzione di validazione corretta.
         */
         async function saveCompleteConfiguration() {
             console.log('💾 Avvio salvataggio configurazione completa...');
@@ -4197,12 +3972,12 @@
                 return;
             }
             
+            // La validazione ora permette di procedere con 0 configurazioni per la pulizia.
             if (!validateConfiguration()) {
-                SouthTechUI.showAlert('❌ Correggi gli errori prima di salvare', 'error');
+                SouthTechUI.showAlert('❌ Correggi gli errori nelle configurazioni prima di salvare', 'error');
                 return;
             }
             
-            // Mostra popup di conferma con backup info
             showCompleteSaveConfirmation();
         }
 
@@ -4427,6 +4202,71 @@
             } finally {
                 isSaving = false;
                 console.log('🏁 === FINE SALVATAGGIO COMPLETO ===');
+            }
+        }
+
+        /**
+        * Funzione helper che contiene la logica di generazione.
+        */
+        async function executeGenerationProcess() {
+            try {
+                // La validazione ora non bloccherà più il processo se le configurazioni sono 0.
+                if (!validateConfiguration()) {
+                    SouthTechUI.showAlert('❌ Correggi gli errori nelle configurazioni prima di generare', 'error');
+                    return;
+                }
+                
+                console.log(`📋 Generazione/Pulizia per ${configurations.length} configurazioni...`);
+                SouthTechUI.showAlert('🔄 Operazione in corso...', 'info', 3000);
+                
+                const yamlContents = await generateAllYAMLContents();
+                
+                if (!yamlContents.apps || !yamlContents.dashboard || !yamlContents.templates) {
+                    throw new Error('Errore generazione uno o più file YAML');
+                }
+                
+                console.log('📄 Tutti i YAML generati:', {
+                    apps: yamlContents.apps.length,
+                    dashboard: yamlContents.dashboard.length, 
+                    templates: yamlContents.templates.length
+                });
+                
+                await populateAllTabs(yamlContents);
+                
+                const yamlOutputElement = document.getElementById('yamlOutput');
+                if (yamlOutputElement) {
+                    yamlOutputElement.style.display = 'block';
+                    console.log('✅ Interfaccia output con 4 tab mostrata');
+                    yamlOutputElement.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+                } else {
+                    console.warn('⚠️ Elemento yamlOutput non trovato');
+                }
+                
+                if (configurations.length > 0) {
+                    const totalSensors = configurations.length * 4;
+                    const totalFiles = configurations.length + 1;
+                    SouthTechUI.showAlert(
+                        `✨ Configurazione completa generata!\n` +
+                        `📋 ${configurations.length} configurazioni luci\n` +
+                        `🎨 ${totalFiles} file dashboard\n` +
+                        `🧩 ${totalSensors} template sensors\n` +
+                        `📄 3 file YAML pronti per il salvataggio`, 
+                        'success',
+                        6000
+                    );
+                } else {
+                    SouthTechUI.showAlert(
+                        `✨ File pronti per la pulizia. Clicca "Salva Configurazione Completa" per applicare.`, 
+                        'info',
+                        6000
+                    );
+                }
+                
+                console.log('✅ Processo di generazione/pulizia avviato con successo');
+                
+            } catch (error) {
+                console.error('❌ Errore durante il processo di generazione:', error);
+                SouthTechUI.showAlert(`❌ Errore: ${error.message}`, 'error', 8000);
             }
         }
 
@@ -4825,6 +4665,70 @@
             modal.addEventListener('hidden.bs.modal', () => {
                 modal.remove();
             });
+        }
+
+        // ====================================================================
+        // NUOVE FUNZIONI PER L'ANTEPRIMA DAL BACKEND
+        // ====================================================================
+
+        /**
+         * [NUOVA FUNZIONE]
+         * Funzione principale che orchestra la richiesta di anteprima al backend
+         * e la visualizzazione dei risultati nel frontend.
+         */
+        async function requestAndDisplayPreviews() {
+            console.log('✨ Richiesta anteprima configurazione al backend...');
+
+            if (!validateConfiguration()) {
+                SouthTechUI.showAlert('❌ Correggi gli errori nelle configurazioni prima di generare l\'anteprima', 'error');
+                return;
+            }
+
+            // Mostra un indicatore di caricamento
+            SouthTechUI.showAlert('🔄 Generazione anteprima in corso dal backend...', 'info', 4000);
+            const yamlOutputElement = document.getElementById('yamlOutput');
+            if (yamlOutputElement) {
+                yamlOutputElement.style.display = 'block';
+                document.getElementById('yamlCode').textContent = 'Caricamento...';
+                document.getElementById('templatesYamlCode').textContent = 'Caricamento...';
+                document.getElementById('dashboardYamlCode').textContent = 'Caricamento...';
+            }
+
+            try {
+                // Invia le configurazioni attuali al backend per la generazione "a secco"
+                const response = await fetch(`${APPDAEMON_API_URL}/southtech_preview_config`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ configurations: configurations })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `Errore del server: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success && data.previews) {
+                    // Popola i tab con il codice ricevuto dal backend
+                    await populateAllTabs(data.previews);
+                    
+                    yamlOutputElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    SouthTechUI.showAlert('✅ Anteprima generata con successo dal backend!', 'success');
+                } else {
+                    throw new Error(data.error || 'Risposta non valida dal backend.');
+                }
+
+            } catch (error) {
+                console.error('❌ Errore durante la richiesta di anteprima:', error);
+                SouthTechUI.showAlert(`❌ Errore anteprima: ${error.message}`, 'error', 8000);
+                document.getElementById('yamlCode').textContent = `Errore durante la generazione dell'anteprima.`;
+                document.getElementById('templatesYamlCode').textContent = `Errore.`;
+                document.getElementById('dashboardYamlCode').textContent = `Errore.`;
+            }
         }
         
         console.log('✨ SouthTech Dashboard Extension con 4 Tab e Backup Rotazione caricato - versione 3.3.0');

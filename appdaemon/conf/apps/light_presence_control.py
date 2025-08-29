@@ -16,8 +16,12 @@ class LightPresenceControl(hass.Hass):
         # Inizializza il dizionario per i flag
         self.light_turned_off_by_illuminance = {}
         self.light_illuminance_lock_on = {}
+        
+        # Aggiunte per attivazione manuale
+        self.manual_activation_sequence = {}  # Traccia la sequenza per ogni luce
+        self.cooldown_flags = {}  # Cooldown post-attivazione
 
-        config = self.args["light_presence"]
+        config = self.args.get("light_presence", [])
         self.initialize_light_configurations(config)
 
     def initialize_light_configurations(self, config):
@@ -62,6 +66,7 @@ class LightPresenceControl(hass.Hass):
         timer_seconds_max_lux = light_config.get("timer_seconds_max_lux", int(5))
         turn_on_light_offset = light_config.get("turn_on_light_offset", float(0.0))
         turn_off_light_offset = light_config.get("turn_off_light_offset", int(30))
+        enable_manual_activation_light_sensor = light_config.get("enable_manual_activation_light_sensor", "on")
 
         light_config.update({
             "enable_illuminance_filter": enable_illuminance_filter,
@@ -130,7 +135,8 @@ class LightPresenceControl(hass.Hass):
                 f"Timer Filter On Time: {self.formatted_value(timer_filter_on_time, timer_filter_on_time == int(5))}",
                 f"Timer Seconds Max Lux: {self.formatted_value(timer_seconds_max_lux, timer_seconds_max_lux == int(5))}",
                 f"Turn On Light Offset: {self.formatted_value(turn_on_light_offset, turn_on_light_offset == float(0.0))}",
-                f"Turn Off Light Offset: {self.formatted_value(turn_off_light_offset, turn_off_light_offset == int(30))}"
+                f"Turn Off Light Offset: {self.formatted_value(turn_off_light_offset, turn_off_light_offset == int(30))}",
+                f"Enable Manual Activation: {self.formatted_value(enable_manual_activation_light_sensor, enable_manual_activation_light_sensor == 'on')}"
             ],
             "listeners": listeners
         })
@@ -477,6 +483,10 @@ class LightPresenceControl(hass.Hass):
         automatic_enable_automation = config["automatic_enable_automation"]
         enable_sensor = config["enable_sensor"]
 
+        # *** GESTIONE ATTIVAZIONE MANUALE ***
+        # Passa old e new per verificare la transizione corretta
+        self.check_manual_activation_sequence(light_entity, old, new, config)
+
         timer_push_key = f"{light_entity}_timer_on_push"
 
         # Cancella il timer_on_push se attivo
@@ -517,6 +527,10 @@ class LightPresenceControl(hass.Hass):
         presence_sensor_off = config["presence_sensor_off"]
         timer_minutes_on_push = config["timer_minutes_on_push"]
         timer_key = f"{light_entity}_timer_on_push"
+
+        # *** GESTIONE ATTIVAZIONE MANUALE ***
+        # Passa old e new per verificare la transizione corretta
+        self.check_manual_activation_sequence(light_entity, old, new, config)
 
         # Resetta il flag a False per questa luce
         self.light_illuminance_lock_on[light_entity] = False
@@ -1177,3 +1191,286 @@ class LightPresenceControl(hass.Hass):
 
         except Exception as e:
             self.log(f"ERRORE: {str(e)}", level="ERROR")
+
+    def check_manual_activation_sequence(self, light_entity, old_state, new_state, config):
+        """
+        Controlla se il cambio di stato fa parte di una sequenza di attivazione manuale.
+        Verifica le transizioni OFF->ON o ON->OFF per attivare/disattivare enable_sensor.
+        """
+        # Verifica se l'attivazione manuale è abilitata
+        manual_activation = config.get("enable_manual_activation_light_sensor", "on")
+        if self.get_state(manual_activation) != "on":
+            return False
+
+        # Verifica se siamo in cooldown
+        if light_entity in self.cooldown_flags:
+            self.log(f"🔒 Cooldown attivo per {light_entity}, ignoro sequenza manuale")
+            return False
+
+        # Verifica presenza
+        presence_active = (
+            self.get_state(config["presence_sensor_on"]) == "on" or
+            self.get_state(config["presence_sensor_off"]) == "on"
+        )
+        
+        if not presence_active:
+            return False
+
+        # Verifica che il cambio sia MANUALE
+        if self.is_automation_in_progress(light_entity):
+            return False
+
+        enable_sensor_state = self.get_state(config["enable_sensor"])
+        
+        # Inizializza la sequenza se non esiste
+        if light_entity not in self.manual_activation_sequence:
+            self.manual_activation_sequence[light_entity] = {
+                "step": 0,
+                "target_sequence": None,
+                "start_time": None,
+                "expected_first_transition": None
+            }
+
+        sequence = self.manual_activation_sequence[light_entity]
+        
+        # **LOGICA CORRETTA PER ATTIVAZIONE (enable_sensor OFF)**
+        if enable_sensor_state == "off":
+            # Step 1: Transizione OFF->ON (luce si accende)
+            if old_state == "off" and new_state == "on" and sequence["step"] == 0:
+                sequence["step"] = 1
+                sequence["target_sequence"] = "activate"
+                sequence["start_time"] = self.get_now()
+                sequence["expected_first_transition"] = "off_to_on"
+                self.log(f"🎯 Sequenza attivazione iniziata per {light_entity} (step 1: off->on)")
+                
+                # Avvia timer di timeout (1 secondo)
+                self.timer_manager.start_timer(
+                    key=f"{light_entity}_manual_timeout",
+                    delay=1,
+                    callback=self.reset_manual_sequence,
+                    is_filter=False,
+                    light_entity=light_entity
+                )
+                return True
+                
+            # Step 2: Transizione ON->OFF (luce si spegne) - completa la sequenza
+            elif (old_state == "on" and new_state == "off" and 
+                  sequence["step"] == 1 and 
+                  sequence["target_sequence"] == "activate"):
+                
+                elapsed = (self.get_now() - sequence["start_time"]).total_seconds()
+                if elapsed <= 1.0:
+                    self.log(f"✅ Sequenza attivazione completata per {light_entity} in {elapsed:.2f}s")
+                    self.complete_manual_activation(light_entity, "activate", config)
+                    return True
+                else:
+                    self.log(f"⏰ Sequenza attivazione troppo lenta per {light_entity} ({elapsed:.2f}s)")
+                    self.reset_manual_sequence({"light_entity": light_entity})
+                    return False
+
+        # **LOGICA CORRETTA PER DISATTIVAZIONE (enable_sensor ON)**
+        elif enable_sensor_state == "on":
+            # Step 1: Transizione ON->OFF (luce si spegne)
+            if old_state == "on" and new_state == "off" and sequence["step"] == 0:
+                sequence["step"] = 1
+                sequence["target_sequence"] = "deactivate"
+                sequence["start_time"] = self.get_now()
+                sequence["expected_first_transition"] = "on_to_off"
+                self.log(f"🎯 Sequenza disattivazione iniziata per {light_entity} (step 1: on->off)")
+                
+                # Avvia timer di timeout (1 secondo)
+                self.timer_manager.start_timer(
+                    key=f"{light_entity}_manual_timeout",
+                    delay=1,
+                    callback=self.reset_manual_sequence,
+                    is_filter=False,
+                    light_entity=light_entity
+                )
+                return True
+                
+            # Step 2: Transizione OFF->ON (luce si accende) - completa la sequenza
+            elif (old_state == "off" and new_state == "on" and 
+                  sequence["step"] == 1 and 
+                  sequence["target_sequence"] == "deactivate"):
+                
+                elapsed = (self.get_now() - sequence["start_time"]).total_seconds()
+                if elapsed <= 1.0:
+                    self.log(f"✅ Sequenza disattivazione completata per {light_entity} in {elapsed:.2f}s")
+                    self.complete_manual_activation(light_entity, "deactivate", config)
+                    return True
+                else:
+                    self.log(f"⏰ Sequenza disattivazione troppo lenta per {light_entity} ({elapsed:.2f}s)")
+                    self.reset_manual_sequence({"light_entity": light_entity})
+                    return False
+
+        # Reset se sequenza errata o timeout
+        if sequence["step"] > 0:
+            # Verifica se la transizione è quella corretta per il secondo step
+            if sequence["target_sequence"] == "activate":
+                # Per attivazione: primo step è off->on, secondo step deve essere on->off
+                if sequence["step"] == 1 and not (old_state == "on" and new_state == "off"):
+                    self.log(f"❌ Sequenza attivazione interrotta per {light_entity} (transizione errata: {old_state}->{new_state})")
+                    self.reset_manual_sequence({"light_entity": light_entity})
+            elif sequence["target_sequence"] == "deactivate":
+                # Per disattivazione: primo step è on->off, secondo step deve essere off->on
+                if sequence["step"] == 1 and not (old_state == "off" and new_state == "on"):
+                    self.log(f"❌ Sequenza disattivazione interrotta per {light_entity} (transizione errata: {old_state}->{new_state})")
+                    self.reset_manual_sequence({"light_entity": light_entity})
+        
+        return False
+
+    def complete_manual_activation(self, light_entity, action, config):
+        """
+        Completa la sequenza di attivazione manuale e avvia il blink di conferma.
+        """
+        # Cancella timer di timeout
+        self.timer_manager.cancel_timer(f"{light_entity}_manual_timeout")
+        
+        # Reset sequenza
+        self.reset_manual_sequence({"light_entity": light_entity})
+        
+        # Pausa solo i timer critici
+        self.pause_conflicting_timers(light_entity)
+        
+        if action == "activate":
+            # Attiva enable_sensor e avvia blink di conferma
+            self.turn_on(config["enable_sensor"])
+            self.log(f"🔌 Enable_sensor attivato per {light_entity}")
+            
+            # Blink: conferma attivazione (spenta per 1s, poi accesa finale)
+            self.start_confirmation_blink(light_entity, "off", "on", config)
+            
+        elif action == "deactivate":
+            # Disattiva enable_sensor e avvia blink di conferma  
+            self.turn_off(config["enable_sensor"])
+            self.log(f"⏹️ Enable_sensor disattivato per {light_entity}")
+            
+            # Blink: conferma disattivazione (accesa per 1s, poi spenta finale)
+            self.start_confirmation_blink(light_entity, "on", "off", config)
+
+    def pause_conflicting_timers(self, light_entity):
+        """
+        Pausa temporaneamente solo i timer critici durante l'attivazione manuale.
+        """
+        # Salva lo stato dei timer attivi per ripristinarli dopo
+        if not hasattr(self, 'paused_timers'):
+            self.paused_timers = {}
+        
+        critical_timers = [
+            f"{light_entity}_turn_on_timer",
+            f"{light_entity}_turn_off_timer"
+        ]
+        
+        self.paused_timers[light_entity] = []
+        
+        for timer_key in critical_timers:
+            if self.timer_manager.is_timer_active(timer_key):
+                self.timer_manager.cancel_timer(timer_key)
+                self.paused_timers[light_entity].append(timer_key)
+                self.log(f"⏸️ Timer {timer_key} pausato per attivazione manuale")
+
+    def start_confirmation_blink(self, light_entity, initial_state, final_state, config):
+        """
+        Avvia il blink di conferma per l'attivazione/disattivazione manuale.
+        """
+        # Imposta stato iniziale
+        if initial_state == "on":
+            self.turn_on(light_entity)
+        else:
+            self.turn_off(light_entity)
+        
+        self.log(f"✨ Blink conferma: {light_entity} impostato a {initial_state}")
+        
+        # Avvia il timer per il blink (1 secondo)
+        self.timer_manager.start_timer(
+            key=f"{light_entity}_blink_confirm",
+            delay=1,
+            callback=self.complete_confirmation_blink,
+            is_filter=False,
+            light_entity=light_entity,
+            final_state=final_state,
+            config=config
+        )
+
+    def complete_confirmation_blink(self, kwargs):
+        """
+        Completa il blink di conferma e imposta lo stato finale.
+        """
+        light_entity = kwargs["light_entity"]
+        final_state = kwargs["final_state"]
+        config = kwargs["config"]
+        
+        # Imposta stato finale
+        if final_state == "on":
+            self.turn_on(light_entity)
+            self.log(f"✅ Blink completato: {light_entity} rimane ACCESA (enable_sensor ON)")
+        else:
+            self.turn_off(light_entity)
+            self.log(f"✅ Blink completato: {light_entity} rimane SPENTA (enable_sensor OFF)")
+        
+        # Pulisci i timer pausati
+        if hasattr(self, 'paused_timers') and light_entity in self.paused_timers:
+            del self.paused_timers[light_entity]
+        
+        # Avvia cooldown di 2 secondi
+        self.cooldown_flags[light_entity] = True
+        self.timer_manager.start_timer(
+            key=f"{light_entity}_cooldown",
+            delay=2,
+            callback=self.end_cooldown,
+            is_filter=False,
+            light_entity=light_entity
+        )
+        self.log(f"⏳ Cooldown avviato per {light_entity} (2s)")
+
+    def reset_manual_sequence(self, kwargs):
+        """
+        Resetta la sequenza di attivazione manuale per la luce specificata.
+        """
+        light_entity = kwargs["light_entity"]
+        
+        if light_entity in self.manual_activation_sequence:
+            del self.manual_activation_sequence[light_entity]
+        
+        # Cancella timer di timeout
+        self.timer_manager.cancel_timer(f"{light_entity}_manual_timeout")
+        
+        self.log(f"🔄 Sequenza manuale resettata per {light_entity}")
+
+    def end_cooldown(self, kwargs):
+        """
+        Termina il cooldown per l'attivazione manuale.
+        """
+        light_entity = kwargs["light_entity"]
+        if light_entity in self.cooldown_flags:
+            del self.cooldown_flags[light_entity]
+        self.log(f"✅ Cooldown terminato per {light_entity}")
+
+    def get_now(self):
+        """
+        Ottiene il timestamp corrente.
+        """
+        return datetime.now()
+
+    def is_automation_in_progress(self, light_entity):
+        """
+        Verifica se ci sono automazioni in corso che potrebbero aver causato il cambio di stato.
+        """
+        # Lista dei timer che indicano automazioni in corso
+        automation_timers = [
+            f"{light_entity}_turn_on_timer",
+            f"{light_entity}_turn_off_timer",
+            f"{light_entity}_illuminance_timer"
+        ]
+        
+        for timer_key in automation_timers:
+            if self.timer_manager.is_timer_active(timer_key):
+                return True
+            if self.timer_manager.is_timer_active(timer_key, is_filter=True):
+                return True
+        
+        # Verifica se è stata spenta da illuminanza
+        if self.light_turned_off_by_illuminance.get(light_entity, False):
+            return True
+        
+        return False
