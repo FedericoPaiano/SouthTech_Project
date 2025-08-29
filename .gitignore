@@ -7,3 +7,4 @@ appdaemon/conf/.vscode
 
 # Ignora tutti i file `.log`
 *.log
+appdaemon/appdaemon.yaml
