@@ -137,6 +137,13 @@ function addSystemEventListeners() {
 * 📝 Registra attività utente REALE (CORRETTA)
 */
 function recordUserActivity() {
+  // Se il popup di avviso è già mostrato, ignora qualsiasi altra attività.
+  // L'utente deve interagire esplicitamente con il popup.
+  if (SOUTHTECH_TIMEOUT_V4.state.warningShown) {
+    console.log('🔒 [Timeout v4.1] Warning mostrato, attività ignorata. Interazione con modal richiesta.');
+    return;
+  }
+
   const now = Date.now();
   SOUTHTECH_TIMEOUT_V4.state.lastActivity = now;
   
@@ -146,13 +153,6 @@ function recordUserActivity() {
   
   // Salva anche timestamp globale per controlli cross-tab
   localStorage.setItem('southtech_global_last_activity', now.toString());
-  
-  // ✅ CORREZIONE: Reset warning SOLO per attività REALE dell'utente
-  if (SOUTHTECH_TIMEOUT_V4.state.warningShown) {
-      console.log('📝 [Timeout v4.1] Attività utente REALE rilevata - reset warning valido');
-      hideTimeoutWarning();
-  }
-  
   // Reset timer fallback
   resetFallbackTimer();
   

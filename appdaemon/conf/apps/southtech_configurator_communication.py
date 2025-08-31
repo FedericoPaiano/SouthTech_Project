@@ -336,29 +336,42 @@ class SouthTechConfiguratorCommunication:
             request_data = attrs["attributes"]
             configurations = request_data.get("configurations", [])
             
+            # [FIX] Estrai il request_id per includerlo nella risposta, garantendo che il frontend corretto riceva i dati.
+            request_id = request_data.get("request_id")
+            
             # RICONOSCIMENTO MODALITÀ COMPLETA
             action = request_data.get("action", "save_yaml")
             generate_dashboard = request_data.get("generate_dashboard", False)
             generate_templates = request_data.get("generate_templates", False)
 
-            # --- INIZIO LOGICA MODIFICATA ---
             if action == "save_complete" or generate_dashboard or generate_templates:
-                # Per un salvataggio/pulizia completo, una lista vuota è valida.
                 self.configurator.log("✨ SENSOR: Richiesta SALVATAGGIO COMPLETO/PULIZIA rilevata")
                 result = self.configurator.yaml.execute_complete_save_advanced("sensor", configurations, request_data)
+            
+            elif action.startswith("save_") and action.endswith("_only"):
+                file_type = action.replace("save_", "").replace("_only", "")
+                self.configurator.log(f"📡 SENSOR: Richiesta salvataggio SPECIFICO per '{file_type}'")
+                result = self.configurator.yaml.execute_single_file_save("sensor", file_type, request_data)
+            
+            elif action == "preview":
+                self.configurator.log("🔍 SENSOR: Richiesta ANTEPRIMA rilevata")
+                # Chiama il nuovo metodo centralizzato per generare le anteprime
+                result = self.configurator.yaml.execute_preview_generation(configurations)
+
             else:
-                # Per un salvataggio standard, le configurazioni sono necessarie.
                 if not configurations:
                     self.create_sensor_save_response({
                         "success": False, 
                         "error": "Configurazioni mancanti per un salvataggio standard."
                     })
                     return
-
                 self.configurator.log("📡 SENSOR: Richiesta salvataggio STANDARD")
                 result = self.configurator.yaml.execute_save_advanced("sensor", configurations, request_data)
-            # --- FINE LOGICA MODIFICATA ---
             
+            # [FIX] Aggiungi il request_id al risultato prima di inviare la risposta.
+            if request_id and isinstance(result, dict):
+                result["request_id"] = request_id
+
             # Invia risposta
             self.create_sensor_save_response(result)
             self.configurator.set_state("sensor.southtech_save_request", state="completed")

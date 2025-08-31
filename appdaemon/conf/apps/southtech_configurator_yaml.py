@@ -476,7 +476,7 @@ class SouthTechConfiguratorYaml:
             )
             
             # 8. Salvataggio atomico e sicuro
-            self.atomic_file_write(new_content)
+            self.atomic_file_write(new_content, self.configurator.apps_yaml_path)
             
             # 9. Verifica post-salvataggio
             self.verify_yaml_integrity(self.configurator.apps_yaml_path)
@@ -516,6 +516,60 @@ class SouthTechConfiguratorYaml:
                 "timestamp": datetime.now().isoformat(),
                 "backup_created": backup_info.get("backup_created", False) if 'backup_info' in locals() else False,
                 "backup_skipped": skip_backup
+            }
+
+    def execute_single_file_save(self, method_type, file_type, request_data):
+        """
+        [MODIFIED] Esegue il salvataggio di un singolo file/componente di configurazione,
+        applicando la logica di generazione e backup appropriata.
+        """
+        try:
+            self.configurator.log(f"💾 SINGLE SAVE ({method_type.upper()}): Inizio salvataggio per '{file_type}'")
+            start_time = time.time()
+            
+            configurations = request_data.get("configurations", [])
+            
+            # Esegui l'operazione specifica per il tipo di file
+            if file_type == 'apps':
+                result = self.process_apps_yaml_advanced(configurations, skip_backup=False)
+            elif file_type == 'templates':
+                result = self.configurator.dashboard.generate_template_sensors(configurations, skip_backup=False)
+            elif file_type == 'configuration':
+                result = self.configurator.dashboard.update_configuration_yaml(skip_backup=False)
+            elif file_type == 'dashboard':
+                # Questo salva tutti i file della dashboard (principale, index, e singoli)
+                main_result = self.configurator.dashboard.generate_main_dashboard(configurations, skip_backup=False)
+                lights_result = self.configurator.dashboard.generate_light_config_files(configurations, skip_backup=False)
+                
+                # Combina i risultati
+                success = main_result.get("success") and lights_result.get("success")
+                result = {
+                    "success": success,
+                    "message": "File dashboard generati." if success else "Errore generazione dashboard.",
+                    "details": {
+                        "main_dashboard": main_result,
+                        "light_configs": lights_result
+                    },
+                    "error": main_result.get("error") or lights_result.get("error")
+                }
+            else:
+                raise ValueError(f"Tipo di file non valido per salvataggio singolo: {file_type}")
+
+            operation_duration = round(time.time() - start_time, 2)
+            # Aggiungi metadati comuni al risultato
+            if isinstance(result, dict):
+                result['operation_duration'] = operation_duration
+                result['method'] = f"{method_type}_single_save"
+                result['file_type'] = file_type
+
+            return result
+
+        except Exception as e:
+            self.configurator.error(f"❌ SINGLE SAVE: Errore salvataggio '{file_type}': {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "file_type": file_type
             }
 
     def execute_save_advanced(self, method_type, configurations, request_data):
@@ -582,7 +636,6 @@ class SouthTechConfiguratorYaml:
                 apps_result = self.process_apps_yaml_advanced(configurations, skip_backup=True)
                 
                 if not apps_result.get("success"):
-                    self.configurator.security.record_attempt(user_id, f"{method_type}_complete_save", False)
                     return {
                         "success": False,
                         "error": f"Errore apps.yaml: {apps_result.get('error')}",
@@ -675,18 +728,46 @@ class SouthTechConfiguratorYaml:
             
             # Aggiungi i details dashboard se esistono
             dashboard_details = dashboard_result.get("details", {})
-            if dashboard_details:
+            if dashboard_details:                
                 # Aggiungi flag backup_skipped a tutti i componenti dashboard
                 for component_key, component_details in dashboard_details.items():
                     if isinstance(component_details, dict):
                         component_details["backup_skipped"] = True
                 unified_details.update(dashboard_details)
             
-            # Calcola successo basato su 4 componenti
+            # --- INIZIO BLOCCO DI ASSEMBLAGGIO ROBUSTO (v4) ---
+            # STEP 1: Calcola lo stato di successo per ogni componente in modo esplicito
             apps_success = apps_result.get("success", False)
             templates_success = unified_details.get("templates", {}).get("success", False)
             config_success = unified_details.get("configuration", {}).get("success", False)
-            dashboard_files_success = unified_details.get("dashboard", {}).get("success", False)
+            
+            dashboard_main_success = unified_details.get("dashboard", {}).get("success", False)
+            lights_config_success = unified_details.get("lights_config", {}).get("success", False)
+            dashboard_files_success = dashboard_main_success and lights_config_success
+
+            # STEP 2: Crea un dizionario "pulito" da zero, garantendo la struttura a 4 chiavi
+            # che il frontend si aspetta.
+            rebuilt_details = {
+                "apps": unified_details.get("apps", {}),
+                "templates": unified_details.get("templates", {}),
+                "configuration": unified_details.get("configuration", {}),
+                "dashboard": {
+                    "success": dashboard_files_success,
+                    "details": {
+                        "main": unified_details.get("dashboard", {}),
+                        "lights": unified_details.get("lights_config", {})
+                    },
+                    "backup_skipped": unified_details.get("dashboard", {}).get("backup_skipped", True)
+                }
+            }
+            if not dashboard_files_success:
+                main_err = unified_details.get("dashboard", {}).get('error', 'N/A')
+                lights_err = unified_details.get("lights_config", {}).get('error', 'N/A')
+                rebuilt_details["dashboard"]["error"] = f"Main: {main_err}; Lights: {lights_err}"
+            
+            # STEP 3: Sovrascrivi il dizionario "sporco" con quello "pulito". Questo è il fix cruciale.
+            unified_details = rebuilt_details
+            # --- FINE BLOCCO DI ASSEMBLAGGIO ROBUSTO (v4) ---
             
             # Conta componenti riusciti (su 4 totali)
             successful_components = sum([apps_success, templates_success, config_success, dashboard_files_success])
@@ -864,65 +945,44 @@ class SouthTechConfiguratorYaml:
                 "backup_error": "Critical error prevented backup"
             }
 
-    def execute_yaml_save_websocket(self, yaml_content, configurations, user_id):
+    def execute_preview_generation(self, configurations):
         """
-        Esegue il salvataggio YAML per richiesta WebSocket
+        [NUOVO] Genera un'anteprima "a secco" di tutte le configurazioni senza salvarle.
+        Questa è la nuova fonte di verità per l'anteprima, usata sia dall'API che dai sensori.
         """
         try:
-            self.configurator.log("💾 WEBSOCKET: Inizio salvataggio apps.yaml...") # Correzione qui
-            
-            # 1. Backup se file esiste
-            backup_file = None
-            if os.path.exists(self.configurator.apps_yaml_path):
-                backup_file = self.configurator.create_backup()
-                self.configurator.log(f"📦 Backup creato: {backup_file}") # Correzione qui
-            
-            # 2. Salva contenuto usando metodo esistente
-            self.save_yaml_content_safe(yaml_content)
-            
-            # 3. Verifica file salvato
-            self.verify_saved_file(yaml_content)
-            
-            # 4. Genera helper opzionali
-            helpers_created = 0
-            try:
-                helpers_created = self.configurator.generate_helpers_sync(configurations)
-            except Exception as e:
-                self.configurator.log(f"⚠️ Warning generazione helper: {e}") # Correzione qui
-            
-            # 5. Risultato successo
-            result = {
+            self.configurator.log(f"🔍 PREVIEW: Generazione anteprima per {len(configurations)} configurazioni.")
+            start_time = time.time()
+
+            # Chiama i metodi di generazione esistenti per creare il codice di anteprima
+            apps_yaml_preview = self.generate_light_control_section(configurations)
+            templates_yaml_preview = self.configurator.dashboard.create_templates_content(configurations)
+            main_dashboard_preview = self.configurator.dashboard.create_main_dashboard_content(configurations)
+            configuration_yaml_preview = self.configurator.dashboard.create_configuration_yaml_entry_content()
+
+            operation_duration = round(time.time() - start_time, 2)
+
+            # Assembla la risposta JSON
+            response_data = {
                 "success": True,
-                "message": "Configurazione salvata con successo via WebSocket",
-                "method": "websocket_direct",
-                "backup_created": backup_file is not None,
-                "backup_file": backup_file,
-                "helpers_created": helpers_created,
-                "configurations_count": len(configurations),
-                "file_path": self.configurator.apps_yaml_path,
-                "file_size": os.path.getsize(self.configurator.apps_yaml_path),
+                "previews": {
+                    "apps_yaml": apps_yaml_preview,
+                    "templates_yaml": templates_yaml_preview,
+                    "dashboard_yaml": main_dashboard_preview,
+                    "configuration_yaml": configuration_yaml_preview
+                },
                 "timestamp": datetime.now().isoformat(),
-                "user_id": user_id[:20]
+                "operation_duration": operation_duration,
+                "method": "preview_generation"
             }
             
-            self.configurator.log("✅ WEBSOCKET: Salvataggio completato con successo") # Correzione qui
-            
-            # Notifica successo
-            self.configurator.security.create_ha_notification(
-                "✅ SouthTech: Configurazione Salvata",
-                f"Apps.yaml aggiornato con {len(configurations)} configurazioni via WebSocket"
-            )
-            
-            return result
-            
+            return response_data
+
         except Exception as e:
-            self.configurator.error(f"❌ WEBSOCKET: Errore durante salvataggio: {e}") # Correzione qui
-            return {
-                "success": False,
-                "error": str(e),
-                "method": "websocket_error",
-                "timestamp": datetime.now().isoformat()
-            }
+            self.configurator.error(f"❌ PREVIEW: Errore durante la generazione dell'anteprima: {e}")
+            import traceback
+            self.configurator.error(traceback.format_exc())
+            return {"success": False, "error": str(e)}
 
     def execute_yaml_save_sensor(self, yaml_content, configurations, user_id):
         """Esegue il salvataggio YAML per comando sensore (versione corretta)"""
@@ -1017,9 +1077,9 @@ class SouthTechConfiguratorYaml:
         self.configurator.log(f"✅ Validazione: {len(valid_configs)}/{len(configurations)} configurazioni valide") # Correzione qui
         return valid_configs
 
-    def atomic_file_write(self, content):
+    def atomic_file_write(self, content, target_path):
         """Scrittura atomica del file per evitare corruzioni"""
-        temp_path = self.configurator.apps_yaml_path + ".tmp_atomic"
+        temp_path = target_path + ".tmp_atomic"
         
         try:
             # Scrivi in file temporaneo
@@ -1034,42 +1094,14 @@ class SouthTechConfiguratorYaml:
                 raise Exception("Contenuto file temporaneo non corrisponde")
             
             # Sostituisci atomicamente
-            os.replace(temp_path, self.configurator.apps_yaml_path)
-            self.configurator.log("💾 Scrittura atomica completata") # Correzione qui
+            os.replace(temp_path, target_path)
+            self.configurator.log(f"💾 Scrittura atomica completata per {target_path}")
             
         except Exception as e:
             # Pulizia in caso di errore
             if os.path.exists(temp_path):
                 try:
                     os.remove(temp_path)
-                except:
-                    pass
-            raise
-
-    def atomic_yaml_write(self, content):
-        """Scrittura atomica del file YAML"""
-        temp_file = self.configurator.apps_yaml_path + ".tmp_write"
-        
-        try:
-            # Scrivi in file temporaneo
-            with open(temp_file, 'w', encoding='utf-8') as f:
-                f.write(content)
-            
-            # Verifica contenuto
-            with open(temp_file, 'r', encoding='utf-8') as f:
-                verify_content = f.read()
-            
-            if verify_content != content:
-                raise Exception("Verifica contenuto fallita")
-            
-            # Sostituisci atomicamente
-            os.replace(temp_file, self.configurator.apps_yaml_path)
-            
-        except Exception as e:
-            # Cleanup in caso di errore
-            if os.path.exists(temp_file):
-                try:
-                    os.remove(temp_file)
                 except:
                     pass
             raise

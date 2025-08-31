@@ -408,6 +408,11 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link" id="configuration-yaml-tab" data-bs-toggle="tab" data-bs-target="#configuration-yaml-content" type="button" role="tab">
+                    <i class="fas fa-file-alt"></i> Configuration.yaml
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="dashboard-yaml-tab" data-bs-toggle="tab" data-bs-target="#dashboard-yaml-content" type="button" role="tab">
                     <i class="fas fa-file-code"></i> Dashboard.yaml
                 </button>
@@ -432,7 +437,7 @@
                     <button class="btn btn-warning btn-lg me-2" style="height: 48px;" onclick="downloadAppsYAML()">
                         <i class="fas fa-download"></i> Scarica apps.yaml
                     </button>
-                    <button class="btn btn-info btn-lg me-2" style="height: 48px;" onclick="saveAppsYAMLOnly()">
+                    <button class="btn btn-info btn-lg me-2" style="height: 48px;" onclick="showSpecificSaveConfirmation('apps')">
                         <i class="fas fa-file-upload"></i> Salva Configurazione Apps.yaml
                     </button>
                     <button class="btn btn-success btn-lg" style="height: 48px;" onclick="saveCompleteConfiguration()">
@@ -443,27 +448,51 @@
             
             <!-- Templates YAML Tab -->
             <div class="tab-pane fade" id="templates-yaml-content" role="tabpanel">
-                <div class="yaml-output" id="templatesYamlCode"></div>
-                <div class="yaml-stats" id="templatesYamlStats"></div>
-                <div class="mt-3">
-                    <button class="btn btn-primary btn-lg me-2" style="height: 48px;" onclick="copyTemplatesYAML()">
-                        <i class="fas fa-copy"></i> Copia Templates.yaml
-                    </button>
-                    <button class="btn btn-warning btn-lg me-2" style="height: 48px;" onclick="downloadTemplatesYAML()">
-                        <i class="fas fa-download"></i> Scarica templates.yaml
-                    </button>
-                    <button class="btn btn-info btn-lg me-2" style="height: 48px;" onclick="saveTemplatesYAMLOnly()">
-                        <i class="fas fa-file-upload"></i> Salva Configurazione Templates.yaml
-                    </button>
-                    <button class="btn btn-success btn-lg" style="height: 48px;" onclick="saveCompleteConfiguration()">
-                        <i class="fas fa-save"></i> Salva Configurazione Completa
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Dashboard YAML Tab -->
-            <div class="tab-pane fade" id="dashboard-yaml-content" role="tabpanel">
-                <div class="yaml-output" id="dashboardYamlCode"></div>
+              <div class="yaml-output" id="templatesYamlCode"></div>
+              <div class="yaml-stats" id="templatesYamlStats"></div>
+              <div class="mt-3">
+                  <button class="btn btn-primary btn-lg me-2" style="height: 48px;" onclick="copyTemplatesYAML()">
+                      <i class="fas fa-copy"></i> Copia Templates.yaml
+                  </button>
+                  <button class="btn btn-warning btn-lg me-2" style="height: 48px;" onclick="downloadTemplatesYAML()">
+                      <i class="fas fa-download"></i> Scarica templates.yaml
+                  </button>
+                  <button class="btn btn-info btn-lg me-2" style="height: 48px;" onclick="showSpecificSaveConfirmation('templates')">
+                      <i class="fas fa-file-upload"></i> Salva Configurazione Templates.yaml
+                  </button>
+                  <button class="btn btn-success btn-lg" style="height: 48px;" onclick="saveCompleteConfiguration()">
+                      <i class="fas fa-save"></i> Salva Configurazione Completa
+                  </button>
+              </div>
+          </div>
+          
+          <!-- Configuration YAML Tab -->
+          <div class="tab-pane fade" id="configuration-yaml-content" role="tabpanel">
+              <div class="yaml-output" id="configurationYamlCode"></div>
+              <div class="yaml-stats" id="configurationYamlStats"></div>
+              <div class="alert alert-info mt-3">
+                  <i class="fas fa-info-circle me-2"></i>
+                  <strong>Nota:</strong> Questo blocco di codice va aggiunto una sola volta al tuo file <code>configuration.yaml</code>.
+              </div>
+              <div class="mt-3">
+                  <button class="btn btn-primary btn-lg me-2" style="height: 48px;" onclick="copyConfigurationYAML()">
+                      <i class="fas fa-copy"></i> Copia Configuration.yaml
+                  </button>
+                  <button class="btn btn-warning btn-lg me-2" style="height: 48px;" onclick="downloadConfigurationYAML()">
+                      <i class="fas fa-download"></i> Scarica configuration.yaml
+                  </button>
+                  <button class="btn btn-info btn-lg me-2" style="height: 48px;" onclick="showSpecificSaveConfirmation('configuration')">
+                      <i class="fas fa-file-upload"></i> Salva Configurazione Configuration.yaml
+                  </button>
+                  <button class="btn btn-success btn-lg" style="height: 48px;" onclick="saveCompleteConfiguration()">
+                      <i class="fas fa-save"></i> Salva Configurazione Completa
+                  </button>
+              </div>
+          </div>
+
+          <!-- Dashboard YAML Tab -->
+          <div class="tab-pane fade" id="dashboard-yaml-content" role="tabpanel">
+              <div class="yaml-output" id="dashboardYamlCode"></div>
                 <div class="yaml-stats" id="dashboardYamlStats"></div>
                 <div class="mt-3">
                     <button class="btn btn-primary btn-lg me-2" style="height: 48px;" onclick="copyDashboardYAML()">
@@ -472,7 +501,7 @@
                     <button class="btn btn-warning btn-lg me-2" style="height: 48px;" onclick="downloadDashboardYAML()">
                         <i class="fas fa-download"></i> Scarica ui-lovelace-light-presence.yaml
                     </button>
-                    <button class="btn btn-info btn-lg me-2" style="height: 48px;" onclick="saveDashboardYAMLOnly()">
+                    <button class="btn btn-info btn-lg me-2" style="height: 48px;" onclick="showSpecificSaveConfirmation('dashboard')">
                         <i class="fas fa-file-upload"></i> Salva Configurazione Dashboard.yaml
                     </button>
                     <button class="btn btn-success btn-lg" style="height: 48px;" onclick="saveCompleteConfiguration()">
@@ -506,8 +535,6 @@
 
     <script>
         // Configurazione API
-        const APPDAEMON_API_URL = `${window.location.protocol}//${window.location.hostname}:5050/api/appdaemon`;
-        
         let haAreasRegistry = [];
         let haEntityRegistry = [];
         let haDeviceRegistry = [];
@@ -633,6 +660,86 @@
                 return `${baseName} (${entityArea})`;
             } else {
                 return `${baseName} (Area non assegnata)`;
+            }
+        }
+
+        // ====================================================================
+        // NUOVO SISTEMA DI COMUNICAZIONE VIA SENSORI
+        // ====================================================================
+
+        /**
+         * [NUOVA FUNZIONE HELPER - CORRETTA v2]
+         * Gestisce la comunicazione con il backend usando i sensori di Home Assistant.
+         * Utilizza il metodo POST diretto all'endpoint /api/states/ per coerenza
+         * con le altre funzioni del sistema (es. sync e login).
+         * @param {string} action - Il tipo di azione (es. 'preview', 'save').
+         * @param {object} payload - I dati da inviare al backend.
+         * @param {number} timeoutSeconds - Il tempo massimo di attesa per una risposta.
+         * @returns {Promise<object>} - Una promessa che si risolve con la risposta del backend.
+         */
+        async function communicateViaSensors(action, payload, timeoutSeconds = 30) {
+            const requestId = `${action}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const requestSensor = `sensor.southtech_${action}_request`;
+            const responseSensor = `sensor.southtech_${action}_response`;
+
+            console.log(`📡 SENSOR COMM: Avvio azione '${action}' (ID: ${requestId})`);
+
+            try {
+                // 1. Invia la richiesta scrivendo sul sensore tramite l'API REST di Home Assistant
+                // [CORREZIONE] Utilizziamo il metodo POST diretto a /api/states/<entity_id>
+                // che è lo stesso metodo usato con successo dalle funzioni di sync e login.
+                const requestPayload = {
+                    state: 'pending',
+                    attributes: {
+                        ...payload,
+                        request_id: requestId,
+                        timestamp: new Date().toISOString(),
+                        browser_id: browserId
+                    }
+                };
+
+                const setServiceResponse = await fetch(`/api/states/${requestSensor}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${haToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestPayload)
+                });
+
+                if (!setServiceResponse.ok) {
+                    let errorDetails = setServiceResponse.statusText;
+                    try {
+                        const errorJson = await setServiceResponse.json();
+                        errorDetails = errorJson.message || errorDetails;
+                    } catch (e) {}
+                    throw new Error(`Errore nell'invio della richiesta al sensore: ${errorDetails}`);
+                }
+
+                // 2. Attendi la risposta dal sensore di risposta (logica invariata)
+                const maxAttempts = timeoutSeconds;
+                for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    const getStateResponse = await fetch(`/api/states/${responseSensor}`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${haToken}`
+                        }
+                    });
+
+                    if (getStateResponse.ok) {
+                        const responseState = await getStateResponse.json();
+                        if (responseState && responseState.state === 'completed' && responseState.attributes.request_id === requestId) {
+                            console.log(`✅ SENSOR COMM: Risposta ricevuta per '${action}'`, responseState.attributes);
+                            return responseState.attributes;
+                        }
+                    }
+                }
+                throw new Error(`Timeout: Nessuna risposta dal backend per l'azione '${action}' entro ${timeoutSeconds} secondi.`);
+            } catch (error) {
+                console.error(`❌ SENSOR COMM: Errore durante l'azione '${action}':`, error);
+                throw error;
             }
         }
 
@@ -1360,28 +1467,25 @@
             
             if (incompatibleFields.length > 0) {
                 // Mostra avviso di conferma
-                const fieldsList = incompatibleFields.map(field => 
-                    `- ${field.label}: ${field.entityName}`
-                ).join('\n');
-                
-                const message = `I seguenti campi non appartengono all'area "${selectedArea}":\n\n${fieldsList}\n\nConfermi il reset di questi campi?`;
+                const message = `Hai selezionato un'area diversa da quella di alcune entità già inserite.
+                                 <br><br>Le entità esistenti <strong>non verranno cancellate</strong>, ma i menu a tendina verranno aggiornati per mostrare le entità della nuova area.
+                                 <br><br>Vuoi continuare?`;
                 
                 SouthTechUI.showConfirmDialog(
-                    'Campi Incompatibili',
-                    `I seguenti campi non appartengono all'area "${selectedArea}":\n\n${fieldsList}\n\nConfermi il reset di questi campi?`,
+                    'Cambio Area',
+                    message,
                     {
-                        confirmText: 'Sì, Reset',
+                        confirmText: 'Continua',
                         cancelText: 'Annulla',
-                        confirmClass: 'btn-warning',
+                        confirmClass: 'btn-primary',
                         cancelClass: 'btn-secondary',
                         onConfirm: () => {
-                            // Reset campi incompatibili
-                            incompatibleFields.forEach(field => {
-                                config[field.field] = '';
-                            });
-                            
-                            console.log(`✅ Reset ${incompatibleFields.length} campi incompatibili`);
-                            SouthTechUI.showAlert(`Reset ${incompatibleFields.length} campi incompatibili con l'area "${selectedArea}"`, 'info');
+                            // [MODIFICA] Non resettare più i campi.
+                            // Semplicemente aggiorna l'area selezionata e ricarica l'interfaccia.
+                            // La funzione filterEntitiesWithExisting si occuperà di mantenere
+                            // le selezioni esistenti nei dropdown.
+                            console.log(`✅ Cambio area confermato. Le entità esistenti verranno mantenute.`);
+                            SouthTechUI.showAlert(`Area cambiata in "${selectedArea}". Le selezioni precedenti sono state mantenute.`, 'info');
                             
                             // Aggiorna configurazione con area selezionata
                             config.selected_area = selectedArea;
@@ -1390,12 +1494,9 @@
                             updateConfigurationsList();
                         },
                         onCancel: () => {
-                            // Annulla cambio area - ripristina valore precedente
-                            const areaSelect = document.querySelector(`#areaSelect_${configIndex}`);
-                            if (areaSelect) {
-                                const detectedArea = detectConfigurationArea(config);
-                                areaSelect.value = detectedArea || '';
-                            }
+                            // Annulla cambio area - ripristina il valore precedente
+                            // semplicemente ridisegnando l'interfaccia. Il modello dati non è stato modificato.
+                            updateConfigurationsList();
                         }
                     }
                 );
@@ -1838,7 +1939,10 @@
             
             // Rileva area automatica della configurazione
             const detectedArea = detectConfigurationArea(config);
-            const selectedArea = config.selected_area || detectedArea || '';
+            // FIX: Rispetta la selezione esplicita dell'utente (anche se vuota), altrimenti usa l'area rilevata.
+            const selectedArea = (config.selected_area !== undefined && config.selected_area !== null) 
+                                 ? config.selected_area 
+                                 : (detectedArea || '');
             
             // Ottieni lista aree disponibili
             const availableAreas = extractUniqueAreas();
@@ -2365,84 +2469,77 @@
                     appsError, templatesError, configError, dashboardError,
                     configCount, totalSensors } = states;
             
+            // Helper to generate a single card
+            const createCard = (title, iconClass, success, countText, errorText) => {
+                let cardClass, badgeClass, badgeText, errorHtml;
+
+                if (success === true) {
+                    cardClass = 'border-success';
+                    badgeClass = 'bg-success';
+                    badgeText = countText;
+                    errorHtml = '';
+                } else if (success === false) {
+                    cardClass = 'border-danger';
+                    badgeClass = 'bg-danger';
+                    badgeText = 'Errore';
+                    errorHtml = `<div class="small text-danger mt-2" style="max-height: 60px; overflow-y: auto;">${(errorText || '').substring(0, 100)}</div>`;
+                } else { // success is null (Not Applicable)
+                    cardClass = 'border-secondary opacity-50';
+                    badgeClass = 'bg-secondary';
+                    badgeText = 'Non salvato';
+                    errorHtml = '';
+                }
+
+                return `
+                    <div class="col-md-3 text-center mb-3">
+                        <div class="card ${cardClass}">
+                            <div class="card-body">
+                                <i class="${iconClass} fa-2x mb-2"></i>
+                                <h6>${title}</h6>
+                                <span class="badge ${badgeClass}">${badgeText}</span>
+                                ${errorHtml}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            };
+
             return `
                 <div class="row">
-                    <!-- 1. Apps.yaml -->
-                    <div class="col-md-3 text-center mb-3">
-                        <div class="card border-${appsSuccess ? 'primary' : 'danger'}">
-                            <div class="card-body">
-                                <i class="fas fa-cog fa-2x ${appsSuccess ? 'text-primary' : 'text-danger'} mb-2"></i>
-                                <h6>Apps.yaml</h6>
-                                <span class="badge bg-${appsSuccess ? 'primary' : 'danger'}">
-                                    ${appsSuccess ? `${configCount} config` : 'Errore'}
-                                </span>
-                                ${!appsSuccess ? `
-                                    <div class="small text-danger mt-2" style="max-height: 60px; overflow-y: auto;">
-                                        ${appsError.substring(0, 100)}${appsError.length > 100 ? '...' : ''}
-                                    </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 2. Templates.yaml -->
-                    <div class="col-md-3 text-center mb-3">
-                        <div class="card border-${templatesSuccess ? 'success' : 'danger'}">
-                            <div class="card-body">
-                                <i class="fas fa-puzzle-piece fa-2x ${templatesSuccess ? 'text-success' : 'text-danger'} mb-2"></i>
-                                <h6>Templates.yaml</h6>
-                                <span class="badge bg-${templatesSuccess ? 'success' : 'danger'}">
-                                    ${templatesSuccess ? `${totalSensors} sensori` : 'Errore'}
-                                </span>
-                                ${!templatesSuccess ? `
-                                    <div class="small text-danger mt-2" style="max-height: 60px; overflow-y: auto;">
-                                        ${templatesError.substring(0, 100)}${templatesError.length > 100 ? '...' : ''}
-                                    </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 3. Configuration.yaml -->
-                    <div class="col-md-3 text-center mb-3">
-                        <div class="card border-${configSuccess ? 'warning' : 'danger'}">
-                            <div class="card-body">
-                                <i class="fas fa-file-code fa-2x ${configSuccess ? 'text-warning' : 'text-danger'} mb-2"></i>
-                                <h6>Configuration.yaml</h6>
-                                <span class="badge bg-${configSuccess ? 'warning' : 'danger'}">
-                                    ${configSuccess ? 'Aggiornato' : 'Manuale'}
-                                </span>
-                                ${!configSuccess ? `
-                                    <div class="small text-warning mt-2" style="max-height: 60px; overflow-y: auto;">
-                                        ${configError.substring(0, 100)}${configError.length > 100 ? '...' : ''}
-                                    </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 4. Dashboard -->
-                    <div class="col-md-3 text-center mb-3">
-                        <div class="card border-${dashboardSuccess ? 'info' : 'danger'}">
-                            <div class="card-body">
-                                <i class="fas fa-tachometer-alt fa-2x ${dashboardSuccess ? 'text-info' : 'text-danger'} mb-2"></i>
-                                <h6>Dashboard</h6>
-                                <span class="badge bg-${dashboardSuccess ? 'info' : 'danger'}">
-                                    ${dashboardSuccess ? `${configCount} pannelli` : 'Errore'}
-                                </span>
-                                ${!dashboardSuccess ? `
-                                    <div class="small text-danger mt-2" style="max-height: 60px; overflow-y: auto;">
-                                        ${dashboardError.substring(0, 100)}${dashboardError.length > 100 ? '...' : ''}
-                                    </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
+                    ${createCard('Apps.yaml', 'fas fa-cog text-primary', states.appsSuccess, `${configCount} config`, states.appsError)}
+                    ${createCard('Templates.yaml', 'fas fa-puzzle-piece text-success', states.templatesSuccess, `${totalSensors} sensori`, states.templatesError)}
+                    ${createCard('Configuration.yaml', 'fas fa-file-code text-warning', states.configSuccess, 'Aggiornato', states.configError)}
+                    ${createCard('Dashboard', 'fas fa-tachometer-alt text-info', states.dashboardSuccess, `${configCount} pannelli`, states.dashboardError)}
                 </div>
             `;
         }
 
         function createUniversalStatusSummary(result, states) {
+            // [FIX] Detect single file save via file_type
+            const fileType = result.file_type;
+
+            if (fileType) {
+                // Single file save view
+                const success = result.success;
+                const alertClass = success ? 'alert-success' : 'alert-danger';
+                const icon = success ? 'fas fa-check-circle' : 'fas fa-times-circle';
+                const friendlyName = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+                const title = success ? `Salvataggio ${friendlyName}.yaml Riuscito` : `Salvataggio ${friendlyName}.yaml Fallito`;
+                const message = success ? `Il file è stato aggiornato correttamente sul server.` : `Si è verificato un errore: ${result.error || 'Dettaglio non disponibile'}`;
+
+                return `
+                    <div class="alert ${alertClass} text-center">
+                        <i class="${icon} fa-3x mb-3"></i>
+                        <h4>${title}</h4>
+                        <p>${message}</p>
+                    </div>
+                `;
+            }
+
+            // Complete save view (existing logic)
+            const { appsSuccess, templatesSuccess, configSuccess, dashboardSuccess,
+                    appsError, templatesError, configError, dashboardError,
+                    configCount, totalSensors } = states;
             const successCount = [states.appsSuccess, states.templatesSuccess, states.configSuccess, states.dashboardSuccess].filter(Boolean).length;
             const alertClass = successCount >= 3 ? 'alert-success' : (successCount >= 2 ? 'alert-warning' : 'alert-danger');
             const icon = successCount >= 3 ? 'fas fa-check-circle' : (successCount >= 2 ? 'fas fa-exclamation-triangle' : 'fas fa-times-circle');
@@ -2515,12 +2612,9 @@
             await copyAppsYAML();
         }
 
-        /**
-        * 📋 Funzioni di copia per ogni file YAML
-        */
         async function copyDashboardYAML() {
             try {
-                const dashboardContent = generateDashboardYAML();
+                const dashboardContent = document.getElementById('dashboardYamlCode').textContent;
                 await navigator.clipboard.writeText(dashboardContent);
                 SouthTechUI.showAlert('📋 Dashboard.yaml copiato negli appunti!', 'success', 3000);
             } catch (error) {
@@ -2529,11 +2623,22 @@
             }
         }
 
+        async function copyConfigurationYAML() {
+            try {
+                const configContent = document.getElementById('configurationYamlCode').textContent;
+                await navigator.clipboard.writeText(configContent);
+                SouthTechUI.showAlert('📋 Configuration.yaml copiato negli appunti!', 'success', 3000);
+            } catch (error) {
+                console.error('Errore copia Configuration.yaml:', error);
+                SouthTechUI.showAlert('❌ Errore copia Configuration.yaml', 'error');
+            }
+        }
+
         /**
         * 📁 Funzioni di download per ogni file YAML
         */
         function downloadDashboardYAML() {
-            const dashboardContent = generateDashboardYAML();
+            const dashboardContent = document.getElementById('dashboardYamlCode').textContent;
             const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
             const filename = `ui-lovelace-light-presence_${timestamp}.yaml`;
             
@@ -2552,7 +2657,7 @@
         }
 
         function downloadTemplatesYAML() {
-            const templatesContent = generateTemplatesYAML();
+            const templatesContent = document.getElementById('templatesYamlCode').textContent;
             const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
             const filename = `templates_${timestamp}.yaml`;
             
@@ -2570,8 +2675,27 @@
             SouthTechUI.showAlert(`📁 File scaricato: ${filename}`, 'success');
         }
 
+        function downloadConfigurationYAML() {
+            const configContent = document.getElementById('configurationYamlCode').textContent;
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            const filename = `configuration_entry_${timestamp}.yaml`;
+            
+            const blob = new Blob([configContent], { type: 'text/yaml' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            SouthTechUI.showAlert(`📁 File scaricato: ${filename}`, 'success');
+        }
+
         function downloadAppsYAML() {
-            const appsContent = generateYAMLContent();
+            const appsContent = document.getElementById('yamlCode').textContent;
             const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
             const filename = `apps_${timestamp}.yaml`;
             
@@ -2605,7 +2729,7 @@
 
         async function copyDashboardYAML() {
             try {
-                const dashboardContent = generateDashboardYAML(); // Rigenera per sicurezza
+                const dashboardContent = document.getElementById('dashboardYamlCode').textContent;
                 await navigator.clipboard.writeText(dashboardContent);
                 SouthTechUI.showAlert('📋 Dashboard.yaml copiato negli appunti!', 'success', 3000);
             } catch (error) {
@@ -2616,7 +2740,7 @@
 
         async function copyTemplatesYAML() {
             try {
-                const templatesContent = generateTemplatesYAML(); // Rigenera per sicurezza
+                const templatesContent = document.getElementById('templatesYamlCode').textContent;
                 await navigator.clipboard.writeText(templatesContent);
                 SouthTechUI.showAlert('📋 Templates.yaml copiato negli appunti!', 'success', 3000);
             } catch (error) {
@@ -3871,7 +3995,26 @@
                     `;
                 }
                 
-                // 4. Tab Preview Dashboard (logica invariata, è solo HTML)
+                // 4. Configuration.yaml
+                const configurationYamlElement = document.getElementById('configurationYamlCode');
+                const configurationStatsElement = document.getElementById('configurationYamlStats');
+                if (configurationYamlElement && configurationStatsElement) {
+                    const content = previews.configuration_yaml || '';
+                    configurationYamlElement.textContent = content;
+
+                    const lines = content.split('\n').length;
+                    const size = (content.length / 1024).toFixed(1);
+
+                    configurationStatsElement.innerHTML = `
+                        <div class="small text-muted mt-2">
+                            📄 <strong>${lines}</strong> righe • 
+                            💾 <strong>${size} KB</strong> • 
+                            ⚙️ <strong>1</strong> voce dashboard
+                        </div>
+                    `;
+                }
+                
+                // 5. Tab Preview Dashboard (logica invariata, è solo HTML)
                 await populateDashboardPreview();
                 
                 console.log('✅ Tutti i tab popolati con successo');
@@ -3961,7 +4104,7 @@
         }
 
         /**
-        * 💾 FUNZIONE DI SALVATAGGIO MODIFICATA
+        * 💾 FUNZIONE DI SALVATAGGIO
         * Utilizza la funzione di validazione corretta.
         */
         async function saveCompleteConfiguration() {
@@ -3972,22 +4115,44 @@
                 return;
             }
             
-            // La validazione ora permette di procedere con 0 configurazioni per la pulizia.
             if (!validateConfiguration()) {
                 SouthTechUI.showAlert('❌ Correggi gli errori nelle configurazioni prima di salvare', 'error');
                 return;
             }
             
+            // Mostra il modale di conferma prima di procedere
             showCompleteSaveConfirmation();
+        }
+
+        /**
+        * ✅ Procede con il salvataggio dopo la conferma dell'utente.
+        */
+        async function proceedWithCompleteSave() {
+            // Chiudi il modal di conferma
+            const modal = bootstrap.Modal.getInstance(document.getElementById('completeSaveConfirmationModal'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            // Avvia il processo di salvataggio effettivo
+            await executeCompleteSave();
         }
 
         /**
         * ✅ Mostra popup di conferma per salvataggio completo - 4 COMPONENTI
         */
         function showCompleteSaveConfirmation() {
-            const yamlContent = generateYAMLContent();
+            // Legge il contenuto dall'elemento dell'interfaccia,
+            // che è stato popolato dalla chiamata di anteprima al backend.
+            const yamlContent = document.getElementById('yamlCode').textContent;
+            
+            if (!yamlContent || yamlContent === 'Caricamento...') {
+                SouthTechUI.showAlert('Errore: Contenuto YAML di anteprima non disponibile. Prova a rigenerare.', 'error');
+                return;
+            }
+
             const configCount = configurations.length;
-            const totalSensors = configCount * 4;
+            const totalSensors = configCount * 4 + 1; // +1 per il placeholder
             
             const modal = document.createElement('div');
             modal.className = 'modal fade';
@@ -4002,140 +4167,57 @@
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body" style="padding: 30px;">
-                            <div style="text-align: center; margin-bottom: 25px;">
-                                <div style="font-size: 3rem; color: var(--secondary-color); margin-bottom: 15px;">
-                                    <i class="fas fa-magic"></i>
-                                </div>
-                                <h4 style="color: var(--primary-color); font-weight: bold;">Salvataggio Configurazione Completa</h4>
-                                <p class="text-muted">Stai per generare Apps.yaml, Templates.yaml, Configuration.yaml e Dashboard Lovelace</p>
-                            </div>
+                            <h4 style="color: var(--primary-color); font-weight: bold; text-align: center;">Stai per salvare la configurazione completa.</h4>
+                            <p class="text-muted text-center">Questo aggiornerà tutti i file necessari sul server.</p>
                             
-                            <div class="row">
-                                <!-- 1. Apps.yaml -->
+                            <div class="row mt-4">
                                 <div class="col-md-3">
-                                    <div style="background: #e8f4fd; border-left: 4px solid var(--primary-color); padding: 20px; border-radius: 10px; margin-bottom: 20px; height: 200px;">
-                                        <h6 style="color: var(--primary-color); font-weight: bold; margin-bottom: 15px;">
-                                            <i class="fas fa-cog me-2"></i>Apps.yaml
-                                        </h6>
-                                        <div style="font-size: 0.9rem;">
-                                            <div class="mb-2">
-                                                <strong>📊 Configurazioni:</strong> <span class="badge bg-primary">${configCount}</span>
-                                            </div>
-                                            <div class="mb-2">
-                                                <strong>📄 Righe:</strong> <span class="badge bg-info">${yamlContent.split('\n').length}</span>
-                                            </div>
-                                            <div class="mb-2">
-                                                <strong>💾 File:</strong><br>
-                                                <code style="font-size: 0.8rem;">apps.yaml</code>
-                                            </div>
-                                            <div class="mt-3">
-                                                <i class="fas fa-check text-success me-2"></i>Backup automatico<br>
-                                                <i class="fas fa-check text-success me-2"></i>Validazione YAML
-                                            </div>
+                                    <div class="card text-center h-100">
+                                        <div class="card-body">
+                                            <i class="fas fa-cog fa-2x text-primary mb-2"></i>
+                                            <h6>Apps.yaml</h6>
+                                            <span class="badge bg-primary">${configCount} configurazioni</span>
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <!-- 2. Templates.yaml -->
                                 <div class="col-md-3">
-                                    <div style="background: #e8f5e8; border-left: 4px solid var(--success-color); padding: 20px; border-radius: 10px; margin-bottom: 20px; height: 200px;">
-                                        <h6 style="color: var(--success-color); font-weight: bold; margin-bottom: 15px;">
-                                            <i class="fas fa-puzzle-piece me-2"></i>Templates.yaml
-                                        </h6>
-                                        <div style="font-size: 0.9rem;">
-                                            <div class="mb-2">
-                                                <strong>🧩 Sensori:</strong> <span class="badge bg-primary">${totalSensors}</span>
-                                            </div>
-                                            <div class="mb-2">
-                                                <strong>🔧 Per luce:</strong> <span class="badge bg-info">4</span>
-                                            </div>
-                                            <div class="mb-2">
-                                                <strong>📁 File:</strong><br>
-                                                <code style="font-size: 0.8rem;">templates.yaml</code>
-                                            </div>
-                                            <div class="mt-3">
-                                                <i class="fas fa-check text-success me-2"></i>Stati presenza/luce<br>
-                                                <i class="fas fa-check text-success me-2"></i>Monitoraggio continuo
-                                            </div>
+                                    <div class="card text-center h-100">
+                                        <div class="card-body">
+                                            <i class="fas fa-puzzle-piece fa-2x text-success mb-2"></i>
+                                            <h6>Templates.yaml</h6>
+                                            <span class="badge bg-success">${totalSensors} sensori</span>
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <!-- 3. Configuration.yaml -->
                                 <div class="col-md-3">
-                                    <div style="background: #fff8e1; border-left: 4px solid var(--warning-color); padding: 20px; border-radius: 10px; margin-bottom: 20px; height: 200px;">
-                                        <h6 style="color: var(--warning-color); font-weight: bold; margin-bottom: 15px;">
-                                            <i class="fas fa-file-code me-2"></i>Configuration.yaml
-                                        </h6>
-                                        <div style="font-size: 0.9rem;">
-                                            <div class="mb-2">
-                                                <strong>🎨 Dashboard:</strong> <span class="badge bg-primary">Dashboard</span>
-                                            </div>
-                                            <div class="mb-2">
-                                                <strong>🔧 Configura:</strong> <span class="badge bg-info">Accesso</span>
-                                            </div>
-                                            <div class="mb-2">
-                                                <strong>📁 File:</strong><br>
-                                                <code style="font-size: 0.8rem;">configuration.yaml</code>
-                                            </div>
-                                            <div class="mt-3">
-                                                <i class="fas fa-check text-success me-2"></i>Dashboard Lovelace<br>
-                                                <i class="fas fa-check text-success me-2"></i>Accesso sidebar
-                                            </div>
+                                    <div class="card text-center h-100">
+                                        <div class="card-body">
+                                            <i class="fas fa-file-alt fa-2x text-warning mb-2"></i>
+                                            <h6>Configuration.yaml</h6>
+                                            <span class="badge bg-warning">1 voce</span>
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <!-- 4. Dashboard -->
                                 <div class="col-md-3">
-                                    <div style="background: #e3f2fd; border-left: 4px solid var(--secondary-color); padding: 20px; border-radius: 10px; margin-bottom: 20px; height: 200px;">
-                                        <h6 style="color: var(--secondary-color); font-weight: bold; margin-bottom: 15px;">
-                                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
-                                        </h6>
-                                        <div style="font-size: 0.9rem;">
-                                            <div class="mb-2">
-                                                <strong>🎨 Dashboard:</strong> <span class="badge bg-primary">1</span>
-                                            </div>
-                                            <div class="mb-2">
-                                                <strong>💡 Pannelli luci:</strong> <span class="badge bg-info">${configCount}</span>
-                                            </div>
-                                            <div class="mb-2">
-                                                <strong>📁 File:</strong><br>
-                                                <code style="font-size: 0.8rem;">ui-lovelace-light-presence.yaml</code>
-                                            </div>
-                                            <div class="mt-3">
-                                                <i class="fas fa-check text-success me-2"></i>Pannelli individuali<br>
-                                                <i class="fas fa-check text-success me-2"></i>Grafici ApexCharts
-                                            </div>
+                                    <div class="card text-center h-100">
+                                        <div class="card-body">
+                                            <i class="fas fa-tachometer-alt fa-2x text-info mb-2"></i>
+                                            <h6>Dashboard & Lovelace</h6>
+                                            <span class="badge bg-info">${configCount + 1} viste</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 10px; padding: 15px; margin-bottom: 20px;">
-                                <div style="display: flex; align-items: center;">
-                                    <i class="fas fa-exclamation-triangle text-warning me-3" style="font-size: 1.5rem;"></i>
-                                    <div>
-                                        <strong>File che verranno modificati:</strong><br>
-                                        <code>apps.yaml</code> • <code>templates.yaml</code> • <code>configuration.yaml</code> • <code>ui-lovelace-light-presence.yaml</code><br>
-                                        <small>Backup automatici verranno creati per tutti i file</small>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div style="text-align: center; color: #6c757d;">
-                                <small>
-                                    <i class="fas fa-clock me-1"></i>
-                                    Il processo completo richiede solitamente 5-10 secondi
-                                </small>
+                            <div class="alert alert-warning mt-4">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Importante:</strong> Sarà creato un backup automatico prima di applicare le modifiche.
                             </div>
                         </div>
                         <div class="modal-footer" style="border: none; padding: 20px 30px 30px;">
-                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="border-radius: 10px; padding: 12px 25px; font-weight: 600;">
-                                <i class="fas fa-times me-2"></i>Annulla
-                            </button>
-                            <button type="button" class="btn btn-success" onclick="proceedWithCompleteSave()" style="background: linear-gradient(135deg, var(--success-color) 0%, #229954 100%); border: none; border-radius: 10px; padding: 12px 25px; font-weight: 600; font-size: 1.1rem;">
-                                <i class="fas fa-magic me-2"></i>Conferma e Genera Tutto
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
+                            <button type="button" class="btn btn-success" onclick="proceedWithCompleteSave()">
+                                <i class="fas fa-save me-2"></i>Conferma e Salva Tutto
                             </button>
                         </div>
                     </div>
@@ -4146,7 +4228,6 @@
             const bootstrapModal = new bootstrap.Modal(modal);
             bootstrapModal.show();
             
-            // Rimuovi modal quando chiuso
             modal.addEventListener('hidden.bs.modal', () => {
                 modal.remove();
             });
@@ -4174,31 +4255,23 @@
             }
             
             isSaving = true;
-            const yamlContent = generateYAMLContent();
             
             try {
                 console.log('🚀 === INIZIO SALVATAGGIO COMPLETO ===');
+                SouthTechUI.showAlert('✨ Generazione e salvataggio configurazione completa in corso...', 'info');
                 
-                // Usa il metodo sensori ottimizzati con flag dashboard
-                console.log('📡 Salvataggio completo via sensori ottimizzati...');
-                SouthTechUI.showAlert('✨ Generazione configurazione completa in corso...', 'info');
+                const result = await saveCompleteViaSensorsOptimized(configurations);
                 
-                const result = await saveCompleteViaSensorsOptimized(yamlContent, configurations);
-                
-                if (result.success) {
-                    // Mostra risultati dettagliati
-                    showCompleteSaveResults(result);
-                } else {
-                    throw new Error(result.error || 'Salvataggio completo fallito');
-                }
+                showSaveResultsModal(result);
                 
             } catch (error) {
                 console.error('❌ Errore salvataggio completo:', error);
-                SouthTechUI.showAlert(`❌ Errore: ${error.message}`, 'error');
-                
-                // Fallback: istruzioni manuali estese
-                showManualCompleteInstructions();
-                
+                SouthTechUI.showAlert(`❌ Errore critico: ${error.message}`, 'error');
+                showSaveResultsModal({
+                    success: false,
+                    error: error.message,
+                    details: {}
+                });
             } finally {
                 isSaving = false;
                 console.log('🏁 === FINE SALVATAGGIO COMPLETO ===');
@@ -4271,65 +4344,19 @@
         }
 
         /**
-        * 📡 Salvataggio completo via sensori ottimizzati
-        */
-        async function saveCompleteViaSensorsOptimized(yamlContent, configurations) {
+         * Ora utilizza il sistema di comunicazione a sensori.
+         */
+        async function saveCompleteViaSensorsOptimized(configurations) {
             try {
-                const requestTimestamp = new Date().toISOString();
-                const requestId = `complete_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                
-                // Reset sensore risposta
-                await fetch('/api/states/sensor.southtech_save_response', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${haToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        state: 'ready',
-                        attributes: { 
-                            reset_at: requestTimestamp,
-                            reset_for_request: requestId,
-                            mode: 'complete_save'
-                        }
-                    })
-                });
-                
-                await SouthTechCore.sleep(1500);
-                
-                // Invia richiesta COMPLETA
-                const response = await fetch('/api/states/sensor.southtech_save_request', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${haToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        state: 'pending',
-                        attributes: {
-                            request_id: requestId,
-                            timestamp: requestTimestamp,
-                            action: 'save_complete', // ⭐ NUOVO: Indica salvataggio completo
-                            yaml_content: yamlContent,
-                            configurations: configurations,
-                            browser_id: browserId,
-                            method: 'complete_optimized',
-                            generate_dashboard: true, // ⭐ Flag per dashboard
-                            generate_templates: true  // ⭐ Flag per templates
-                        }
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Errore invio richiesta completa: HTTP ${response.status}`);
-                }
-                
-                console.log('📤 Richiesta salvataggio completo inviata');
-                
-                // Attendi risposta con timeout esteso (30 secondi per operazioni multiple)
-                const result = await waitForSensorResponseOptimized(30);
-                return result;
-                
+                const payload = {
+                    action: 'save_complete',
+                    // Non inviamo più lo yaml_content, il backend lo genera
+                    configurations: configurations,
+                    method: 'complete_sensor',
+                    generate_dashboard: true,
+                    generate_templates: true
+                };
+                return await communicateViaSensors('save', payload, 45);
             } catch (error) {
                 console.error('❌ Salvataggio completo via sensori fallito:', error);
                 return { success: false, error: error.message };
@@ -4337,262 +4364,105 @@
         }
 
         /**
-        * 💾 Salvataggio specifico Apps.yaml
-        */
-        async function saveAppsYAMLOnly() {
-            if (isSaving) {
-                SouthTechUI.showAlert('⚠️ Salvataggio già in corso, attendere...', 'warning');
-                return;
-            }
-            
-            if (!validateConfiguration()) {
-                SouthTechUI.showAlert('❌ Correggi gli errori prima di salvare', 'error');
-                return;
-            }
-            
-            isSaving = true;
-            const yamlContent = generateYAMLContent();
-            
-            try {
-                console.log('🚀 Salvataggio specifico Apps.yaml...');
-                SouthTechUI.showAlert('📡 Salvataggio Apps.yaml in corso...', 'info');
-                
-                const result = await saveSpecificFileViaSensors('apps', yamlContent);
-                
-                if (result.success) {
-                    SouthTechUI.showAlert('✅ Apps.yaml salvato con successo!', 'success');
-                } else {
-                    throw new Error(result.error || 'Salvataggio Apps.yaml fallito');
-                }
-                
-            } catch (error) {
-                console.error('❌ Errore salvataggio Apps.yaml:', error);
-                SouthTechUI.showAlert(`❌ Errore salvataggio Apps.yaml: ${error.message}`, 'error');
-            } finally {
-                isSaving = false;
-            }
-        }
+         * ✅ [NUOVO] Mostra popup di conferma per salvataggio specifico.
+         */
+        function showSpecificSaveConfirmation(fileType) {
+            const friendlyName = fileType.charAt(0).toUpperCase() + fileType.slice(1);
 
-        /**
-        * 💾 Salvataggio specifico Templates.yaml
-        */
-        async function saveTemplatesYAMLOnly() {
-            if (isSaving) {
-                SouthTechUI.showAlert('⚠️ Salvataggio già in corso, attendere...', 'warning');
-                return;
-            }
-            
-            if (!validateConfiguration()) {
-                SouthTechUI.showAlert('❌ Correggi gli errori prima di salvare', 'error');
-                return;
-            }
-            
-            isSaving = true;
-            const templatesContent = generateTemplatesYAML();
-            
-            try {
-                console.log('🚀 Salvataggio specifico Templates.yaml...');
-                SouthTechUI.showAlert('📡 Salvataggio Templates.yaml in corso...', 'info');
-                
-                const result = await saveSpecificFileViaSensors('templates', templatesContent);
-                
-                if (result.success) {
-                    SouthTechUI.showAlert('✅ Templates.yaml salvato con successo!', 'success');
-                } else {
-                    throw new Error(result.error || 'Salvataggio Templates.yaml fallito');
-                }
-                
-            } catch (error) {
-                console.error('❌ Errore salvataggio Templates.yaml:', error);
-                SouthTechUI.showAlert(`❌ Errore salvataggio Templates.yaml: ${error.message}`, 'error');
-            } finally {
-                isSaving = false;
-            }
-        }
-
-        /**
-        * 💾 Salvataggio specifico Dashboard.yaml
-        */
-        async function saveDashboardYAMLOnly() {
-            if (isSaving) {
-                SouthTechUI.showAlert('⚠️ Salvataggio già in corso, attendere...', 'warning');
-                return;
-            }
-            
-            if (!validateConfiguration()) {
-                SouthTechUI.showAlert('❌ Correggi gli errori prima di salvare', 'error');
-                return;
-            }
-            
-            isSaving = true;
-            const dashboardContent = generateDashboardYAML();
-            
-            try {
-                console.log('🚀 Salvataggio specifico Dashboard.yaml...');
-                SouthTechUI.showAlert('📡 Salvataggio Dashboard.yaml in corso...', 'info');
-                
-                const result = await saveSpecificFileViaSensors('dashboard', dashboardContent);
-                
-                if (result.success) {
-                    SouthTechUI.showAlert('✅ Dashboard.yaml salvato con successo!', 'success');
-                } else {
-                    throw new Error(result.error || 'Salvataggio Dashboard.yaml fallito');
-                }
-                
-            } catch (error) {
-                console.error('❌ Errore salvataggio Dashboard.yaml:', error);
-                SouthTechUI.showAlert(`❌ Errore salvataggio Dashboard.yaml: ${error.message}`, 'error');
-            } finally {
-                isSaving = false;
-            }
-        }
-
-        /**
-        * 📡 Funzione helper per salvare file specifici
-        */
-        async function saveSpecificFileViaSensors(fileType, content) {
-            try {
-                const requestTimestamp = new Date().toISOString();
-                const requestId = `specific_${fileType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                
-                // Reset sensore risposta
-                await fetch('/api/states/sensor.southtech_save_response', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${haToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        state: 'ready',
-                        attributes: { 
-                            reset_at: requestTimestamp,
-                            reset_for_request: requestId,
-                            mode: `save_${fileType}_only`
-                        }
-                    })
-                });
-                
-                await SouthTechCore.sleep(1500);
-                
-                // Invia richiesta specifica
-                const response = await fetch('/api/states/sensor.southtech_save_request', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${haToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        state: 'pending',
-                        attributes: {
-                            request_id: requestId,
-                            timestamp: requestTimestamp,
-                            action: `save_${fileType}_only`, // ⭐ Azione specifica
-                            file_type: fileType,
-                            yaml_content: content,
-                            configurations: configurations,
-                            browser_id: browserId,
-                            method: `${fileType}_specific`
-                        }
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Errore invio richiesta ${fileType}: HTTP ${response.status}`);
-                }
-                
-                console.log(`📤 Richiesta ${fileType} specifica inviata`);
-                
-                // Attendi risposta
-                const result = await waitForSensorResponseOptimized(20);
-                return result;
-                
-            } catch (error) {
-                console.error(`❌ Salvataggio ${fileType} specifico fallito:`, error);
-                return { success: false, error: error.message };
-            }
-        }
-
-        /**
-        * 🎉 Gestore risultati universale - VERSIONE 4 COMPONENTI  
-        * Gestisce tutti i possibili formati di risposta dal backend
-        */
-        function showCompleteSaveResults(result) {
-            const configCount = configurations.length;
-            const totalSensors = configCount * 4;
-            
-            console.log('🎉 UNIVERSAL HANDLER (4 componenti) - Input:', result);
-            
-            // ✅ ESTRAZIONE ROBUSTA: 4 componenti
-            const details = result.details || result.dashboard?.details || {};
-            
-            // ✅ STATI 4 COMPONENTI con multiple fonti
-            const appsSuccess = extractComponentSuccess(result, 'apps');
-            const templatesSuccess = extractComponentSuccess(result, 'templates');
-            const configSuccess = extractComponentSuccess(result, 'configuration');
-            const dashboardSuccess = extractComponentSuccess(result, 'dashboard'); 
-            
-            // ✅ MESSAGGI ERRORE con fallback per 4 componenti
-            const appsError = extractComponentError(result, 'apps');
-            const templatesError = extractComponentError(result, 'templates');
-            const configError = extractComponentError(result, 'configuration');
-            const dashboardError = extractComponentError(result, 'dashboard');
-            
-            console.log('✅ STATI 4 COMPONENTI ESTRATTI:', {
-                apps: { success: appsSuccess, error: appsError },
-                templates: { success: templatesSuccess, error: templatesError },
-                configuration: { success: configSuccess, error: configError },
-                dashboard: { success: dashboardSuccess, error: dashboardError }
-            });
-            
-            // Crea modalità universale con 4 componenti
-            const successCount = [appsSuccess, templatesSuccess, configSuccess, dashboardSuccess].filter(Boolean).length;
-            
-            // Alert principale aggiornato per 4 componenti
-            let alertMessage, alertType;
-            if (result.success && successCount >= 3) {
-                alertMessage = `✅ Configurazione completata!\n📋 ${configCount} configurazioni\n🧩 ${totalSensors} template sensors`;
-                if (appsSuccess) alertMessage += '\n✅ Apps.yaml salvato';
-                if (templatesSuccess) alertMessage += '\n✅ Templates generati';
-                if (dashboardSuccess) alertMessage += '\n✅ Dashboard creata';
-                if (configSuccess) alertMessage += '\n✅ Configuration.yaml aggiornato';
-                else alertMessage += '\n⚠️ Configuration.yaml manuale';
-                alertType = configSuccess ? 'success' : 'warning';
-            } else if (result.success && successCount >= 2) {
-                alertMessage = `⚠️ Configurazione parziale!\n📋 ${configCount} configurazioni\n⚠️ Alcuni componenti richiedono attenzione`;
-                alertType = 'warning';
-            } else {
-                alertMessage = `❌ Configurazione fallita!\n📋 ${configCount} configurazioni\n❌ Controlla i dettagli degli errori`;
-                alertType = 'error';
-            }
-            
-            SouthTechUI.showAlert(alertMessage, alertType, 8000);
-            
-            // Modal dettagliato con 4 componenti
             const modal = document.createElement('div');
             modal.className = 'modal fade';
-            modal.id = 'universalResultsModal';
-            modal.innerHTML = createUniversalModalHTML(result, {
-                appsSuccess, templatesSuccess, configSuccess, dashboardSuccess,
-                appsError, templatesError, configError, dashboardError,
-                configCount, totalSensors
-            });
-            
+            modal.id = 'specificSaveConfirmationModal';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content" style="border-radius: 20px;">
+                        <div class="modal-header bg-info text-white" style="border-radius: 20px 20px 0 0;">
+                            <h5 class="modal-title">
+                                <i class="fas fa-save me-2"></i>Conferma Salvataggio ${friendlyName}.yaml
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body" style="padding: 30px;">
+                            <p>Stai per salvare le modifiche solo per il file <strong>${friendlyName}.yaml</strong>.</p>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Questa operazione sovrascriverà la sezione pertinente nel file di destinazione. Sarà creato un backup automatico.
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                            <button type="button" class="btn btn-info" onclick="executeSpecificSave('${fileType}')">
+                                <i class="fas fa-file-upload me-2"></i>Conferma e Salva
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
             document.body.appendChild(modal);
             const bootstrapModal = new bootstrap.Modal(modal);
             bootstrapModal.show();
-            
-            modal.addEventListener('hidden.bs.modal', () => {
-                modal.remove();
-            });
+
+            modal.addEventListener('hidden.bs.modal', () => modal.remove());
         }
 
         /**
-        * 📖 Mostra istruzioni manuali complete
+         * ✅ [NUOVO] Esegue il salvataggio specifico dopo la conferma.
+         */
+        async function executeSpecificSave(fileType) {
+            // Chiudi il modal di conferma
+            const modal = bootstrap.Modal.getInstance(document.getElementById('specificSaveConfirmationModal'));
+            if (modal) {
+                modal.hide();
+            }
+
+            if (isSaving) {
+                SouthTechUI.showAlert('⚠️ Salvataggio già in corso, attendere...', 'warning');
+                return;
+            }
+
+            if (!validateConfiguration()) {
+                SouthTechUI.showAlert('❌ Correggi gli errori prima di salvare', 'error');
+                return;
+            }
+
+            isSaving = true;
+            const friendlyName = fileType.charAt(0).toUpperCase() + fileType.slice(1);
+
+            try {
+                console.log(`🚀 Salvataggio specifico ${friendlyName}.yaml...`);
+                SouthTechUI.showAlert(`📡 Salvataggio ${friendlyName}.yaml in corso...`, 'info');
+
+                // [CORREZIONE] Rimuovo il parametro 'content' che non è definito e non è più necessario.
+                // La logica di generazione del contenuto è ora interamente nel backend,
+                // che ha solo bisogno di sapere quale tipo di file salvare.
+                const result = await saveSpecificFileViaSensors(fileType);
+
+                showSaveResultsModal(result);
+
+            } catch (error) {
+                console.error(`❌ Errore salvataggio ${friendlyName}.yaml:`, error);
+                SouthTechUI.showAlert(`❌ Errore salvataggio ${friendlyName}.yaml: ${error.message}`, 'error');
+                showSaveResultsModal({ success: false, error: error.message });
+            } finally {
+                isSaving = false;
+            }
+        }
+
+        /**
+        * 📡 [NUOVA FUNZIONE HELPER] Funzione per salvare file specifici via sensori.
         */
-        function showManualCompleteInstructions() {
-            // Implementazione simile a showManualSaveInstructions() 
-            // ma con sezioni per dashboard e templates
-            // ... (dettagli implementazione)
+        async function saveSpecificFileViaSensors(fileType) {
+            try {
+                const payload = {
+                    action: `save_${fileType}_only`, // Azione specifica per il backend
+                    file_type: fileType,
+                    configurations: configurations // Configurazioni correnti per contesto
+                };
+                return await communicateViaSensors('save', payload, 30);
+            } catch (error) {
+                console.error(`❌ Salvataggio specifico per ${fileType} fallito:`, error);
+                return { success: false, error: error.message };
+            }
         }
 
         /**
@@ -4667,67 +4537,116 @@
             });
         }
 
+        /**
+        * 🎉 [NUOVA] Gestore risultati universale
+        * Mostra un modale con il riepilogo dettagliato del salvataggio.
+        */
+        function showSaveResultsModal(result) {
+            const configCount = configurations.length;
+            const totalSensors = configCount * 4 + 1;
+            
+            console.log('🎉 Riepilogo salvataggio:', result);
+ 
+            // Estrazione robusta dello stato di successo per ogni componente
+            // [FIX] Logica migliorata per gestire sia salvataggi completi che specifici.
+            const details = result.details || {};
+            // [FIX REGRESSIONE] La condizione precedente era troppo fragile. Usare 'method' è più robusto.
+            const isSingleFileSave = result.method?.includes('_single_save');
+            const fileType = result.file_type;
+            let states = {};
+
+            if (isSingleFileSave) {
+                // Per un salvataggio specifico, solo il componente target è rilevante.
+                // Gli altri sono impostati a 'null' per indicare "Non Applicabile".
+                states = {
+                    appsSuccess: fileType === 'apps' ? result.success : null,
+                    templatesSuccess: fileType === 'templates' ? result.success : null,
+                    configSuccess: fileType === 'configuration' ? result.success : null,
+                    dashboardSuccess: fileType === 'dashboard' ? result.success : null,
+                    appsError: fileType === 'apps' && !result.success ? (result.error || 'Errore') : null,
+                    templatesError: fileType === 'templates' && !result.success ? (result.error || 'Errore') : null,
+                    configError: fileType === 'configuration' && !result.success ? (result.error || 'Errore') : null,
+                    dashboardError: fileType === 'dashboard' && !result.success ? (result.error || 'Errore') : null,
+                };
+            } else {
+                // Logica esistente per un salvataggio completo.
+                // [FIX] Semplificata la logica per renderla più robusta e corretta.
+                // Ora si basa direttamente sulla presenza e sul valore di 'success' per ogni componente.
+                states = {
+                    appsSuccess: details.apps?.success === true,
+                    templatesSuccess: details.templates?.success === true,
+                    configSuccess: details.configuration?.success === true,
+                    dashboardSuccess: details.dashboard?.success === true,
+                    appsError: details.apps?.error ?? 'Dettaglio non disponibile',
+                    templatesError: details.templates?.error ?? 'Dettaglio non disponibile',
+                    configError: details.configuration?.error ?? 'Richiede intervento manuale',
+                    dashboardError: details.dashboard?.error ?? 'Dettaglio non disponibile'
+                };
+                console.log('🔍 [Complete Save] Status Check:', states);
+            }
+
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.id = 'saveResultsModal';
+            modal.innerHTML = createUniversalModalHTML(result, { ...states, configCount, totalSensors });
+            
+            document.body.appendChild(modal);
+            const bootstrapModal = new bootstrap.Modal(modal);
+            bootstrapModal.show();
+            
+            modal.addEventListener('hidden.bs.modal', () => modal.remove());
+        }
+
         // ====================================================================
         // NUOVE FUNZIONI PER L'ANTEPRIMA DAL BACKEND
         // ====================================================================
 
         /**
-         * [NUOVA FUNZIONE]
-         * Funzione principale che orchestra la richiesta di anteprima al backend
-         * e la visualizzazione dei risultati nel frontend.
+         * [MODIFICATA] - Ora l'azione è coerente con il nome del sensore nel backend
          */
         async function requestAndDisplayPreviews() {
-            console.log('✨ Richiesta anteprima configurazione al backend...');
+            console.log('✨ Richiesta anteprima configurazione via sensori...');
 
             if (!validateConfiguration()) {
                 SouthTechUI.showAlert('❌ Correggi gli errori nelle configurazioni prima di generare l\'anteprima', 'error');
                 return;
             }
 
-            // Mostra un indicatore di caricamento
-            SouthTechUI.showAlert('🔄 Generazione anteprima in corso dal backend...', 'info', 4000);
+            SouthTechUI.showAlert('🔄 Generazione anteprima in corso dal backend (via sensori)...', 'info', 4000);
             const yamlOutputElement = document.getElementById('yamlOutput');
             if (yamlOutputElement) {
                 yamlOutputElement.style.display = 'block';
                 document.getElementById('yamlCode').textContent = 'Caricamento...';
                 document.getElementById('templatesYamlCode').textContent = 'Caricamento...';
+                document.getElementById('configurationYamlCode').textContent = 'Caricamento...';
                 document.getElementById('dashboardYamlCode').textContent = 'Caricamento...';
             }
 
             try {
-                // Invia le configurazioni attuali al backend per la generazione "a secco"
-                const response = await fetch(`${APPDAEMON_API_URL}/southtech_preview_config`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    body: JSON.stringify({ configurations: configurations })
-                });
+                // [CORREZIONE] Usa il canale 'save' per inviare l'azione 'preview'.
+                // Il backend ora ascolta 'action: preview' sul sensore 'sensor.southtech_save_request'.
+                const response = await communicateViaSensors('save', { 
+                    configurations: configurations, 
+                    action: 'preview' 
+                }, 20);
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || `Errore del server: ${response.status}`);
-                }
-
-                const data = await response.json();
-
-                if (data.success && data.previews) {
-                    // Popola i tab con il codice ricevuto dal backend
-                    await populateAllTabs(data.previews);
-                    
+                if (response.success && response.previews) {
+                    await populateAllTabs(response.previews);
                     yamlOutputElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    SouthTechUI.showAlert('✅ Anteprima generata con successo dal backend!', 'success');
+                    SouthTechUI.showAlert('✅ Anteprima generata con successo!', 'success');
                 } else {
-                    throw new Error(data.error || 'Risposta non valida dal backend.');
+                    throw new Error(response.error || 'Risposta non valida dal backend.');
                 }
 
             } catch (error) {
                 console.error('❌ Errore durante la richiesta di anteprima:', error);
                 SouthTechUI.showAlert(`❌ Errore anteprima: ${error.message}`, 'error', 8000);
-                document.getElementById('yamlCode').textContent = `Errore durante la generazione dell'anteprima.`;
-                document.getElementById('templatesYamlCode').textContent = `Errore.`;
-                document.getElementById('dashboardYamlCode').textContent = `Errore.`;
+                if (yamlOutputElement) {
+                    document.getElementById('yamlCode').textContent = `Errore durante la generazione dell'anteprima.`;
+                    document.getElementById('templatesYamlCode').textContent = `Errore.`;
+                    document.getElementById('configurationYamlCode').textContent = `Errore.`;
+                    document.getElementById('dashboardYamlCode').textContent = `Errore.`;
+                }
             }
         }
         

@@ -1228,6 +1228,28 @@ class SouthTechConfiguratorDashboard:
     # CONFIGURATION.YAML UPDATE
     # ===============================================================
 
+    def create_configuration_yaml_entry_content(self):
+        """
+        [NUOVO] Genera il contenuto testuale per l'anteprima di configuration.yaml.
+        Questo contenuto è statico.
+        """
+        try:
+            # textwrap.dedent viene usato per rimuovere l'indentazione comune.
+            content = textwrap.dedent("""
+                lovelace:
+                  dashboards:
+                    light-presence:
+                      mode: yaml
+                      title: SouthTech - Light Presence Monitor
+                      icon: mdi:lightbulb-on
+                      filename: www/southtech/dashboards/ui-lovelace-light-presence.yaml
+                      show_in_sidebar: true
+            """).strip()
+            return content
+        except Exception as e:
+            self.configurator.error(f"❌ Errore generazione anteprima configuration.yaml: {e}")
+            return f"# Errore nella generazione dell'anteprima: {e}"
+
     def update_configuration_yaml(self, skip_backup=False):
         """
         📝 AGGIORNAMENTO CONFIGURATION.YAML - VERSIONE CORRETTA E SICURA
@@ -1775,135 +1797,135 @@ class SouthTechConfiguratorDashboard:
                 *Controlla i log di AppDaemon per maggiori informazioni.*
             """).strip()
 
-def create_lights_index_content(self, configurations):
-    """
-    [MODIFICATO] Genera la vista indice (pagina principale) della dashboard 
-    con il layout esatto richiesto, prestando attenzione a spazi e indentazione.
-    """
-    try:
-        # Importa textwrap per gestire correttamente l'indentazione YAML
-        import textwrap
-        from datetime import datetime
+    def create_lights_index_content(self, configurations):
+        """
+        [MODIFICATO] Genera la vista indice (pagina principale) della dashboard 
+        con il layout esatto richiesto, prestando attenzione a spazi e indentazione.
+        """
+        try:
+            # Importa textwrap per gestire correttamente l'indentazione YAML
+            import textwrap
+            from datetime import datetime
 
-        # Ottiene dati dinamici
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        active_configs_count = len(configurations)
-        template_sensors_count = active_configs_count * 4
-        dashboard_files_count = active_configs_count
+            # Ottiene dati dinamici
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            active_configs_count = len(configurations)
+            template_sensors_count = active_configs_count * 4
+            dashboard_files_count = active_configs_count
 
-        # Contenuto per la card markdown di sinistra
-        # I doppi spazi alla fine di ogni riga forzano un a capo in Markdown
-        markdown_content_left = textwrap.dedent(f"""
-            # Monitoraggio Luci e Presenza
-            **Versione {self.version}** 🔊 **Configurazioni attive:** {active_configs_count}  
-            🕐 **Ultimo aggiornamento:** {timestamp}  
-            ---
-        """).strip()
+            # Contenuto per la card markdown di sinistra
+            # I doppi spazi alla fine di ogni riga forzano un a capo in Markdown
+            markdown_content_left = textwrap.dedent(f"""
+                # Monitoraggio Luci e Presenza
+                **Versione {self.version}** 🔊 **Configurazioni attive:** {active_configs_count}  
+                🕐 **Ultimo aggiornamento:** {timestamp}  
+                ---
+            """).strip()
 
-        # Contenuto per la card markdown di destra
-        # FIXED: Usa \n espliciti invece di righe vuote per garantire i line break
-        markdown_content_right = textwrap.dedent(f"""
-            🔧 **Dashboard generata da SouthTech Configurator v{self.version}**
-            📈 **Sensori Template:** {template_sensors_count} sensori generati
-            🎨 **Dashboard Files:** Dashboard principale + {dashboard_files_count} file singoli
-            💡 **Tip:** Ogni configurazione ha 4 sensori template per monitorare tutte le combinazioni luce/presenza
-        """).strip()
-        
-        # Indenta il contenuto markdown per inserirlo correttamente
-        indented_markdown_left = textwrap.indent(markdown_content_left, ' ' * 10)
-        indented_markdown_right = textwrap.indent(markdown_content_right, ' ' * 10)
-        
-        # Costruisce la struttura YAML completa usando una lista di stringhe
-        lines = [
-            "type: horizontal-stack",
-            "cards:",
-            "  - type: custom:vertical-stack-in-card",
-            "    cards:",
-            "      - type: custom:button-card",
-            "        name: SouthTech Light Presence Monitor",
-            "        icon: mdi:lightbulb-auto",
-            "        styles:",
-            "          card:",
-            '            - height: 50%',
-            '            - background: "linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)"',
-            '            - border-radius: 12px',
-            '            - padding: 16px',
-            '            - box-shadow: 0 4px 12px rgba(0,0,0,0.3)',
-            "          name:",
-            '            - font-size: 22px',
-            '            - font-weight: bold',
-            '            - color: white',
-            "          icon:",
-            '            - color: "#FFD700"',
-            '            - width: 40px',
-            '            - margin-bottom: 8px',
-            "      - type: markdown",
-            "        content: |",
-            f"{indented_markdown_left}",
-            "        styles:",
-            "          card:",
-            '            - height: 50%',
-            '            - background: rgba(255, 255, 255, 0.1)',
-            '            - border-radius: 10px',
-            '            - padding: 14px',
-            '            - color: white',
-            '            - font-size: 16px !important',
-            '            - line-height: 1.5',
-            "  - type: custom:vertical-stack-in-card",
-            "    styles:",
-            "      card:",
-            '        - height: 240px !important',
-            '        - width: 50%',
-            '        - border-radius: 12px',
-            '        - background: rgba(255, 255, 255, 0.05)',
-            '        - box-shadow: 0 4px 12px rgba(0,0,0,0.3)',
-            "    cards:",
-            "      - type: custom:button-card",
-            "        name: Dettagli Configurazione",
-            "        icon: mdi:cog",
-            "        styles:",
-            "          card:",
-            '            - height: 50%',
-            '            - background: "linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)"',
-            '            - border-radius: 12px',
-            '            - padding: 16px',
-            '            - box-shadow: 0 4px 12px rgba(0,0,0,0.3)',
-            "          name:",
-            '            - font-size: 20px',
-            '            - font-weight: bold',
-            '            - color: white',
-            "          icon:",
-            '            - color: "#FFD700"',
-            '            - width: 36px',
-            '            - margin-bottom: 8px',
-            "      - type: markdown",
-            "        content: |",  # Changed from "content: >" to "content: |"
-            f"{indented_markdown_right}",
-            "        styles:",
-            "          card:",
-            '            - height: 50%',
-            '            - background: rgba(255, 255, 255, 0.1)',
-            '            - border-radius: 10px',
-            '            - padding: 16px',
-            '            - box-shadow: 0 2px 8px rgba(0,0,0,0.2)',
-            '            - color: white',
-            '            - font-size: 20px !important',
-            '            - line-height: 1.8'
-        ]
-        
-        return "\n".join(lines)
+            # Contenuto per la card markdown di destra
+            # FIXED: Usa \n espliciti invece di righe vuote per garantire i line break
+            markdown_content_right = textwrap.dedent(f"""
+                🔧 **Dashboard generata da SouthTech Configurator v{self.version}**
+                📈 **Sensori Template:** {template_sensors_count} sensori generati
+                🎨 **Dashboard Files:** Dashboard principale + {dashboard_files_count} file singoli
+                💡 **Tip:** Ogni configurazione ha 4 sensori template per monitorare tutte le combinazioni luce/presenza
+            """).strip()
+            
+            # Indenta il contenuto markdown per inserirlo correttamente
+            indented_markdown_left = textwrap.indent(markdown_content_left, ' ' * 10)
+            indented_markdown_right = textwrap.indent(markdown_content_right, ' ' * 10)
+            
+            # Costruisce la struttura YAML completa usando una lista di stringhe
+            lines = [
+                "type: horizontal-stack",
+                "cards:",
+                "  - type: custom:vertical-stack-in-card",
+                "    cards:",
+                "      - type: custom:button-card",
+                "        name: SouthTech Light Presence Monitor",
+                "        icon: mdi:lightbulb-auto",
+                "        styles:",
+                "          card:",
+                '            - height: 50%',
+                '            - background: "linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)"',
+                '            - border-radius: 12px',
+                '            - padding: 16px',
+                '            - box-shadow: 0 4px 12px rgba(0,0,0,0.3)',
+                "          name:",
+                '            - font-size: 22px',
+                '            - font-weight: bold',
+                '            - color: white',
+                "          icon:",
+                '            - color: "#FFD700"',
+                '            - width: 40px',
+                '            - margin-bottom: 8px',
+                "      - type: markdown",
+                "        content: |",
+                f"{indented_markdown_left}",
+                "        styles:",
+                "          card:",
+                '            - height: 50%',
+                '            - background: rgba(255, 255, 255, 0.1)',
+                '            - border-radius: 10px',
+                '            - padding: 14px',
+                '            - color: white',
+                '            - font-size: 16px !important',
+                '            - line-height: 1.5',
+                "  - type: custom:vertical-stack-in-card",
+                "    styles:",
+                "      card:",
+                '        - height: 240px !important',
+                '        - width: 50%',
+                '        - border-radius: 12px',
+                '        - background: rgba(255, 255, 255, 0.05)',
+                '        - box-shadow: 0 4px 12px rgba(0,0,0,0.3)',
+                "    cards:",
+                "      - type: custom:button-card",
+                "        name: Dettagli Configurazione",
+                "        icon: mdi:cog",
+                "        styles:",
+                "          card:",
+                '            - height: 50%',
+                '            - background: "linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)"',
+                '            - border-radius: 12px',
+                '            - padding: 16px',
+                '            - box-shadow: 0 4px 12px rgba(0,0,0,0.3)',
+                "          name:",
+                '            - font-size: 20px',
+                '            - font-weight: bold',
+                '            - color: white',
+                "          icon:",
+                '            - color: "#FFD700"',
+                '            - width: 36px',
+                '            - margin-bottom: 8px',
+                "      - type: markdown",
+                "        content: |",  # Changed from "content: >" to "content: |"
+                f"{indented_markdown_right}",
+                "        styles:",
+                "          card:",
+                '            - height: 50%',
+                '            - background: rgba(255, 255, 255, 0.1)',
+                '            - border-radius: 10px',
+                '            - padding: 16px',
+                '            - box-shadow: 0 2px 8px rgba(0,0,0,0.2)',
+                '            - color: white',
+                '            - font-size: 20px !important',
+                '            - line-height: 1.8'
+            ]
+            
+            return "\n".join(lines)
 
-    except Exception as e:
-        self.configurator.error(f"⚠️ Errore critico durante la creazione del contenuto dell'indice luci: {e}")
-        # Ritorna una card di errore in caso di problemi
-        return textwrap.dedent(f"""
-          - type: markdown
-            content: |
-              ## ⚠️ Errore di Generazione Vista
-              **Si è verificato un errore durante la creazione della dashboard principale.**
-              **Dettagli:** `{e}`
-              *Controlla i log di AppDaemon per maggiori informazioni.*
-        """).strip()
+        except Exception as e:
+            self.configurator.error(f"⚠️ Errore critico durante la creazione del contenuto dell'indice luci: {e}")
+            # Ritorna una card di errore in caso di problemi
+            return textwrap.dedent(f"""
+              - type: markdown
+                content: |
+                  ## ⚠️ Errore di Generazione Vista
+                  **Si è verificato un errore durante la creazione della dashboard principale.**
+                  **Dettagli:** `{e}`
+                  *Controlla i log di AppDaemon per maggiori informazioni.*
+            """).strip()
 
     # ===============================================================
     # TEMPLATE SENSORS - METODI DI SUPPORTO
