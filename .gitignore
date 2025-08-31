@@ -1,5 +1,6 @@
-# Ignora un file specifico
+# Ignora i file secrets.yaml
 appdaemon/conf/secrets.yaml
+www/secrets.yaml
 
 # Ignora una cartella intera
 .vscode
@@ -8,3 +9,10 @@ appdaemon/conf/.vscode
 # Ignora tutti i file `.log`
 *.log
 appdaemon/appdaemon.yaml
+
+# Ignora la cartella hardware e software di esphome
+esphome/hardware/
+esphome/software/
+
+# Ignora configuration.yaml
+www/configuration.yaml
