@@ -159,20 +159,30 @@ class LightPresenceEntityGenerator(hass.Hass):
         """Genera i blocchi per gli input boolean"""
         blocks = []
         boolean_fields = [
-            ("enable_sensor", "Enable Sensor"),
-            ("enable_manual_activation_sensor", "Enable Manual Activation Sensor"),
-            ("enable_manual_activation_light_sensor", "Enable Manual Activation Light Sensor"),
-            ("enable_automation", "Enable Automation"),
-            ("enable_illuminance_filter", "Enable Illuminance Filter"),
-            ("enable_illuminance_automation", "Enable Illuminance Automation")
+            "enable_sensor",
+            "enable_manual_activation_sensor",
+            "enable_manual_activation_light_sensor",
+            "enable_automation",
+            "enable_illuminance_filter",
+            "enable_illuminance_automation"
         ]
         
-        for field, friendly_name in boolean_fields:
+        friendly_names = {
+            "enable_sensor": "Enable Sensor",
+            "enable_manual_activation_sensor": "Enable Manual Activation Sensor",
+            "enable_manual_activation_light_sensor": "Enable Manual Activation Light Sensor",
+            "enable_automation": "Enable Automation", 
+            "enable_illuminance_filter": "Enable Illuminance Filter",
+            "enable_illuminance_automation": "Enable Illuminance Automation"
+        }
+        
+        for field in boolean_fields:
             entity_id = f"{base_id}_{field}"
-            if entity_id in config_ids and field in cfg and cfg[field].startswith("input_boolean."):
+            if field in cfg:
                 blocks.append(
                     f"{entity_id}:\n"
-                    f"  name: {friendly_base} {friendly_name}"
+                    f"  name: {friendly_base} {friendly_names[field]}\n"
+                    f"  icon: mdi:toggle-switch"
                 )
         
         return blocks
@@ -183,45 +193,54 @@ class LightPresenceEntityGenerator(hass.Hass):
         number_configs = {
             "timer_minutes_on_push": {
                 "name": "Timer Minutes On Push",
-                "min": 0, "max": 60, "step": 1, "unit": "min"
+                "min": 0, "max": 60, "step": 1, "unit": "min",
+                "icon": "mdi:timer"
             },
             "timer_filter_on_push": {
                 "name": "Timer Filter On Push",
-                "min": 0, "max": 600, "step": 1, "unit": "sec"
+                "min": 0, "max": 600, "step": 1, "unit": "sec",
+                "icon": "mdi:timer-outline"
             },
             "timer_minutes_on_time": {
                 "name": "Timer Minutes On Time",
-                "min": 0, "max": 60, "step": 1, "unit": "min"
+                "min": 0, "max": 60, "step": 1, "unit": "min",
+                "icon": "mdi:timer"
             },
             "timer_filter_on_time": {
                 "name": "Timer Filter On Time",
-                "min": 0, "max": 600, "step": 1, "unit": "sec"
+                "min": 0, "max": 600, "step": 1, "unit": "sec",
+                "icon": "mdi:timer-outline"
             },
             "timer_seconds_max_lux": {
                 "name": "Timer Seconds Max Lux",
-                "min": 0, "max": 10, "step": 1, "unit": "sec"
+                "min": 0, "max": 10, "step": 1, "unit": "sec",
+                "icon": "mdi:timer-sand"
             },
             "min_lux_activation": {
                 "name": "Min Lux Activation",
-                "min": 0, "max": 100, "step": 0.1, "unit": "lux"
+                "min": 0, "max": 100, "step": 0.1, "unit": "lux",
+                "icon": "mdi:brightness-6"
             },
             "max_lux_activation": {
                 "name": "Max Lux Activation",
-                "min": 0, "max": 300, "step": 0.1, "unit": "lux"
+                "min": 0, "max": 300, "step": 0.1, "unit": "lux",
+                "icon": "mdi:brightness-7"
             },
             "turn_on_light_offset": {
                 "name": "Turn On Light Offset",
-                "min": 0, "max": 60, "step": 0.1, "unit": "sec"
+                "min": 0, "max": 60, "step": 0.1, "unit": "sec",
+                "icon": "mdi:timer-plus"
             },
             "turn_off_light_offset": {
                 "name": "Turn Off Light Offset",
-                "min": 0, "max": 600, "step": 1, "unit": "sec"
+                "min": 0, "max": 600, "step": 1, "unit": "sec",
+                "icon": "mdi:timer-minus"
             }
         }
         
         for field, config in number_configs.items():
             entity_id = f"{base_id}_{field}"
-            if entity_id in config_ids and field in cfg and cfg[field].startswith("input_number."):
+            if field in cfg:
                 blocks.append(
                     f"{entity_id}:\n"
                     f"  name: {friendly_base} {config['name']}\n"
@@ -229,7 +248,8 @@ class LightPresenceEntityGenerator(hass.Hass):
                     f"  max: {config['max']}\n"
                     f"  step: {config['step']}\n"
                     f"  unit_of_measurement: \"{config['unit']}\"\n"
-                    f"  mode: box"
+                    f"  mode: box\n"
+                    f"  icon: {config['icon']}"
                 )
         
         return blocks
@@ -240,19 +260,19 @@ class LightPresenceEntityGenerator(hass.Hass):
         select_configs = {
             "automatic_enable_automation": {
                 "name": "Automatic Enable Automation",
-                "icon": "mdi:motion-sensor",
+                "icon": "mdi:home-automation",
                 "options": ["Push", "Time", "All"]
             },
             "light_sensor_config": {
                 "name": "Light Sensor Config",
-                "icon": "mdi:motion-sensor",
+                "icon": "mdi:brightness-auto",
                 "options": ["On", "Off", "All"]
             }
         }
         
         for field, config in select_configs.items():
             entity_id = f"{base_id}_{field}"
-            if entity_id in config_ids and field in cfg and cfg[field].startswith("input_select."):
+            if field in cfg:
                 options_str = "\n".join([f"    - \"{option}\"" for option in config['options']])
                 blocks.append(
                     f"{entity_id}:\n"
