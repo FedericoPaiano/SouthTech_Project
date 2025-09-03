@@ -1,9 +1,7 @@
 import os
 import json
-import yaml
 import shutil
 import time
-import re
 import textwrap
 from datetime import datetime
 from contextlib import contextmanager
@@ -1498,10 +1496,44 @@ class SouthTechConfiguratorDashboard:
         utilizzando vertical-stack, button-card e card-mod.
         """
         try:
-            import textwrap
-            
+            # Get entity IDs from config
             light_entity = config.get('light_entity', '')
+            presence_sensor_on = config.get('presence_sensor_on', '')
+            presence_sensor_off = config.get('presence_sensor_off', '')
+            illuminance_sensor = config.get('illuminance_sensor', '')
+            
+            if not light_entity:
+                return "type: markdown\ncontent: 'Errore: light_entity non definito nella configurazione.'"
+
             base_id = light_entity.replace('light.', '')
+
+            # Build the entities list for the "Stato Attuale" card
+            stato_attuale_entities_list = []
+            if light_entity:
+                stato_attuale_entities_list.append(f"                              - entity: {light_entity}")
+            if presence_sensor_on:
+                stato_attuale_entities_list.append(f"                              - entity: {presence_sensor_on}")
+            if presence_sensor_off:
+                stato_attuale_entities_list.append(f"                              - entity: {presence_sensor_off}")
+            else:
+                # Usa una 'section' per un messaggio più chiaro e visibile
+                stato_attuale_entities_list.append("                              - type: section\n                                label: Sensore Spegnimento non presente")
+            if illuminance_sensor:
+                stato_attuale_entities_list.append(f"                              - entity: {illuminance_sensor}")
+            else:
+                # Usa una 'section' per un messaggio più chiaro e visibile
+                stato_attuale_entities_list.append("                              - type: section\n                                label: Sensore Illuminazione non presente")
+            
+            stato_attuale_entities_yaml = '\n'.join(stato_attuale_entities_list)
+
+            # Build the entities list for the history graph
+            history_graph_entities = []
+            if light_entity:
+                history_graph_entities.append(f"                              - entity: {light_entity}")
+            if illuminance_sensor:
+                history_graph_entities.append(f"                              - entity: {illuminance_sensor}")
+            
+            history_graph_yaml = '\n'.join(history_graph_entities)
 
             # Definisce il template YAML usando una f-string e textwrap.dedent per la corretta indentazione.
             # Le parentesi graffe {} di Javascript sono escapate usando doppie graffe {{}}
@@ -1519,7 +1551,7 @@ class SouthTechConfiguratorDashboard:
                         }}
                         return `Pannello di Configurazione - ${{entity_id}}`;
                       ]]]
-                    entity: light.{base_id}_luce
+                    entity: {light_entity}
                     icon: mdi:tune-variant
                     styles:
                       card:
@@ -1567,8 +1599,7 @@ class SouthTechConfiguratorDashboard:
                                 - align-self: center
                           - type: entities
                             entities:
-                              - entity: light.{base_id}_luce
-                              - entity: binary_sensor.{base_id}_presenza
+{stato_attuale_entities_yaml}
                             style:
                               ha-card:
                                 background: rgba(40, 65, 115, 0.4)
@@ -1623,8 +1654,7 @@ class SouthTechConfiguratorDashboard:
                                 - align-self: center
                           - type: history-graph
                             entities:
-                              - entity: light.{base_id}_luce
-                              - entity: sensor.{base_id}_illuminance_lux
+{history_graph_yaml}
                             hours_to_show: 24
                             refresh_interval: 0
                             style:
