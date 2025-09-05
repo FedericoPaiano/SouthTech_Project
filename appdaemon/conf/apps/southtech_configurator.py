@@ -26,8 +26,11 @@ class SouthTechConfigurator(hass.Hass):
         # ===============================================================
         
         # Path dei file - CORRETTI per Home Assistant OS con AppDaemon addon
-        self.apps_yaml_path = "/homeassistant/appdaemon/apps/apps.yaml"
-        self.www_path = "/homeassistant/www/southtech"
+        # ✅ MODIFICA: Rendi i percorsi base configurabili in apps.yaml per maggiore flessibilità
+        self.apps_yaml_path = self.args.get("apps_yaml_path", "/homeassistant/appdaemon/apps/apps.yaml")
+        self.www_base_path = self.args.get("www_base_path", "/homeassistant/www")
+        
+        self.www_path = os.path.join(self.www_base_path, "southtech")
         self.auth_file = os.path.join(self.www_path, "auth.json")
         self.backup_path = os.path.join(self.www_path, "backups")
         self.security_file = os.path.join(self.www_path, "security.json")
@@ -36,9 +39,10 @@ class SouthTechConfigurator(hass.Hass):
         self.api_path = os.path.join(self.www_path, "api")
         
         # Path aggiuntivi per dashboard e templates
+        self.esphome_hardware_path = self.args.get("esphome_hardware_path", "/homeassistant/esphome/hardware")
         self.dashboard_path = os.path.join(self.www_path, "dashboards")
         self.lights_config_path = os.path.join(self.dashboard_path, "lights_config")
-        self.templates_file = "/homeassistant/www/configurations/templates.yaml"
+        self.templates_file = os.path.join(self.www_base_path, "configurations/templates.yaml")
         self.configuration_yaml_path = "/homeassistant/configuration.yaml"
         
         # Marcatori per il file YAML - Supporto doppio formato
@@ -162,7 +166,7 @@ class SouthTechConfigurator(hass.Hass):
         
         # Monitora richieste via sensori ogni 5 secondi (sistema fallback)
         self.run_every(self.communication.monitor_sensor_requests, "now+5", 5)
-        
+
         # Monitora richieste via file ogni 3 secondi (sistema fallback)
         self.run_every(self.communication.monitor_file_requests, "now+3", 3)
         
@@ -316,6 +320,7 @@ class SouthTechConfigurator(hass.Hass):
                     "api_path": self.api_path,
                     "backup_path": self.backup_path,
                     "dashboard_path": self.dashboard_path,
+                    "esphome_hardware_path": self.esphome_hardware_path,
                     "templates_file": self.templates_file
                 },
                 "files": {
@@ -351,6 +356,7 @@ class SouthTechConfigurator(hass.Hass):
                 self.backup_path, 
                 self.api_path,
                 self.dashboard_path,
+                self.esphome_hardware_path,
                 self.lights_config_path,
                 os.path.dirname(self.templates_file)
             ]
@@ -415,7 +421,8 @@ class SouthTechConfigurator(hass.Hass):
                 self.backup_path, 
                 self.api_path,
                 self.dashboard_path,
-                self.lights_config_path
+                self.lights_config_path,
+                self.esphome_hardware_path
             ]
             
             for directory in gitkeep_dirs:
@@ -438,7 +445,8 @@ class SouthTechConfigurator(hass.Hass):
                 self.backup_path, 
                 self.api_path,
                 self.dashboard_path,
-                self.lights_config_path
+                self.lights_config_path,
+                self.esphome_hardware_path
             ]
             
             for directory in test_dirs:
@@ -536,6 +544,7 @@ class SouthTechConfigurator(hass.Hass):
             "backup_count": len([f for f in os.listdir(self.backup_path) 
                                if f.startswith("backup_")]) if os.path.exists(self.backup_path) else 0,
             "active_sessions": len(self.active_tokens),
+            "esphome_devices": len([f for f in os.listdir(self.esphome_hardware_path) if f.endswith('.yaml')]) if os.path.exists(self.esphome_hardware_path) else 0,
             "version": "4.0.0",
             "architecture": "modular",
             "modules_ready": self.modules_ready,
@@ -698,6 +707,111 @@ class SouthTechConfigurator(hass.Hass):
         except Exception as e:
             self.error(f"Errore get_entity_friendly_name per {entity_id}: {e}")
             return fallback if fallback else "Unknown Entity"
+
+    def _get_available_device_numbers(self, request_data):
+        """Scansiona la cartella hardware di ESPHome e restituisce i numeri disponibili."""
+        try:
+            if not os.path.exists(self.esphome_hardware_path):
+                os.makedirs(self.esphome_hardware_path)
+                self.log(f"Creata directory hardware ESPHome: {self.esphome_hardware_path}")
+            
+            pattern = re.compile(r'AION_A8R_(\d{2})\.yaml$')
+            
+            used_numbers = set()
+            for filename in os.listdir(self.esphome_hardware_path):
+                match = pattern.search(filename)
+                if match:
+                    used_numbers.add(int(match.group(1)))
+            
+            all_numbers = set(range(1, 100))
+            available_numbers = sorted(list(all_numbers - used_numbers))
+            
+            next_number = "01"
+            if available_numbers:
+                next_number = f"{available_numbers[0]:02d}"
+
+            available_numbers_str = [f"{n:02d}" for n in available_numbers]
+
+            return {
+                "success": True, 
+                "available_numbers": available_numbers_str, 
+                "next_number": next_number,
+                "request_id": request_data.get("request_id")
+            }
+        except Exception as e:
+            self.error(f"Errore nel calcolare i numeri di dispositivo disponibili: {e}")
+            return {"success": False, "error": str(e), "request_id": request_data.get("request_id")}
+
+    def _get_existing_devices(self, request_data):
+        """Scansiona la cartella hardware di ESPHome e restituisce i dispositivi esistenti."""
+        try:
+            if not os.path.exists(self.esphome_hardware_path):
+                self.log(f"Directory hardware ESPHome non trovata: {self.esphome_hardware_path}", level="WARNING")
+                return {"success": True, "devices": [], "request_id": request_data.get("request_id")}
+
+            # Mappa i nomi dei file (minuscolo) ai modelli dell'interfaccia utente.
+            model_map = {
+                'kc868_a8': 'AION_A8R',
+                'aion_a8r': 'AION_A8R'
+            }
+            
+            # Regex per catturare la parte del modello e la parte del numero.
+            # Esempio: kc868_a8_01.yaml o AION_A8R_02.yaml
+            pattern = re.compile(r'^(kc868_a8|aion_a8r)_(\d{2,})\.yaml$', re.IGNORECASE)
+            
+            devices = []
+            for filename in os.listdir(self.esphome_hardware_path):
+                match = pattern.search(filename)
+                if match:
+                    file_model_part = match.group(1).lower()
+                    number = match.group(2)
+                    
+                    # Ottiene il nome del modello standardizzato per l'interfaccia utente
+                    ui_model = model_map.get(file_model_part)
+                    
+                    if ui_model:
+                        # Usa il nome del modello dell'interfaccia per il nome "friendly"
+                        model_friendly_name = "AION Model A8R" if ui_model == "AION_A8R" else ui_model
+                        devices.append({
+                            "model": ui_model,
+                            "number": number,
+                            "filename": filename,
+                            "friendly_name": f"{model_friendly_name} ({number})"
+                        })
+            
+            devices.sort(key=lambda x: x['friendly_name'])
+
+            return {"success": True, "devices": devices, "request_id": request_data.get("request_id")}
+        except Exception as e:
+            self.error(f"Errore nel leggere i dispositivi esistenti: {e}")
+            return {"success": False, "error": str(e), "request_id": request_data.get("request_id")}
+
+    def _save_esphome_device(self, request_data):
+        """Salva un nuovo file di configurazione del dispositivo ESPHome."""
+        try:
+            filename = request_data.get("filename")
+            content = request_data.get("content")
+            
+            if not filename or not content:
+                return {"success": False, "error": "Nome file o contenuto mancante.", "request_id": request_data.get("request_id")}
+                
+            if not re.match(r'^AION_A8R_\d{2}\.yaml$', filename):
+                return {"success": False, "error": "Nome file non valido.", "request_id": request_data.get("request_id")}
+                
+            file_path = os.path.join(self.esphome_hardware_path, filename)
+            
+            if os.path.exists(file_path):
+                self.log(f"Sovrascrittura del file esistente: {filename}", level="WARNING")
+
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+                
+            self.log(f"File dispositivo ESPHome salvato: {file_path}")
+            return {"success": True, "message": f"File {filename} salvato con successo.", "request_id": request_data.get("request_id")}
+            
+        except Exception as e:
+            self.error(f"Errore nel salvataggio del file dispositivo ESPHome: {e}")
+            return {"success": False, "error": str(e), "request_id": request_data.get("request_id")}
 
     # ===============================================================
     # SISTEMA BACKUP STRUTTURATO
@@ -987,3 +1101,14 @@ class SouthTechConfigurator(hass.Hass):
             
         except Exception as e:
             self.error(f"Errore durante terminazione: {e}")
+
+# ===============================================================
+# NOTA PER L'INTEGRAZIONE NEL MODULO DI COMUNICAZIONE
+# ===============================================================
+# Nel file 'southtech_configurator_communication.py', all'interno del gestore
+# di richieste (probabilmente 'monitor_sensor_requests' o un metodo simile),
+# è necessario aggiungere un nuovo blocco per gestire l'azione 'get_existing_devices'.
+#
+# Esempio di codice da aggiungere:
+# elif action == 'get_existing_devices':
+#     response_data = self.configurator._get_existing_devices(request_data)

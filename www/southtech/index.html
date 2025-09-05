@@ -500,9 +500,8 @@
                     <p class="menu-description">
                         Configura e gestisci dispositivi IoT collegati al sistema domotico.
                     </p>
-                    <button class="btn-menu" onclick="openIoTDevices()" disabled>
-                        <i class="fas fa-arrow-right me-2"></i> Dispositivi
-                        <small class="d-block">Prossimamente</small>
+                    <button class="btn-menu" onclick="openIoTDevices()">
+                        <i class="fas fa-arrow-right me-2"></i> Configura Dispositivi
                     </button>
                 </div>
             </div>
@@ -1168,7 +1167,13 @@
         }
         
         function openIoTDevices() {
-            SouthTechUI.showAlert('Funzione Dispositivi IoT prossimamente disponibile', 'info');
+            // Salva token per la prossima pagina
+            sessionStorage.setItem('southtech_session_token', authToken);
+            sessionStorage.setItem('southtech_ha_token', haToken);
+            sessionStorage.setItem('southtech_browser_id', browserId);
+            sessionStorage.setItem('southtech_page_source', 'index');
+            
+            window.location.href = 'devices.html';
         }
         
         function openSecurity() {

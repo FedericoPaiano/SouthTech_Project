@@ -245,7 +245,8 @@ class SouthTechConfiguratorCommunication:
                 'sync': False,
                 'setup': False,
                 'login': False,
-                'reset': False
+            'reset': False,
+            'device_config': False
             }
 
     def monitor_sensor_requests(self, kwargs):
@@ -322,6 +323,48 @@ class SouthTechConfiguratorCommunication:
                         self.process_sensor_reset_request()
                     finally:
                         self.sensor_locks['reset'] = False
+            
+            # Device Config Request
+            if not self.sensor_locks.get('device_config', False):
+                device_config_sensor = self.configurator.get_state("sensor.southtech_device_config_request")
+                device_config_attrs = self.configurator.get_state("sensor.southtech_device_config_request", attribute="all")
+                
+                if (device_config_sensor == "pending" and device_config_attrs and 
+                    self.configurator.security.is_new_request('device_config', device_config_attrs.get('attributes', {}))):
+                    
+                    self.sensor_locks['device_config'] = True
+                    try:
+                        self.process_sensor_device_config_request()
+                    finally:
+                        self.sensor_locks['device_config'] = False
+            
+            # Device Config Request
+            if not self.sensor_locks.get('device_config', False):
+                device_config_sensor = self.configurator.get_state("sensor.southtech_device_config_request")
+                device_config_attrs = self.configurator.get_state("sensor.southtech_device_config_request", attribute="all")
+                
+                if (device_config_sensor == "pending" and device_config_attrs and 
+                    self.configurator.security.is_new_request('device_config', device_config_attrs.get('attributes', {}))):
+                    
+                    self.sensor_locks['device_config'] = True
+                    try:
+                        self.process_sensor_device_config_request()
+                    finally:
+                        self.sensor_locks['device_config'] = False
+            
+            # Device Config Request
+            if not self.sensor_locks.get('device_config', False):
+                device_config_sensor = self.configurator.get_state("sensor.southtech_device_config_request")
+                device_config_attrs = self.configurator.get_state("sensor.southtech_device_config_request", attribute="all")
+                
+                if (device_config_sensor == "pending" and device_config_attrs and 
+                    self.configurator.security.is_new_request('device_config', device_config_attrs.get('attributes', {}))):
+                    
+                    self.sensor_locks['device_config'] = True
+                    try:
+                        self.process_sensor_device_config_request()
+                    finally:
+                        self.sensor_locks['device_config'] = False
                         
         except Exception as e:
             self.configurator.error(f"Errore monitor_sensor_requests: {e}")
@@ -682,6 +725,44 @@ class SouthTechConfiguratorCommunication:
             self.configurator.error(f"Errore processing sensor reset: {e}")
             self.create_response_sensor("sensor.southtech_reset_response", 
                                       {"success": False, "error": str(e)})
+
+    def process_sensor_device_config_request(self):
+        """Processa richiesta di configurazione dispositivo via sensore."""
+        request_data = None
+        try:
+            attrs = self.configurator.get_state("sensor.southtech_device_config_request", attribute="all")
+            if not attrs or "attributes" not in attrs:
+                return
+            
+            request_data = attrs["attributes"]
+            action = request_data.get("action")
+            request_id = request_data.get("request_id")
+
+            self.configurator.log(f"🔌 SENSOR: Ricevuta richiesta configurazione dispositivo: {action} (ID: {request_id})")
+
+            response_data = {"success": False, "error": "Azione non riconosciuta", "request_id": request_id}
+
+            if action == "get_available_device_numbers":
+                # Chiama il metodo dalla classe principale
+                response_data = self.configurator._get_available_device_numbers(request_data)
+            elif action == "save_esphome_device":
+                # Chiama il metodo dalla classe principale
+                response_data = self.configurator._save_esphome_device(request_data)
+            elif action == 'get_existing_devices':
+                response_data = self.configurator._get_existing_devices(request_data)
+
+            # Invia la risposta aggiornando il sensore di risposta
+            self.create_response_sensor("sensor.southtech_device_config_response", response_data)
+            self.configurator.log(f"🔌 SENSOR: Risposta inviata per {action} (ID: {request_id})")
+            self.configurator.set_state("sensor.southtech_device_config_request", state="completed")
+
+        except Exception as e:
+            self.configurator.error(f"❌ SENSOR: Errore durante la gestione della richiesta dispositivo: {e}")
+            error_response = {"success": False, "error": str(e)}
+            if request_data and "request_id" in request_data:
+                error_response["request_id"] = request_data["request_id"]
+            self.create_response_sensor("sensor.southtech_device_config_response", error_response)
+            self.configurator.set_state("sensor.southtech_device_config_request", state="completed")
 
     def monitor_save_requests(self, kwargs):
         """Monitora richieste di salvataggio via sensori (fallback) - VERSIONE MIGLIORATA"""
