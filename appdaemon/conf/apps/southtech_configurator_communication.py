@@ -745,6 +745,9 @@ class SouthTechConfiguratorCommunication:
             if action == "get_available_device_numbers":
                 # Chiama il metodo dalla classe principale
                 response_data = self.configurator._get_available_device_numbers(request_data)
+            elif action == "get_available_board_models":
+                # Chiama il metodo dalla classe principale per ottenere i modelli di schede
+                response_data = self.configurator._get_available_board_models(request_data)
             elif action == "save_esphome_device":
                 # Chiama il metodo dalla classe principale
                 response_data = self.configurator._save_esphome_device(request_data)

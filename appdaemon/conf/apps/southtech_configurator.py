@@ -715,14 +715,16 @@ class SouthTechConfigurator(hass.Hass):
                 os.makedirs(self.esphome_hardware_path)
                 self.log(f"Creata directory hardware ESPHome: {self.esphome_hardware_path}")
             
-            pattern = re.compile(r'AION_A8R_(\d{2})\.yaml$')
+            # Pattern per riconoscere tutti i modelli supportati (a8, a8r, a8s)
+            pattern = re.compile(r'^(kc868_a8|aion_a8r|aion_a8|aion_a8s)_(\d{2,})\.yaml$', re.IGNORECASE)
             
             used_numbers = set()
             for filename in os.listdir(self.esphome_hardware_path):
                 match = pattern.search(filename)
                 if match:
-                    used_numbers.add(int(match.group(1)))
-            
+                    # Il numero del dispositivo è nel secondo gruppo della regex
+                    used_numbers.add(int(match.group(2)))
+
             all_numbers = set(range(1, 100))
             available_numbers = sorted(list(all_numbers - used_numbers))
             
@@ -742,6 +744,32 @@ class SouthTechConfigurator(hass.Hass):
             self.error(f"Errore nel calcolare i numeri di dispositivo disponibili: {e}")
             return {"success": False, "error": str(e), "request_id": request_data.get("request_id")}
 
+    def _get_available_board_models(self, request_data):
+        """
+        Scansiona la cartella esphome/hardware e restituisce un elenco di modelli di schede
+        disponibili per la creazione in base alla presenza di file contenenti
+        'a8' o 'a8s'.
+        """
+        try:
+            if not os.path.exists(self.esphome_hardware_path):
+                self.log(f"Directory hardware ESPHome non trovata: {self.esphome_hardware_path}", level="WARNING")
+                return {"success": True, "models": [], "request_id": request_data.get("request_id")}
+
+            available_models = set()
+            
+            # Scansiona i file per determinare i modelli disponibili
+            for filename in os.listdir(self.esphome_hardware_path):
+                filename_lower = filename.lower()
+                if "a8s" in filename_lower:
+                    available_models.add("AION_A8SR")
+                elif "a8" in filename_lower:
+                    available_models.add("AION_A8R")
+            
+            return {"success": True, "models": sorted(list(available_models)), "request_id": request_data.get("request_id")}
+        except Exception as e:
+            self.error(f"Errore nel recuperare i modelli di schede disponibili: {e}")
+            return {"success": False, "error": str(e), "request_id": request_data.get("request_id")}
+
     def _get_existing_devices(self, request_data):
         """Scansiona la cartella hardware di ESPHome e restituisce i dispositivi esistenti."""
         try:
@@ -752,12 +780,20 @@ class SouthTechConfigurator(hass.Hass):
             # Mappa i nomi dei file (minuscolo) ai modelli dell'interfaccia utente.
             model_map = {
                 'kc868_a8': 'AION_A8R',
-                'aion_a8r': 'AION_A8R'
+                'aion_a8r': 'AION_A8R',
+                'aion_a8': 'AION_A8R',
+                'aion_a8s': 'AION_A8SR' # Nuovo modello per 'a8s'
+            }
+
+            # Mappa per i nomi "friendly" da mostrare nell'interfaccia
+            model_friendly_names = {
+                'AION_A8R': 'AION Model A8R',
+                'AION_A8SR': 'AION Model A8SR'
             }
             
             # Regex per catturare la parte del modello e la parte del numero.
-            # Esempio: kc868_a8_01.yaml o AION_A8R_02.yaml
-            pattern = re.compile(r'^(kc868_a8|aion_a8r)_(\d{2,})\.yaml$', re.IGNORECASE)
+            # Esempio: aion_a8_01.yaml, aion_a8s_02.yaml
+            pattern = re.compile(r'^(kc868_a8|aion_a8r|aion_a8|aion_a8s)_(\d{2,})\.yaml$', re.IGNORECASE)
             
             devices = []
             for filename in os.listdir(self.esphome_hardware_path):
@@ -770,8 +806,8 @@ class SouthTechConfigurator(hass.Hass):
                     ui_model = model_map.get(file_model_part)
                     
                     if ui_model:
-                        # Usa il nome del modello dell'interfaccia per il nome "friendly"
-                        model_friendly_name = "AION Model A8R" if ui_model == "AION_A8R" else ui_model
+                        # Ottiene il nome "friendly" dalla mappa, altrimenti usa l'ID del modello
+                        model_friendly_name = model_friendly_names.get(ui_model, ui_model)
                         devices.append({
                             "model": ui_model,
                             "number": number,
@@ -1101,14 +1137,3 @@ class SouthTechConfigurator(hass.Hass):
             
         except Exception as e:
             self.error(f"Errore durante terminazione: {e}")
-
-# ===============================================================
-# NOTA PER L'INTEGRAZIONE NEL MODULO DI COMUNICAZIONE
-# ===============================================================
-# Nel file 'southtech_configurator_communication.py', all'interno del gestore
-# di richieste (probabilmente 'monitor_sensor_requests' o un metodo simile),
-# è necessario aggiungere un nuovo blocco per gestire l'azione 'get_existing_devices'.
-#
-# Esempio di codice da aggiungere:
-# elif action == 'get_existing_devices':
-#     response_data = self.configurator._get_existing_devices(request_data)

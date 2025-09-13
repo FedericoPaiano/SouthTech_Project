@@ -1,9 +1,11 @@
 let haToken = null;
 let browserId = null;
+let selectedDeviceModel = null;
 
 // Aggiungo una mappa per le specifiche dei modelli
 const MODEL_SPECS = {
-    'AION_A8R': { inputs: 8, relays: 8, friendly_name: 'AION Model: A8R' }
+    'AION_A8R': { inputs: 8, relays: 8, friendly_name: 'AION Model: A8R' },
+    'AION_A8SR': { inputs: 8, relays: 8, friendly_name: 'AION Model: A8SR' }
     // Aggiungere qui altri modelli
 };
 
@@ -14,28 +16,98 @@ async function initializePage() {
     haToken = sessionStorage.getItem('southtech_ha_token');
     browserId = sessionStorage.getItem('southtech_browser_id');
     setupEventListeners();
-    // La popolazione di input/relay ora è gestita da updateDeviceDescription
-    await fetchExistingDevices(); // Deve essere eseguito prima di fetchAvailableDeviceNumbers
-    await fetchAvailableDeviceNumbers();
-
-    // Mostra la descrizione iniziale
-    updateDeviceDescription();
+    await populateDeviceSelector();
 }
 
 /**
  * Imposta i listener per gli eventi della UI.
  */
 function setupEventListeners() {
-    document.getElementById('deviceModel').addEventListener('change', () => updateDeviceDescription(true));
-    document.getElementById('deviceAction').addEventListener('change', handleDeviceActionChange);
+    // Listener per il modello, per aggiornare la UI quando si crea un nuovo dispositivo
+    document.getElementById('deviceModel').addEventListener('change', handleDeviceSelectionChange);
 }
 
 /**
- * Aggiorna la descrizione del dispositivo e popola i campi di input/output.
- * @param {boolean} fromUserInput - Indica se la chiamata proviene da un'azione diretta dell'utente.
+ * Popola il selettore dei dispositivi con opzioni per creare o modificare.
  */
-function updateDeviceDescription(fromUserInput = false) {
-    const model = document.getElementById('deviceModel').value;
+async function populateDeviceSelector() {
+    SouthTechUI.showAlert('Recupero dispositivi esistenti...', 'info');
+    const modelSelect = document.getElementById('deviceModel');
+    
+    // Pulisce le opzioni esistenti, mantenendo solo il placeholder
+    const placeholder = modelSelect.querySelector('option[value=""]');
+    modelSelect.innerHTML = '';
+    if (placeholder) {
+        placeholder.textContent = 'Seleziona un dispositivo da modificare...';
+        modelSelect.appendChild(placeholder);
+    }
+
+    try {
+        // Recupera solo i dispositivi esistenti
+        const devicesResponse = await communicateWithBackend('get_existing_devices');
+
+        if (!devicesResponse.success) throw new Error(devicesResponse.error || 'Errore recupero dispositivi');
+
+        const existingDevices = devicesResponse.devices || [];
+
+        // --- Popola con i dispositivi esistenti ---
+        if (existingDevices.length > 0) {
+            existingDevices.forEach(device => {
+                const option = new Option(device.friendly_name, `edit_${device.model}_${device.number}`);
+                modelSelect.appendChild(option);
+            });
+            SouthTechUI.showAlert('Dispositivi caricati.', 'success', 2000);
+        } else {
+             SouthTechUI.showAlert('Nessun dispositivo trovato. Controlla la cartella esphome/hardware.', 'warning', 5000);
+        }
+
+    } catch (error) {
+        console.error('Errore nel popolare il selettore dispositivi:', error);
+        SouthTechUI.showAlert(`Errore caricamento: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * Gestisce il cambio di selezione nel dropdown del dispositivo/modello.
+ */
+async function handleDeviceSelectionChange() {
+    const modelSelect = document.getElementById('deviceModel');
+    const selectedValue = modelSelect.value;
+    const deviceNumberContainer = document.getElementById('deviceNumberContainer');
+    const header = document.querySelector('.config-section h5');
+    selectedDeviceModel = null; // Reset
+
+    if (!selectedValue) {
+        deviceNumberContainer.style.display = 'none';
+        updateDeviceDescription(null, false);
+        if (header) header.innerHTML = '<i class="fas fa-edit"></i> Modifica Dispositivo';
+        return;
+    }
+
+    // Il valore è sempre nel formato "edit_MODEL_NUMBER"
+    // La riga seguente era errata perché non gestiva i modelli con underscore (es. AION_A8R)
+    // const [mode, model, number] = selectedValue.split('_');
+    const parts = selectedValue.split('_');
+    const mode = parts[0]; // "edit"
+    const number = parts[parts.length - 1]; // "01"
+    const model = parts.slice(1, parts.length - 1).join('_'); // "AION_A8R"
+
+    // --- Modalità MODIFICA ---
+    selectedDeviceModel = model;
+    if (header) header.innerHTML = `<i class="fas fa-edit"></i> Modifica Dispositivo ${model} (${number})`;
+    
+    deviceNumberContainer.innerHTML = `
+        <label for="deviceNumber" class="form-label">Numero Dispositivo</label>
+        <input type="text" id="deviceNumber" class="form-control" value="${number}" readonly style="background-color: #e9ecef;">
+        <small class="form-text text-muted">Numero del dispositivo selezionato (non modificabile).</small>
+    `;
+    deviceNumberContainer.style.display = 'block';
+    
+    updateDeviceDescription(model, true);
+    SouthTechUI.showAlert('Modalità modifica: caricamento configurazione non ancora implementato.', 'info');
+}
+
+function updateDeviceDescription(model, fromUserInput = false) {
     const descriptionEl = document.getElementById('deviceDescription');
     const configAndOutputContainer = document.getElementById('configAndOutputContainer');
 
@@ -172,162 +244,6 @@ function handleRelayTypeChange(event) {
 }
 
 /**
- * Recupera l'elenco dei dispositivi già configurati.
- */
-async function fetchExistingDevices() {
-    SouthTechUI.showAlert('Recupero dispositivi esistenti...', 'info');
-    try {
-        const response = await communicateWithBackend('get_existing_devices');
-        if (response.success) {
-            const actionSelect = document.getElementById('deviceAction');
-            
-            if (response.devices.length > 0) {
-                const optgroup = document.createElement('optgroup');
-                optgroup.label = 'Modifica Esistente';
-                response.devices.forEach(device => {
-                    // Il valore del formato: edit_MODELLO_NUMERO
-                    const option = new Option(device.friendly_name, `edit_${device.model}_${device.number}`);
-                    optgroup.appendChild(option);
-                });
-                actionSelect.appendChild(optgroup);
-            }
-            
-            SouthTechUI.showAlert('Dispositivi esistenti caricati.', 'success', 2000);
-        } else {
-            throw new Error(response.error || 'Errore sconosciuto');
-        }
-    } catch (error) {
-        console.error('Errore nel recuperare i dispositivi esistenti:', error);
-        SouthTechUI.showAlert(`Errore recupero dispositivi: ${error.message}`, 'error');
-    }
-}
-
-/**
- * Gestisce il cambio di azione (Crea vs Modifica).
- */
-async function handleDeviceActionChange() {
-    const actionValue = document.getElementById('deviceAction').value;
-    const modelSelect = document.getElementById('deviceModel');
-    const numberSelect = document.getElementById('deviceNumber');
-
-    if (actionValue === 'create_new') {
-        // Modalità Creazione
-        modelSelect.disabled = false;
-        numberSelect.disabled = false;
-        modelSelect.value = ''; // Resetta
-        await fetchAvailableDeviceNumbers(); // Ricarica solo i numeri disponibili
-        updateDeviceDescription(false); // Nasconde la configurazione
-    } else {
-        // Modalità Modifica
-        const [action, model, number] = actionValue.split('_');
-        
-        modelSelect.value = model;
-        modelSelect.disabled = true;
-        
-        let optionExists = Array.from(numberSelect.options).some(opt => opt.value === number);
-        if (!optionExists) {
-            numberSelect.add(new Option(number, number, false, true));
-        }
-        numberSelect.value = number;
-        numberSelect.disabled = true;
-        
-        updateDeviceDescription(true); // Mostra la configurazione e popola i campi
-    }
-}
-
-/**
- * Recupera l'elenco dei dispositivi già configurati.
- */
-async function fetchExistingDevices() {
-    SouthTechUI.showAlert('Recupero dispositivi esistenti...', 'info');
-    try {
-        const response = await communicateWithBackend('get_existing_devices');
-        if (response.success) {
-            const actionSelect = document.getElementById('deviceAction');
-            
-            if (response.devices.length > 0) {
-                const optgroup = document.createElement('optgroup');
-                optgroup.label = 'Modifica Esistente';
-                response.devices.forEach(device => {
-                    // Il valore del formato: edit_MODELLO_NUMERO
-                    const option = new Option(device.friendly_name, `edit_${device.model}_${device.number}`);
-                    optgroup.appendChild(option);
-                });
-                actionSelect.appendChild(optgroup);
-            }
-            
-            SouthTechUI.showAlert('Dispositivi esistenti caricati.', 'success', 2000);
-        } else {
-            throw new Error(response.error || 'Errore sconosciuto');
-        }
-    } catch (error) {
-        console.error('Errore nel recuperare i dispositivi esistenti:', error);
-        SouthTechUI.showAlert(`Errore recupero dispositivi: ${error.message}`, 'error');
-    }
-}
-
-/**
- * Gestisce il cambio di azione (Crea vs Modifica).
- */
-async function handleDeviceActionChange() {
-    const actionValue = document.getElementById('deviceAction').value;
-    const modelSelect = document.getElementById('deviceModel');
-    const numberSelect = document.getElementById('deviceNumber');
-
-    if (actionValue === 'create_new') {
-        // Modalità Creazione
-        modelSelect.disabled = false;
-        numberSelect.disabled = false;
-        modelSelect.value = ''; // Resetta
-        await fetchAvailableDeviceNumbers(); // Ricarica solo i numeri disponibili
-        updateDeviceDescription(false); // Nasconde la configurazione
-    } else {
-        // Modalità Modifica
-        const [action, model, number] = actionValue.split('_');
-        
-        modelSelect.value = model;
-        modelSelect.disabled = true;
-        
-        let optionExists = Array.from(numberSelect.options).some(opt => opt.value === number);
-        if (!optionExists) {
-            numberSelect.add(new Option(number, number, false, true));
-        }
-        numberSelect.value = number;
-        numberSelect.disabled = true;
-        
-        updateDeviceDescription(true); // Mostra la configurazione e popola i campi
-    }
-}
-
-/**
- * Richiede al backend i numeri di dispositivo disponibili.
- */
-async function fetchAvailableDeviceNumbers() {
-    SouthTechUI.showAlert('Recupero numeri dispositivo disponibili...', 'info');
-    try {
-        const response = await communicateWithBackend('get_available_device_numbers');
-        if (response.success) {
-            const numberSelect = document.getElementById('deviceNumber');
-            numberSelect.innerHTML = '';
-            response.available_numbers.forEach(num => {
-                const option = document.createElement('option');
-                option.value = num;
-                option.textContent = num;
-                numberSelect.appendChild(option);
-            });
-            numberSelect.value = response.next_number;
-            SouthTechUI.showAlert('Numeri dispositivo caricati.', 'success', 2000);
-        } else {
-            throw new Error(response.error || 'Errore sconosciuto');
-        }
-    } catch (error) {
-        console.error('Errore nel recuperare i numeri di dispositivo:', error);
-        SouthTechUI.showAlert(`Errore recupero numeri: ${error.message}`, 'error');
-        document.getElementById('deviceNumber').innerHTML = '<option>Errore</option>';
-    }
-}
-
-/**
  * Valida i pin GPIO inseriti per evitare duplicati e formati non validi.
  * @returns {{isValid: boolean, message?: string}} Oggetto con lo stato della validazione.
  */
@@ -381,8 +297,8 @@ function validatePins() {
  */
 function generateYaml() {
     const deviceNumber = document.getElementById('deviceNumber').value;
-    const model = document.getElementById('deviceModel').value;
-    const specs = MODEL_SPECS[model];
+    const model = selectedDeviceModel;
+    const specs = MODEL_SPECS[selectedDeviceModel];
 
     if (!deviceNumber || deviceNumber === 'Errore') {
         SouthTechUI.showAlert('Numero dispositivo non valido. Impossibile generare YAML.', 'error');
@@ -497,8 +413,8 @@ ${automationsYaml ? 'automation:\n' + automationsYaml : '# Nessuna automazione i
  */
 async function saveYaml() {
     const content = document.getElementById('yamlCode').textContent;
-    const model = document.getElementById('deviceModel').value;
     const deviceNumber = document.getElementById('deviceNumber').value;
+    const model = selectedDeviceModel;
 
     if (content.includes('Clicca "Genera YAML"')) {
         SouthTechUI.showAlert('Per favore, genera prima il codice YAML.', 'warning');
