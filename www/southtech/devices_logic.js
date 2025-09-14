@@ -33,14 +33,8 @@ function setupEventListeners() {
 async function populateDeviceSelector() {
     SouthTechUI.showAlert('Recupero dispositivi esistenti...', 'info');
     const modelSelect = document.getElementById('deviceModel');
-    
-    // Pulisce le opzioni esistenti, mantenendo solo il placeholder
-    const placeholder = modelSelect.querySelector('option[value=""]');
-    modelSelect.innerHTML = '';
-    if (placeholder) {
-        placeholder.textContent = 'Seleziona un dispositivo da modificare...';
-        modelSelect.appendChild(placeholder);
-    }
+
+    modelSelect.innerHTML = '<option value="" selected>Seleziona un dispositivo da modificare...</option>';
 
     try {
         // Recupera solo i dispositivi esistenti

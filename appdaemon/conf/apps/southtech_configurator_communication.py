@@ -245,8 +245,8 @@ class SouthTechConfiguratorCommunication:
                 'sync': False,
                 'setup': False,
                 'login': False,
-            'reset': False,
-            'device_config': False
+                'reset': False,
+                'device_config': False
             }
 
     def monitor_sensor_requests(self, kwargs):

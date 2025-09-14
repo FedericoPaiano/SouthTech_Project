@@ -1248,6 +1248,68 @@ class SouthTechConfiguratorDashboard:
             self.configurator.error(f"❌ Errore generazione anteprima configuration.yaml: {e}")
             return f"# Errore nella generazione dell'anteprima: {e}"
 
+    def find_dashboards_section_flexible(self, content):
+        """
+        Trova la sezione dashboards in configuration.yaml in modo flessibile.
+        Supporta sia 'lovelace: dashboards:' che solo 'dashboards:'.
+        
+        Returns:
+            tuple: (start_index, end_index, indent_level) della sezione
+        """
+        try:
+            lines = content.split('\n')
+            in_lovelace = False
+            found_dashboards = False
+            dashboards_indent = -1
+            dashboards_start = -1
+            dashboards_end = -1
+
+            for i, line in enumerate(lines):
+                stripped = line.rstrip()
+                if not stripped:  # Salta linee vuote
+                    continue
+
+                indent = len(line) - len(line.lstrip())
+                if 'lovelace:' in stripped and not stripped.lstrip().startswith('#'):
+                    in_lovelace = True
+                    lovelace_indent = indent
+                    continue
+
+                if 'dashboards:' in stripped and not stripped.lstrip().startswith('#'):
+                    # Se è sotto lovelace, controlla l'indentazione
+                    if in_lovelace and indent > lovelace_indent:
+                        found_dashboards = True
+                        dashboards_indent = indent
+                        dashboards_start = i
+                        break
+                    # Se è una sezione dashboards indipendente
+                    elif not in_lovelace:
+                        found_dashboards = True
+                        dashboards_indent = indent
+                        dashboards_start = i
+                        break
+
+            # Se abbiamo trovato la sezione dashboards, trova la sua fine
+            if found_dashboards:
+                for i in range(dashboards_start + 1, len(lines)):
+                    if not lines[i].strip():  # Salta linee vuote
+                        continue
+                    current_indent = len(lines[i]) - len(lines[i].lstrip())
+                    if current_indent <= dashboards_indent and lines[i].strip():
+                        dashboards_end = i
+                        break
+                # Se non troviamo una fine esplicita, è l'ultima sezione
+                if dashboards_end == -1:
+                    dashboards_end = len(lines)
+
+                return dashboards_start, dashboards_end, dashboards_indent
+
+            return -1, -1, -1
+
+        except Exception as e:
+            self.configurator.error(f"❌ Errore ricerca sezione dashboards: {e}")
+            return -1, -1, -1
+
     def update_configuration_yaml(self, skip_backup=False):
         """
         📝 AGGIORNAMENTO CONFIGURATION.YAML - VERSIONE CORRETTA E SICURA
@@ -2221,16 +2283,15 @@ class SouthTechConfiguratorDashboard:
             # STEP 4: Markers detection
             try:
                 section_bounds = self.find_dashboards_section_flexible(content)
-                has_markers = section_bounds is not None
+                has_markers = all(x != -1 for x in section_bounds) if section_bounds else False
                 test_results["step4_markers_detection"] = has_markers
                 
                 if has_markers:
-                    start_pos, end_pos, start_marker, end_marker = section_bounds
+                    start_pos, end_pos, indent_level = section_bounds
                     test_results["diagnostics"]["markers_found"] = {
                         "start_pos": start_pos,
                         "end_pos": end_pos,
-                        "start_marker": start_marker,
-                        "end_marker": end_marker
+                        "indent_level": indent_level
                     }
                 else:
                     test_results["diagnostics"]["markers_found"] = False

@@ -14,20 +14,12 @@ class SouthTechConfiguratorYaml:
     def __init__(self, configurator):
         """Inizializza il modulo YAML"""
         self.configurator = configurator
-        # Rimosse le assegnazioni dirette dei metodi di logging.
-        # Si userà self.configurator.log/error/warning direttamente.
-        # self.log = configurator.log
-        # self.error = configurator.error
-        # self.warning = configurator.warning
+        self.log = configurator.log
+        self.error = configurator.error
+        # Non usiamo warning perché non disponibile in hass.Hass
         
-        self.configurator.log("📝 Inizializzazione modulo YAML...")
-        
-        # Verifica integrità file all'avvio
-        is_valid, message = self.configurator.check_file_integrity()
-        if not is_valid:
-            self.configurator.warning(f"⚠️ Integrità YAML: {message}") # Correzione qui
-        
-        self.configurator.log("✅ Modulo YAML inizializzato")
+        self.log("📝 Inizializzazione modulo YAML...")
+        self.log("✅ Modulo YAML inizializzato")
 
     # ===============================================================
     # ESTRAZIONE E PARSING YAML

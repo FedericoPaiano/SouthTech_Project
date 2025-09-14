@@ -1,0 +1,26 @@
+---
+secrets: /homeassistant/secrets.yaml
+appdaemon:
+  plugins:
+    HASS:
+      type: hass
+      ha_url: http://supervisor/core
+      token: !env_var SUPERVISOR_TOKEN
+  time_zone: Europe/Rome
+  latitude: !secret latitude
+  longitude: !secret longitude
+  elevation: !secret elevation
+  threads: 10
+  threadpool_workers: 10
+  app_dir: /homeassistant/appdaemon/apps
+http:
+  url: http://0.0.0.0:5050
+admin:
+api:
+hadashboard:
+
+logs:
+  main_log:
+    filename: /homeassistant/appdaemon/logs/appdaemon.log
+  error_log:
+    filename: /homeassistant/appdaemon/logs/error.log
