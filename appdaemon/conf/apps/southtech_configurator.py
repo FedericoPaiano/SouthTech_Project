@@ -10,6 +10,7 @@ import threading
 from datetime import datetime, timedelta
 import shutil
 from contextlib import contextmanager
+from southtech_configurator_devices import DeviceConfigurationParser
 
 class SouthTechConfigurator(hass.Hass):
     """
@@ -99,8 +100,8 @@ class SouthTechConfigurator(hass.Hass):
             # Corrected typo: 'soouthtech_configurator_dashboard' to 'southtech_configurator_dashboard'
             from southtech_configurator_dashboard import SouthTechConfiguratorDashboard
             from southtech_configurator_communication import SouthTechConfiguratorCommunication
+            from southtech_configurator_devices import DeviceConfigurationParser  # Aggiornato import al nuovo file
             
-            # Inizializza moduli in ordine di dipendenza con gestione errori
             self.log("🔧 Inizializzazione moduli specializzati...")
             
             try:
@@ -144,9 +145,7 @@ class SouthTechConfigurator(hass.Hass):
             raise
         except Exception as e:
             self.error(f"❌ Errore inizializzazione moduli: {e}")
-            raise
-        
-        # ===============================================================
+            raise        # ===============================================================
         # INIZIALIZZAZIONE SISTEMA
         # ===============================================================
         
@@ -763,6 +762,8 @@ class SouthTechConfigurator(hass.Hass):
             self.error(f"Errore nel calcolare i numeri di dispositivo disponibili: {e}")
             return {"success": False, "error": str(e), "request_id": request_data.get("request_id")}
 
+
+
     def _get_existing_devices(self, request_data):
         """Scansiona la cartella hardware di ESPHome e restituisce i dispositivi esistenti."""
         try:
@@ -770,39 +771,22 @@ class SouthTechConfigurator(hass.Hass):
                 self.log(f"Directory hardware ESPHome non trovata: {self.esphome_hardware_path}", level="WARNING")
                 return {"success": True, "devices": [], "request_id": request_data.get("request_id")}
 
-            # Mappa i nomi dei file (minuscolo) ai modelli dell'interfaccia utente.
-            model_map = {
-                'kc868_a8': 'AION_A8R',
-                'aion_a8r': 'AION_A8R'
-            }
-            
-            # Regex per catturare la parte del modello e la parte del numero.
-            # Esempio: kc868_a8_01.yaml o AION_A8R_02.yaml
-            pattern = re.compile(r'^(kc868_a8|aion_a8r)_(\d{2,})\.yaml$', re.IGNORECASE)
-            
-            devices = []
-            for filename in os.listdir(self.esphome_hardware_path):
-                match = pattern.search(filename)
-                if match:
-                    file_model_part = match.group(1).lower()
-                    number = match.group(2)
-                    
-                    # Ottiene il nome del modello standardizzato per l'interfaccia utente
-                    ui_model = model_map.get(file_model_part)
-                    
-                    if ui_model:
-                        # Usa il nome del modello dell'interfaccia per il nome "friendly"
-                        model_friendly_name = "AION Model A8R" if ui_model == "AION_A8R" else ui_model
-                        devices.append({
-                            "model": ui_model,
-                            "number": number,
-                            "filename": filename,
-                            "friendly_name": f"{model_friendly_name} ({number})"
-                        })
-            
-            devices.sort(key=lambda x: x['friendly_name'])
+            # Usa il parser di configurazione dispositivi
+            parser = DeviceConfigurationParser(self.esphome_hardware_path)
+            devices = parser.get_all_devices()
 
-            return {"success": True, "devices": devices, "request_id": request_data.get("request_id")}
+            # Converte gli oggetti DeviceConfig in dizionari per JSON
+            devices_json = []
+            for device in devices:
+                devices_json.append({
+                    "model": device.model,
+                    "number": device.number,
+                    "filename": device.filename,
+                    "friendly_name": device.friendly_name,
+                    "configuration": device.configuration
+                })
+
+            return {"success": True, "devices": devices_json, "request_id": request_data.get("request_id")}
         except Exception as e:
             self.error(f"Errore nel leggere i dispositivi esistenti: {e}")
             return {"success": False, "error": str(e), "request_id": request_data.get("request_id")}

@@ -132,7 +132,7 @@
         }
         .input-row {
             display: grid;
-            grid-template-columns: 100px 1fr 1fr 1fr; /* Aggiunta colonna per associazione relè */
+            grid-template-columns: 100px 1fr 1fr; /* Colonne: Label, Controllo Dispositivo, Nome */
             gap: 15px;
             align-items: center;
             padding: 10px 0;
@@ -147,7 +147,7 @@
         }
         .relay-row {
             display: grid;
-            grid-template-columns: 100px 1fr 1fr 1fr; /* Aggiunta colonna per il pin */
+            grid-template-columns: 100px 1fr 1fr; /* Colonne: Label, Tipo Dispositivo, Nome */
             gap: 15px;
             align-items: center;
             padding: 10px 0;
@@ -259,6 +259,11 @@
                             <div class="config-header">
                                 <h5><i class="fas fa-toggle-on"></i> Configurazione Output (Relè)</h5>
                             </div>
+                            <div class="relay-header-row" style="display: grid; grid-template-columns: 100px 1fr 1fr; gap: 15px; padding: 10px 0; border-bottom: 2px solid #dee2e6; margin-bottom: 10px; font-weight: 600; color: var(--primary-color);">
+                                <span>Relè</span>
+                                <span>Tipo Dispositivo</span>
+                                <span>Nome Descrittivo</span>
+                            </div>
                             <div id="relayConfigContainer">
                                 <!-- Relay rows will be injected here by JS -->
                             </div>
@@ -268,7 +273,12 @@
                     <div class="col-lg-6">
                         <div id="inputConfigSection" class="config-section">
                             <div class="config-header">
-                                <h5><i class="fas fa-sign-in-alt"></i> Configurazione Input</h5>
+                                <h5><i class="fas fa-sign-in-alt"></i> Configurazione Input (Controllo Luci)</h5>
+                            </div>
+                            <div class="input-header-row" style="display: grid; grid-template-columns: 100px 1fr 1fr; gap: 15px; padding: 10px 0; border-bottom: 2px solid #dee2e6; margin-bottom: 10px; font-weight: 600; color: var(--primary-color);">
+                                <span>Input</span>
+                                <span>Controlla Dispositivo</span>
+                                <span>Nome Descrittivo</span>
                             </div>
                             <div id="inputConfigContainer">
                                 <!-- Input rows will be injected here by JS -->
@@ -319,7 +329,7 @@
     <script src="southtech_ui.js"></script>
     <script src="southtech_timeout.js"></script>
     <script src="southtech_session_guard.js"></script>
-    <script src="devices_logic.js?v=1.1"></script> <!-- ✅ AGGIUNTO: Cache-busting per forzare il ricaricamento -->
+    <script src="devices_logic.js?v=1.2"></script> <!-- ✅ AGGIUNTO: Cache-busting per forzare il ricaricamento -->
     <script>
         // Inizializzazione pagina
         window.addEventListener('load', async () => {
@@ -345,11 +355,10 @@
     <template id="inputRowTemplate">
         <div class="input-row">
             <span class="input-label"></span>
-            <input type="text" class="form-control form-control-sm input-pin-input" placeholder="Pin (es. GPIO34)">
-            <input type="text" class="form-control form-control-sm input-name-input" placeholder="Nome (es. Pulsante Salotto)">
             <select class="form-select form-select-sm input-relay-assoc">
                 <!-- Opzioni relè verranno iniettate da JS -->
             </select>
+            <input type="text" class="form-control form-control-sm input-name-input" placeholder="Nome (es. Pulsante Luce Salotto)">
         </div>
     </template>
 
@@ -361,17 +370,12 @@
                 <option value="light">Luce</option>
                 <option value="cover_open">Copertura (Apertura)</option>
                 <option value="cover_close" disabled>Copertura (Chiusura)</option>
-                <option value="thermostat">Termostato</option>
+                <option value="climate">Termostato</option>
             </select>
-            <input type="text" class="form-control form-control-sm relay-pin-input" placeholder="Pin (es. GPIO23)">
-            <div class="relay-extra-options">
-                <!-- Extra options for thermostat will be injected here -->
-            </div>
+            <input type="text" class="form-control form-control-sm relay-name-input" placeholder="Nome (es. Luce Salotto)">
         </div>
     </template>
 
-    <template id="thermostatOptionsTemplate">
-        <input type="text" class="form-control form-control-sm thermostat-sensor" placeholder="ID Sensore Temperatura (es. sensor.temp_salotto)">
-    </template>
+
 </body>
 </html>

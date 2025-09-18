@@ -44,15 +44,45 @@ async function populateDeviceSelector() {
 
         const existingDevices = devicesResponse.devices || [];
 
+        // --- Filtra solo i dispositivi A8R e A8SR ---
+        console.log('Dispositivi trovati:', existingDevices);
+        const validDevices = existingDevices.filter(device => {
+            const modelLower = device.model.toLowerCase();
+            console.log('Controllo modello:', device.model, 'lowercase:', modelLower);
+            const isValid = modelLower.includes('a8') || modelLower.includes('a8s');
+            console.log('È valido?', isValid);
+            return isValid;
+        });
+
         // --- Popola con i dispositivi esistenti ---
-        if (existingDevices.length > 0) {
-            existingDevices.forEach(device => {
-                const option = new Option(device.friendly_name, `edit_${device.model}_${device.number}`);
+        console.log('Dispositivi validi dopo il filtro:', validDevices);
+        if (validDevices.length > 0) {
+            validDevices.forEach(device => {
+                // Determina il modello corretto
+                let displayModel = device.model;
+                console.log('Elaborazione dispositivo:', device);
+                if (device.model.toLowerCase().includes('a8s')) {
+                    displayModel = 'AION_A8SR';
+                } else if (device.model.toLowerCase().includes('a8')) {
+                    displayModel = 'AION_A8R';
+                }
+                console.log('Modello finale:', displayModel);
+                
+                // Salva la configurazione del dispositivo per uso futuro
+                device.displayModel = displayModel;
+                window.deviceConfigurations = window.deviceConfigurations || {};
+                console.log(`Salvando configurazione per ${displayModel}_${device.number}:`, device.configuration);
+                window.deviceConfigurations[`${displayModel}_${device.number}`] = device.configuration;
+                
+                const option = new Option(
+                    `${MODEL_SPECS[displayModel].friendly_name} #${device.number}`, 
+                    `edit_${displayModel}_${device.number}`
+                );
                 modelSelect.appendChild(option);
             });
-            SouthTechUI.showAlert('Dispositivi caricati.', 'success', 2000);
+            SouthTechUI.showAlert(`${validDevices.length} dispositivi compatibili trovati.`, 'success', 2000);
         } else {
-             SouthTechUI.showAlert('Nessun dispositivo trovato. Controlla la cartella esphome/hardware.', 'warning', 5000);
+             SouthTechUI.showAlert('Nessun dispositivo A8R/A8SR trovato nella cartella esphome/hardware.', 'warning', 5000);
         }
 
     } catch (error) {
@@ -98,7 +128,72 @@ async function handleDeviceSelectionChange() {
     deviceNumberContainer.style.display = 'block';
     
     updateDeviceDescription(model, true);
-    SouthTechUI.showAlert('Modalità modifica: caricamento configurazione non ancora implementato.', 'info');
+    
+    // Carica la configurazione salvata
+    const deviceConfig = window.deviceConfigurations[`${model}_${number}`];
+    if (deviceConfig) {
+        console.log('Caricamento configurazione dispositivo completa:', deviceConfig);
+        
+        // Popola i relè con la configurazione salvata
+        if (deviceConfig.relays) {
+            deviceConfig.relays.forEach(relay => {
+                const relayTypeSelect = document.getElementById(`relay_type_${relay.number}`);
+                const relayNameInput = document.getElementById(`relay_name_${relay.number}`);
+                
+                if (relayTypeSelect) {
+                    relayTypeSelect.value = relay.type;
+                    // Trigger dell'evento change per gestire le opzioni aggiuntive
+                    relayTypeSelect.dispatchEvent(new Event('change'));
+                }
+                
+                if (relayNameInput && relay.name) {
+                    relayNameInput.value = relay.name;
+                }
+            });
+        }
+        
+        // Popola gli input con i dati di controllo luci
+        if (deviceConfig.inputs && deviceConfig.inputs.length > 0) {
+            console.log('✅ Configurazione input ricevuta dal backend:', deviceConfig.inputs);
+            deviceConfig.inputs.forEach(input => {
+                const nameInput = document.getElementById(`input_name_${input.number}`);
+                const feedbackSelect = document.getElementById(`input_feedback_assoc_${input.number}`);
+                
+                if (nameInput) nameInput.value = input.name || '';
+                
+                // Determina quale dispositivo è associato a questo input di controllo
+                if (feedbackSelect && input.feedback_for_relay) {
+                    feedbackSelect.value = input.feedback_for_relay;
+                    
+                    // Aggiorna il testo dell'opzione in base al tipo di controllo
+                    const option = feedbackSelect.querySelector(`option[value="${input.feedback_for_relay}"]`);
+                    if (option) {
+                        const controlType = input.control_type || 'unknown';
+                        if (controlType === 'light') {
+                            option.textContent = `Controlla Luce Relè ${input.feedback_for_relay}`;
+                        } else if (controlType === 'cover_open') {
+                            option.textContent = `Apertura Copertura Relè ${input.feedback_for_relay}`;
+                        } else if (controlType === 'cover_close') {
+                            option.textContent = `Chiusura Copertura Relè ${input.feedback_for_relay}`;
+                        } else {
+                            option.textContent = `Controllo ${controlType} Relè ${input.feedback_for_relay}`;
+                        }
+                    }
+                }
+            });
+        } else {
+            console.log('❌ Nessuna configurazione input ricevuta dal backend');
+            console.log('💡 Questo indica che AppDaemon sta usando la vecchia versione del parser');
+            console.log('🔄 Soluzione: Riavviare Home Assistant o AppDaemon');
+            
+            // Mostra un avviso all'utente
+            SouthTechUI.showAlert('⚠️ Configurazione input non disponibile - Riavviare Home Assistant per caricare gli aggiornamenti', 'warning', 8000);
+        }
+        
+        SouthTechUI.showAlert('Configurazione dispositivo caricata.', 'success');
+    } else {
+        SouthTechUI.showAlert('Nessuna configurazione trovata per questo dispositivo.', 'warning');
+    }
 }
 
 function updateDeviceDescription(model, fromUserInput = false) {
@@ -118,8 +213,9 @@ function updateDeviceDescription(model, fromUserInput = false) {
         descriptionEl.innerHTML = `
             <strong>Scheda ${specs.friendly_name}</strong>
             <ul>
-                <li><strong>Input disponibili:</strong> ${specs.inputs}</li>
+                <li><strong>Input disponibili:</strong> ${specs.inputs} (controllo diretto luci)</li>
                 <li><strong>Output (Relè) disponibili:</strong> ${specs.relays}</li>
+                <li><strong>Logica Controllo:</strong> Ogni input controlla direttamente l'accensione/spegnimento di una luce specifica</li>
             </ul>
         `;
         descriptionEl.style.display = 'block';
@@ -145,22 +241,33 @@ function populateInputConfigs(inputCount, relayCount) {
         const clone = template.content.cloneNode(true);
         clone.querySelector('.input-label').textContent = `Input ${i}`;
         
-        clone.querySelector('.input-pin-input').id = `input_pin_${i}`;
-        clone.querySelector('.input-name-input').id = `input_name_${i}`;
+        const nameInput = clone.querySelector('.input-name-input');
+        nameInput.id = `input_name_${i}`;
+        nameInput.readOnly = true;
+        nameInput.style.backgroundColor = '#e9ecef';
 
-        // Popola il dropdown di associazione relè
+        // Popola il dropdown di associazione feedback luce
         const assocSelect = clone.querySelector('.input-relay-assoc');
-        assocSelect.id = `input_relay_assoc_${i}`;
+        assocSelect.id = `input_feedback_assoc_${i}`;
+        assocSelect.disabled = true;
+        assocSelect.style.backgroundColor = '#e9ecef';
         
         const noAssocOption = document.createElement('option');
         noAssocOption.value = "";
-        noAssocOption.textContent = "Nessuna";
+        noAssocOption.textContent = "Nessun controllo";
         assocSelect.appendChild(noAssocOption);
 
+        // Popola con tutti i relè - il testo sarà aggiornato quando si carica la configurazione
         for (let j = 1; j <= relayCount; j++) {
-            assocSelect.add(new Option(`Relè ${j}`, j));
+            assocSelect.add(new Option(`Controlla Relè ${j}`, j));
         }
-        assocSelect.value = i <= relayCount ? i : ""; // Associazione di default (Input 1 -> Relè 1, etc.)
+        
+        // Aggiungi opzioni per coperture (relè accoppiati)
+        for (let j = 1; j < relayCount; j += 2) {
+            const coverRelays = `${j}-${j + 1}`;
+            assocSelect.add(new Option(`Copertura Relè ${coverRelays}`, coverRelays));
+        }
+        assocSelect.value = ""; // Nessuna associazione di default
 
         container.appendChild(clone);
     }
@@ -180,12 +287,17 @@ function populateRelayConfigs(count) {
         relayRow.id = `relay_row_${i}`;
         clone.querySelector('.relay-label').textContent = `Relè ${i}`;
         
+        const nameInput = clone.querySelector('.relay-name-input');
+        nameInput.id = `relay_name_${i}`;
+        nameInput.readOnly = true;
+        nameInput.style.backgroundColor = '#e9ecef';
+        
         const select = clone.querySelector('.relay-type-select');
         select.id = `relay_type_${i}`;
         select.dataset.relayIndex = i;
+        select.disabled = true;
+        select.style.backgroundColor = '#e9ecef';
         select.addEventListener('change', handleRelayTypeChange);
-
-        clone.querySelector('.relay-pin-input').id = `relay_pin_${i}`;
 
         container.appendChild(clone);
     }
@@ -199,9 +311,8 @@ function handleRelayTypeChange(event) {
     const select = event.target;
     const relayIndex = parseInt(select.dataset.relayIndex, 10);
     const selectedType = select.value;
-    const extraOptionsContainer = document.querySelector(`#relay_row_${relayIndex} .relay-extra-options`);
-    extraOptionsContainer.innerHTML = '';
-
+    
+    // Non c'è più il container per opzioni extra nel template semplificato
     const totalRelays = document.querySelectorAll('.relay-row').length;
 
     // Logica per "Copertura"
@@ -225,13 +336,7 @@ function handleRelayTypeChange(event) {
         }
     }
 
-    // Logica per "Termostato"
-    if (selectedType === 'thermostat') {
-        const thermostatTemplate = document.getElementById('thermostatOptionsTemplate');
-        const clone = thermostatTemplate.content.cloneNode(true);
-        clone.querySelector('input').id = `thermostat_sensor_${relayIndex}`;
-        extraOptionsContainer.appendChild(clone);
-    }
+    // Logica per "Termostato" - Non più necessaria, configurazione gestita automaticamente
 
     // Salva il valore corrente per il prossimo cambio
     select.dataset.previousValue = selectedType;
@@ -248,39 +353,9 @@ function validatePins() {
     const specs = MODEL_SPECS[model];
     if (!specs) return { isValid: false, message: "Modello scheda non valido." };
 
-    // Controlla gli input
-    for (let i = 1; i <= specs.inputs; i++) {
-        const pinInput = document.getElementById(`input_pin_${i}`);
-        if (!pinInput) continue;
-        const pin = pinInput.value.trim().toUpperCase();
-        if (pin) {
-            if (pins.has(pin)) {
-                errors.push(`Pin duplicato ${pin} (usato da ${pins.get(pin)} e Input ${i})`);
-            } else {
-                pins.set(pin, `Input ${i}`);
-            }
-            if (!pin.startsWith('GPIO')) {
-                 errors.push(`Pin non valido per Input ${i}: "${pin}". Dovrebbe iniziare con 'GPIO'.`);
-            }
-        }
-    }
+    // Pin validation non più necessaria - gestita automaticamente dal parser
 
-    // Controlla i relè
-    for (let i = 1; i <= specs.relays; i++) {
-        const pinInput = document.getElementById(`relay_pin_${i}`);
-        if (!pinInput) continue;
-        const pin = pinInput.value.trim().toUpperCase();
-        if (pin) {
-            if (pins.has(pin)) {
-                errors.push(`Pin duplicato ${pin} (usato da ${pins.get(pin)} e Relè ${i})`);
-            } else {
-                pins.set(pin, `Relè ${i}`);
-            }
-             if (!pin.startsWith('GPIO')) {
-                 errors.push(`Pin non valido per Relè ${i}: "${pin}". Dovrebbe iniziare con 'GPIO'.`);
-            }
-        }
-    }
+    // I pin dei relè sono ora gestiti automaticamente dal parser, non servono controlli
 
     if (errors.length > 0) return { isValid: false, message: "Errori di validazione:\n- " + errors.join('\n- ') };
     return { isValid: true };
@@ -303,43 +378,18 @@ function generateYaml() {
         return;
     }
 
-    // Esegui la validazione dei pin prima di generare
-    const validation = validatePins();
-    if (!validation.isValid) {
-        SouthTechUI.showAlert(validation.message, 'error', 8000);
-        return;
-    }
+    // La validazione non è più necessaria - configurazione gestita automaticamente dal parser
 
     const deviceName = `${model.toLowerCase()}_${deviceNumber}`;
     const friendlyName = `${specs.friendly_name} ${deviceNumber}`;
 
-    const inputsYaml = Array.from({length: specs.inputs}, (_, i) => {
-        const pin = document.getElementById(`input_pin_${i + 1}`).value.trim();
-        const name = document.getElementById(`input_name_${i + 1}`).value.trim();
-        if (pin && name) {
-            return `  - platform: gpio\n    pin: ${pin}\n    name: "${name}"\n    id: input_${i + 1}`;
-        } else if (pin || name) {
-            return `  # Input ${i + 1} configurato parzialmente e ignorato.`;
-        }
-        return ``; // Non aggiungere nulla se vuoto
-    }).filter(Boolean).join('\n');
+    // La generazione YAML degli input è ora gestita direttamente dal file ESPHome esistente
+    const inputsYaml = `# Input configuration is managed automatically from existing ESPHome file`;
 
-    const relaysYaml = Array.from({length: specs.relays}, (_, i) => {
-        const pin = document.getElementById(`relay_pin_${i + 1}`).value.trim();
-        if (pin) {
-            return `  - platform: gpio\n    pin: ${pin}\n    name: "\\${friendlyName} Relay ${i + 1}"\n    id: relay_${i + 1}`;
-        }
-        return ``; // Non aggiungere nulla se vuoto
-    }).filter(Boolean).join('\n');
+    // I relè sono ora gestiti direttamente dal file YAML esistente - non generiamo più la sezione switch
 
-    const automationsYaml = Array.from({length: specs.inputs}, (_, i) => {
-        const assocRelay = document.getElementById(`input_relay_assoc_${i + 1}`).value;
-        const inputPin = document.getElementById(`input_pin_${i + 1}`).value.trim();
-        if (assocRelay && inputPin) {
-            return `  - alias: "Toggle Relay ${assocRelay} from Input ${i + 1}"\n    trigger:\n      - platform: state\n        entity_id: binary_sensor.input_${i + 1}\n        to: 'on'\n    action:\n      - service: switch.toggle\n        target:\n          entity_id: switch.relay_${assocRelay}`;
-        }
-        return '';
-    }).filter(Boolean).join('\n');
+    // Le automazioni input-dispositivo sono ora gestite dal file ESPHome esistente
+    const automationsYaml = `# Input-device automation is managed automatically from existing ESPHome file`;
 
 
     let yaml = `substitutions:
@@ -364,38 +414,14 @@ wifi:
 
 ${inputsYaml ? 'binary_sensor:\n' + inputsYaml : '# Nessun input configurato'}
 
-${relaysYaml ? 'switch:\n' + relaysYaml : '# Nessun relè configurato'}
+# Le configurazioni switch, light, cover e climate sono gestite dal file YAML esistente
 
 ${automationsYaml ? 'automation:\n' + automationsYaml : '# Nessuna automazione input-relè configurata'}
 `;
 
-    // Aggiunge le configurazioni specifiche per tipo di relè
-    let covers = [];
-    for (let i = 1; i <= specs.relays; i++) {
-        const type = document.getElementById(`relay_type_${i}`).value;
-        const relayId = `relay_${i}`;
-
-        if (type === 'light') {
-            yaml += `light:\n  - platform: switch\n    name: "\${friendly_name} Light ${i}"\n    switch_id: ${relayId}\n\n`;
-        } else if (type === 'cover_open') {
-            covers.push({ open_relay: relayId, close_relay: `relay_${i + 1}`, index: covers.length + 1 });
-        } else if (type === 'thermostat') {
-            const sensorId = document.getElementById(`thermostat_sensor_${i}`).value;
-            if (sensorId) {
-                yaml += `climate:\n  - platform: bang_bang\n    name: "\${friendly_name} Thermostat ${i}"\n    sensor: ${sensorId}\n    cool_action:\n      - switch.turn_on: ${relayId}\n    idle_action:\n      - switch.turn_off: ${relayId}\n\n`;
-            } else {
-                yaml += `# ATTENZIONE: Configurazione Termostato per Relè ${i} incompleta. Manca l'ID del sensore di temperatura.\n\n`;
-            }
-        }
-    }
-
-    // Aggiunge le configurazioni delle coperture
-    if (covers.length > 0) {
-        yaml += 'cover:\n';
-        covers.forEach(cover => {
-            yaml += `  - platform: template\n    name: "\${friendly_name} Cover ${cover.index}"\n    open_action:\n      - switch.turn_on: ${cover.open_relay}\n    close_action:\n      - switch.turn_on: ${cover.close_relay}\n    stop_action:\n      - switch.turn_off: ${cover.open_relay}\n      - switch.turn_off: ${cover.close_relay}\n\n`;
-        });
-    }
+    // Le configurazioni specifiche per tipo di relè (light, cover, climate) 
+    // sono ora gestite direttamente dal file YAML esistente
+    yaml += `\n# NOTA: Le configurazioni di luci, coperture e termostati sono già presenti nel file YAML esistente\n# e vengono gestite automaticamente dal sistema.\n`;
 
     document.getElementById('yamlCode').textContent = yaml;
     document.getElementById('yamlOutput').style.display = 'block';
