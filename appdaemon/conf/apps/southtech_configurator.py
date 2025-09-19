@@ -1,6 +1,7 @@
 import appdaemon.plugins.hass.hassapi as hass
 import yaml
 import os
+import sys
 import re
 import json
 import hashlib
@@ -10,7 +11,6 @@ import threading
 from datetime import datetime, timedelta
 import shutil
 from contextlib import contextmanager
-from southtech_configurator_devices import DeviceConfigurationParser
 
 class SouthTechConfigurator(hass.Hass):
     """
@@ -94,13 +94,25 @@ class SouthTechConfigurator(hass.Hass):
         
         # Importa e inizializza i moduli specializzati
         try:
-            # Changed relative imports to absolute imports
+            # Import con percorso dinamico compatibile con AppDaemon
+            # sys è già importato globalmente
+            
+            # Aggiungi il percorso della sottocartella al sys.path
+            current_dir = os.path.dirname(__file__)
+            southtech_dir = os.path.join(current_dir, 'southtech_configurator')
+            if southtech_dir not in sys.path:
+                sys.path.insert(0, southtech_dir)
+                self.log(f"📁 Aggiunto percorso moduli: {southtech_dir}")
+            
+            # Import diretti dei moduli dalla sottocartella
             from southtech_configurator_security import SouthTechConfiguratorSecurity
             from southtech_configurator_yaml import SouthTechConfiguratorYaml
-            # Corrected typo: 'soouthtech_configurator_dashboard' to 'southtech_configurator_dashboard'
             from southtech_configurator_dashboard import SouthTechConfiguratorDashboard
             from southtech_configurator_communication import SouthTechConfiguratorCommunication
-            from southtech_configurator_devices import DeviceConfigurationParser  # Aggiornato import al nuovo file
+            from southtech_configurator_devices import DeviceConfigurationParser
+            
+            # Salva la classe DeviceConfigurationParser per uso nei metodi
+            self.DeviceConfigurationParser = DeviceConfigurationParser
             
             self.log("🔧 Inizializzazione moduli specializzati...")
             
@@ -772,7 +784,7 @@ class SouthTechConfigurator(hass.Hass):
                 return {"success": True, "devices": [], "request_id": request_data.get("request_id")}
 
             # Usa il parser di configurazione dispositivi
-            parser = DeviceConfigurationParser(self.esphome_hardware_path)
+            parser = self.DeviceConfigurationParser(self.esphome_hardware_path)
             devices = parser.get_all_devices()
 
             # Converte gli oggetti DeviceConfig in dizionari per JSON
