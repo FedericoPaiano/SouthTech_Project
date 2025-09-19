@@ -221,6 +221,9 @@ class SouthTechConfiguratorSecurity:
     def save_security_data(self, kwargs=None):
         """Salva dati di sicurezza su file"""
         try:
+            # Assicurati che la directory json esista
+            os.makedirs(os.path.dirname(self.configurator.security_file), exist_ok=True)
+            
             data = {
                 "blocked_users": self.configurator.blocked_users,
                 "attempt_counters": self.configurator.attempt_counters,
@@ -353,6 +356,9 @@ class SouthTechConfiguratorSecurity:
                 auth_data["security_method"] = "legacy_only"
                 auth_data["migration_note"] = "Reset password per abilitare sicurezza completa"
                 
+                # Assicurati che la directory json esista
+                os.makedirs(os.path.dirname(self.configurator.auth_file), exist_ok=True)
+                
                 with open(self.configurator.auth_file, 'w') as f:
                     json.dump(auth_data, f, indent=2)
             
@@ -386,6 +392,9 @@ class SouthTechConfiguratorSecurity:
                     "created_by": user_id[:20]
                 }
                 self.configurator.log(f"🔐 Salvando con salt: password={password_data[:3]}..., salt={salt[:10]}...")
+            
+            # Assicurati che la directory json esista
+            os.makedirs(os.path.dirname(self.configurator.auth_file), exist_ok=True)
             
             # Scrivi file auth
             with open(self.configurator.auth_file, 'w') as f:
@@ -519,6 +528,9 @@ class SouthTechConfiguratorSecurity:
                 "created_by": user_id[:20]
             }
             
+            # Assicurati che la directory json esista
+            os.makedirs(os.path.dirname(self.configurator.auth_file), exist_ok=True)
+            
             with open(self.configurator.auth_file, 'w') as f:
                 json.dump(auth_data, f, indent=2)
             
@@ -638,6 +650,9 @@ class SouthTechConfiguratorSecurity:
                 "salt": new_salt,
                 "last_changed": datetime.now().isoformat()
             })
+            
+            # Assicurati che la directory json esista
+            os.makedirs(os.path.dirname(self.configurator.auth_file), exist_ok=True)
             
             with open(self.configurator.auth_file, 'w') as f:
                 json.dump(auth_data, f, indent=2)

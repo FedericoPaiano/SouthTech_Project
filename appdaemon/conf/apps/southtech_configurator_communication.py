@@ -959,10 +959,11 @@ class SouthTechConfiguratorCommunication:
                 "architecture": "modular"
             }
             
-            status_file = os.path.join(self.configurator.www_path, "auth_status.json")
+            json_dir = os.path.join(self.configurator.www_path, "json")
+            status_file = os.path.join(json_dir, "auth_status.json")
             
-            # Assicurati che la directory esista
-            os.makedirs(self.configurator.www_path, exist_ok=True)
+            # Assicurati che la directory json esista
+            os.makedirs(json_dir, exist_ok=True)
             
             with open(status_file, 'w') as f:
                 json.dump(status, f, indent=2)
@@ -1003,7 +1004,11 @@ class SouthTechConfiguratorCommunication:
     def create_initial_auth_status(self):
         """Crea il file auth_status.json iniziale"""
         try:
-            auth_status_file = os.path.join(self.configurator.www_path, "auth_status.json")
+            json_dir = os.path.join(self.configurator.www_path, "json")
+            auth_status_file = os.path.join(json_dir, "auth_status.json")
+            
+            # Assicurati che la directory json esista
+            os.makedirs(json_dir, exist_ok=True)
             
             if not os.path.exists(auth_status_file):
                 initial_status = {

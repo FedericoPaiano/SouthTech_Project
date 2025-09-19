@@ -32,9 +32,9 @@ class SouthTechConfigurator(hass.Hass):
         self.www_base_path = self.args.get("www_base_path", "/homeassistant/www")
         
         self.www_path = os.path.join(self.www_base_path, "southtech")
-        self.auth_file = os.path.join(self.www_path, "auth.json")
+        self.auth_file = os.path.join(self.www_path, "json", "auth.json")
         self.backup_path = os.path.join(self.www_path, "backups")
-        self.security_file = os.path.join(self.www_path, "security.json")
+        self.security_file = os.path.join(self.www_path, "json", "security.json")
         
         # File per comunicazione con il frontend
         self.api_path = os.path.join(self.www_path, "api")

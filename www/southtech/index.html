@@ -692,7 +692,7 @@
         async function checkApplicationAuthStatus() {
             try {
                 // Prima controlla file locale
-                const response = await fetch('/local/southtech/auth_status.json?t=' + Date.now());
+                const response = await fetch('/local/southtech/json/auth_status.json?t=' + Date.now());
                 if (response.ok) {
                     const data = await response.json();
                     console.log('🔍 [Auth] Stato da file:', data);
