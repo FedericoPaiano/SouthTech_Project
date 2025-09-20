@@ -221,6 +221,9 @@ class SouthTechConfiguratorSecurity:
     def save_security_data(self, kwargs=None):
         """Salva dati di sicurezza su file"""
         try:
+            # Assicurati che la directory json esista
+            os.makedirs(os.path.dirname(self.configurator.security_file), exist_ok=True)
+            
             data = {
                 "blocked_users": self.configurator.blocked_users,
                 "attempt_counters": self.configurator.attempt_counters,
@@ -353,6 +356,9 @@ class SouthTechConfiguratorSecurity:
                 auth_data["security_method"] = "legacy_only"
                 auth_data["migration_note"] = "Reset password per abilitare sicurezza completa"
                 
+                # Assicurati che la directory json esista
+                os.makedirs(os.path.dirname(self.configurator.auth_file), exist_ok=True)
+                
                 with open(self.configurator.auth_file, 'w') as f:
                     json.dump(auth_data, f, indent=2)
             
@@ -386,6 +392,9 @@ class SouthTechConfiguratorSecurity:
                     "created_by": user_id[:20]
                 }
                 self.configurator.log(f"🔐 Salvando con salt: password={password_data[:3]}..., salt={salt[:10]}...")
+            
+            # Assicurati che la directory json esista
+            os.makedirs(os.path.dirname(self.configurator.auth_file), exist_ok=True)
             
             # Scrivi file auth
             with open(self.configurator.auth_file, 'w') as f:
@@ -519,6 +528,9 @@ class SouthTechConfiguratorSecurity:
                 "created_by": user_id[:20]
             }
             
+            # Assicurati che la directory json esista
+            os.makedirs(os.path.dirname(self.configurator.auth_file), exist_ok=True)
+            
             with open(self.configurator.auth_file, 'w') as f:
                 json.dump(auth_data, f, indent=2)
             
@@ -638,6 +650,9 @@ class SouthTechConfiguratorSecurity:
                 "salt": new_salt,
                 "last_changed": datetime.now().isoformat()
             })
+            
+            # Assicurati che la directory json esista
+            os.makedirs(os.path.dirname(self.configurator.auth_file), exist_ok=True)
             
             with open(self.configurator.auth_file, 'w') as f:
                 json.dump(auth_data, f, indent=2)
@@ -1034,101 +1049,41 @@ class SouthTechConfiguratorSecurity:
             return False
 
     # ===============================================================
-    # API ENDPOINTS - NUOVO ENDPOINT PER ANTEPRIMA
-    # ===============================================================
-
-    def api_preview_config(self, data):
-        """
-        [NUOVO METODO]
-        Genera un'anteprima "a secco" delle configurazioni senza salvarle.
-        Questa è la nuova fonte di verità per l'anteprima del frontend.
-        """
-        self.configurator.log("🔍 PREVIEW: Richiesta anteprima configurazione via API")
-        try:
-            # 1. Verifica token di sessione
-            auth_header = data.get("__headers", {}).get("Authorization", "")
-            token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
-            
-            if not self.verify_token(token):
-                return {"error": "Non autorizzato"}, 401
-
-            # 2. Estrai le configurazioni inviate dal frontend
-            configurations = data.get("configurations", [])
-            self.configurator.log(f"🔍 PREVIEW: Ricevute {len(configurations)} configurazioni per l'anteprima.")
-
-            # 3. Chiama i metodi di generazione del backend per creare il codice
-            #    Questi sono gli stessi metodi usati per il salvataggio finale.
-            apps_yaml_preview = self.configurator.yaml.generate_light_control_section(configurations)
-            templates_yaml_preview = self.configurator.dashboard.create_templates_content(configurations)
-            
-            # Per la dashboard, generiamo sia il file principale che un esempio di file singolo
-            main_dashboard_preview = self.configurator.dashboard.create_main_dashboard_content(configurations)
-            
-            # 4. Assembla la risposta JSON
-            response_data = {
-                "success": True,
-                "previews": {
-                    "apps_yaml": apps_yaml_preview,
-                    "templates_yaml": templates_yaml_preview,
-                    "dashboard_yaml": main_dashboard_preview
-                },
-                "timestamp": datetime.now().isoformat()
-            }
-            
-            return response_data, 200
-
-        except Exception as e:
-            self.configurator.error(f"❌ PREVIEW: Errore durante la generazione dell'anteprima: {e}")
-            import traceback
-            self.configurator.error(traceback.format_exc())
-            return {"error": str(e)}, 500
-
-    # ===============================================================
     # SETUP ENDPOINTS
     # ===============================================================
     
     def setup_endpoints(self):
-        """🔧 Registra tutti gli endpoint API AppDaemon - ALLA FINE dell'inizializzazione"""
+        """🔧 Registra tutti gli endpoint API AppDaemon"""
         try:
             self.configurator.log("🔗 Registrazione endpoint API...")
             
-            # Endpoint principali
+            # [MODIFICATO] Vengono registrati solo gli endpoint essenziali.
+            # Le operazioni di anteprima, salvataggio e sincronizzazione sono ora gestite
+            # principalmente dal sistema di comunicazione a sensori.
+
+            # Endpoint per autenticazione e status (usati da index.html)
             self.configurator.register_endpoint(self.api_auth_status, "southtech_auth_status")
             self.configurator.register_endpoint(self.api_auth_setup, "southtech_auth_setup")
             self.configurator.register_endpoint(self.api_auth_login, "southtech_auth_login")
             self.configurator.register_endpoint(self.api_auth_change, "southtech_auth_change")
-            self.configurator.register_endpoint(self.api_get_entities, "southtech_entities")
-            self.configurator.register_endpoint(self.api_sync_configs, "southtech_sync")
-            self.configurator.register_endpoint(self.api_save_config, "southtech_save")
-            self.configurator.register_endpoint(self.api_preview_config, "southtech_preview_config")
-            
-            # Endpoint WebSocket principale
-            self.configurator.register_endpoint(self.configurator.communication.handle_websocket_save, "southtech_save_yaml")
-            
-            # Endpoint sicurezza
+
+            # Endpoint di sicurezza e sistema
             self.configurator.register_endpoint(self.api_validate_token, "southtech_validate_token")
             self.configurator.register_endpoint(self.api_reset_system, "southtech_reset_system")
             self.configurator.register_endpoint(self.api_check_blocked, "southtech_check_blocked")
-            
+
+            # Endpoint WebSocket (se ancora utilizzato da altre parti del sistema, es. entity loading)
+            self.configurator.register_endpoint(self.configurator.communication.handle_websocket_save, "southtech_save_yaml")
+
             # Endpoint diagnostici
             self.configurator.register_endpoint(self.api_diagnostics, "southtech_diagnostics")
             self.configurator.register_endpoint(self.api_emergency_reset, "southtech_emergency_reset")
             
-            self.configurator.log("✅ Tutti gli endpoint registrati con successo!")
-            self.configurator.log("🔌 Servizio WebSocket: appdaemon.southtech_save_yaml")
+            self.configurator.log("✅ Endpoint API essenziali registrati.")
             
         except Exception as e:
             self.configurator.error(f"❌ Errore registrazione endpoint: {e}")
             raise
-
-    def register_additional_endpoints(self):
-        """Registra endpoint diagnostici aggiuntivi"""
-        try:
-            self.configurator.register_endpoint(self.api_diagnostics, "southtech_diagnostics")
-            self.configurator.register_endpoint(self.api_emergency_reset, "southtech_emergency_reset")
-            self.configurator.log("🔍 Endpoint diagnostici registrati")
-        except Exception as e:
-            self.configurator.error(f"Errore registrazione endpoint diagnostici: {e}")
 
     # ===============================================================
     # CLEANUP E GESTIONE CONFIGURAZIONE

@@ -245,7 +245,8 @@ class SouthTechConfiguratorCommunication:
                 'sync': False,
                 'setup': False,
                 'login': False,
-                'reset': False
+                'reset': False,
+                'device_config': False
             }
 
     def monitor_sensor_requests(self, kwargs):
@@ -322,6 +323,48 @@ class SouthTechConfiguratorCommunication:
                         self.process_sensor_reset_request()
                     finally:
                         self.sensor_locks['reset'] = False
+            
+            # Device Config Request
+            if not self.sensor_locks.get('device_config', False):
+                device_config_sensor = self.configurator.get_state("sensor.southtech_device_config_request")
+                device_config_attrs = self.configurator.get_state("sensor.southtech_device_config_request", attribute="all")
+                
+                if (device_config_sensor == "pending" and device_config_attrs and 
+                    self.configurator.security.is_new_request('device_config', device_config_attrs.get('attributes', {}))):
+                    
+                    self.sensor_locks['device_config'] = True
+                    try:
+                        self.process_sensor_device_config_request()
+                    finally:
+                        self.sensor_locks['device_config'] = False
+            
+            # Device Config Request
+            if not self.sensor_locks.get('device_config', False):
+                device_config_sensor = self.configurator.get_state("sensor.southtech_device_config_request")
+                device_config_attrs = self.configurator.get_state("sensor.southtech_device_config_request", attribute="all")
+                
+                if (device_config_sensor == "pending" and device_config_attrs and 
+                    self.configurator.security.is_new_request('device_config', device_config_attrs.get('attributes', {}))):
+                    
+                    self.sensor_locks['device_config'] = True
+                    try:
+                        self.process_sensor_device_config_request()
+                    finally:
+                        self.sensor_locks['device_config'] = False
+            
+            # Device Config Request
+            if not self.sensor_locks.get('device_config', False):
+                device_config_sensor = self.configurator.get_state("sensor.southtech_device_config_request")
+                device_config_attrs = self.configurator.get_state("sensor.southtech_device_config_request", attribute="all")
+                
+                if (device_config_sensor == "pending" and device_config_attrs and 
+                    self.configurator.security.is_new_request('device_config', device_config_attrs.get('attributes', {}))):
+                    
+                    self.sensor_locks['device_config'] = True
+                    try:
+                        self.process_sensor_device_config_request()
+                    finally:
+                        self.sensor_locks['device_config'] = False
                         
         except Exception as e:
             self.configurator.error(f"Errore monitor_sensor_requests: {e}")
@@ -336,29 +379,42 @@ class SouthTechConfiguratorCommunication:
             request_data = attrs["attributes"]
             configurations = request_data.get("configurations", [])
             
+            # [FIX] Estrai il request_id per includerlo nella risposta, garantendo che il frontend corretto riceva i dati.
+            request_id = request_data.get("request_id")
+            
             # RICONOSCIMENTO MODALITÀ COMPLETA
             action = request_data.get("action", "save_yaml")
             generate_dashboard = request_data.get("generate_dashboard", False)
             generate_templates = request_data.get("generate_templates", False)
 
-            # --- INIZIO LOGICA MODIFICATA ---
             if action == "save_complete" or generate_dashboard or generate_templates:
-                # Per un salvataggio/pulizia completo, una lista vuota è valida.
                 self.configurator.log("✨ SENSOR: Richiesta SALVATAGGIO COMPLETO/PULIZIA rilevata")
                 result = self.configurator.yaml.execute_complete_save_advanced("sensor", configurations, request_data)
+            
+            elif action.startswith("save_") and action.endswith("_only"):
+                file_type = action.replace("save_", "").replace("_only", "")
+                self.configurator.log(f"📡 SENSOR: Richiesta salvataggio SPECIFICO per '{file_type}'")
+                result = self.configurator.yaml.execute_single_file_save("sensor", file_type, request_data)
+            
+            elif action == "preview":
+                self.configurator.log("🔍 SENSOR: Richiesta ANTEPRIMA rilevata")
+                # Chiama il nuovo metodo centralizzato per generare le anteprime
+                result = self.configurator.yaml.execute_preview_generation(configurations)
+
             else:
-                # Per un salvataggio standard, le configurazioni sono necessarie.
                 if not configurations:
                     self.create_sensor_save_response({
                         "success": False, 
                         "error": "Configurazioni mancanti per un salvataggio standard."
                     })
                     return
-
                 self.configurator.log("📡 SENSOR: Richiesta salvataggio STANDARD")
                 result = self.configurator.yaml.execute_save_advanced("sensor", configurations, request_data)
-            # --- FINE LOGICA MODIFICATA ---
             
+            # [FIX] Aggiungi il request_id al risultato prima di inviare la risposta.
+            if request_id and isinstance(result, dict):
+                result["request_id"] = request_id
+
             # Invia risposta
             self.create_sensor_save_response(result)
             self.configurator.set_state("sensor.southtech_save_request", state="completed")
@@ -670,6 +726,47 @@ class SouthTechConfiguratorCommunication:
             self.create_response_sensor("sensor.southtech_reset_response", 
                                       {"success": False, "error": str(e)})
 
+    def process_sensor_device_config_request(self):
+        """Processa richiesta di configurazione dispositivo via sensore."""
+        request_data = None
+        try:
+            attrs = self.configurator.get_state("sensor.southtech_device_config_request", attribute="all")
+            if not attrs or "attributes" not in attrs:
+                return
+            
+            request_data = attrs["attributes"]
+            action = request_data.get("action")
+            request_id = request_data.get("request_id")
+
+            self.configurator.log(f"🔌 SENSOR: Ricevuta richiesta configurazione dispositivo: {action} (ID: {request_id})")
+
+            response_data = {"success": False, "error": "Azione non riconosciuta", "request_id": request_id}
+
+            if action == "get_available_device_numbers":
+                # Chiama il metodo dalla classe principale
+                response_data = self.configurator._get_available_device_numbers(request_data)
+            elif action == "get_available_board_models":
+                # Chiama il metodo dalla classe principale per ottenere i modelli di schede
+                response_data = self.configurator._get_available_board_models(request_data)
+            elif action == "save_esphome_device":
+                # Chiama il metodo dalla classe principale
+                response_data = self.configurator._save_esphome_device(request_data)
+            elif action == 'get_existing_devices':
+                response_data = self.configurator._get_existing_devices(request_data)
+
+            # Invia la risposta aggiornando il sensore di risposta
+            self.create_response_sensor("sensor.southtech_device_config_response", response_data)
+            self.configurator.log(f"🔌 SENSOR: Risposta inviata per {action} (ID: {request_id})")
+            self.configurator.set_state("sensor.southtech_device_config_request", state="completed")
+
+        except Exception as e:
+            self.configurator.error(f"❌ SENSOR: Errore durante la gestione della richiesta dispositivo: {e}")
+            error_response = {"success": False, "error": str(e)}
+            if request_data and "request_id" in request_data:
+                error_response["request_id"] = request_data["request_id"]
+            self.create_response_sensor("sensor.southtech_device_config_response", error_response)
+            self.configurator.set_state("sensor.southtech_device_config_request", state="completed")
+
     def monitor_save_requests(self, kwargs):
         """Monitora richieste di salvataggio via sensori (fallback) - VERSIONE MIGLIORATA"""
         try:
@@ -862,10 +959,11 @@ class SouthTechConfiguratorCommunication:
                 "architecture": "modular"
             }
             
-            status_file = os.path.join(self.configurator.www_path, "auth_status.json")
+            json_dir = os.path.join(self.configurator.www_path, "json")
+            status_file = os.path.join(json_dir, "auth_status.json")
             
-            # Assicurati che la directory esista
-            os.makedirs(self.configurator.www_path, exist_ok=True)
+            # Assicurati che la directory json esista
+            os.makedirs(json_dir, exist_ok=True)
             
             with open(status_file, 'w') as f:
                 json.dump(status, f, indent=2)
@@ -906,7 +1004,11 @@ class SouthTechConfiguratorCommunication:
     def create_initial_auth_status(self):
         """Crea il file auth_status.json iniziale"""
         try:
-            auth_status_file = os.path.join(self.configurator.www_path, "auth_status.json")
+            json_dir = os.path.join(self.configurator.www_path, "json")
+            auth_status_file = os.path.join(json_dir, "auth_status.json")
+            
+            # Assicurati che la directory json esista
+            os.makedirs(json_dir, exist_ok=True)
             
             if not os.path.exists(auth_status_file):
                 initial_status = {

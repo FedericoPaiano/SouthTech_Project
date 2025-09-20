@@ -1,6 +1,7 @@
 import appdaemon.plugins.hass.hassapi as hass
 import yaml
 import os
+import sys
 import re
 import json
 import hashlib
@@ -26,19 +27,23 @@ class SouthTechConfigurator(hass.Hass):
         # ===============================================================
         
         # Path dei file - CORRETTI per Home Assistant OS con AppDaemon addon
-        self.apps_yaml_path = "/homeassistant/appdaemon/apps/apps.yaml"
-        self.www_path = "/homeassistant/www/southtech"
-        self.auth_file = os.path.join(self.www_path, "auth.json")
+        # ✅ MODIFICA: Rendi i percorsi base configurabili in apps.yaml per maggiore flessibilità
+        self.apps_yaml_path = self.args.get("apps_yaml_path", "/homeassistant/appdaemon/apps/apps.yaml")
+        self.www_base_path = self.args.get("www_base_path", "/homeassistant/www")
+        
+        self.www_path = os.path.join(self.www_base_path, "southtech")
+        self.auth_file = os.path.join(self.www_path, "json", "auth.json")
         self.backup_path = os.path.join(self.www_path, "backups")
-        self.security_file = os.path.join(self.www_path, "security.json")
+        self.security_file = os.path.join(self.www_path, "json", "security.json")
         
         # File per comunicazione con il frontend
         self.api_path = os.path.join(self.www_path, "api")
         
         # Path aggiuntivi per dashboard e templates
+        self.esphome_hardware_path = self.args.get("esphome_hardware_path", "/homeassistant/esphome/hardware")
         self.dashboard_path = os.path.join(self.www_path, "dashboards")
         self.lights_config_path = os.path.join(self.dashboard_path, "lights_config")
-        self.templates_file = "/homeassistant/www/configurations/templates.yaml"
+        self.templates_file = os.path.join(self.www_base_path, "configurations/templates.yaml")
         self.configuration_yaml_path = "/homeassistant/configuration.yaml"
         
         # Marcatori per il file YAML - Supporto doppio formato
@@ -89,44 +94,70 @@ class SouthTechConfigurator(hass.Hass):
         
         # Importa e inizializza i moduli specializzati
         try:
-            # Changed relative imports to absolute imports
+            # Import con percorso dinamico compatibile con AppDaemon
+            # sys è già importato globalmente
+            
+            # Aggiungi il percorso della sottocartella al sys.path
+            current_dir = os.path.dirname(__file__)
+            southtech_dir = os.path.join(current_dir, 'southtech_configurator')
+            if southtech_dir not in sys.path:
+                sys.path.insert(0, southtech_dir)
+                self.log(f"📁 Aggiunto percorso moduli: {southtech_dir}")
+            
+            # Import diretti dei moduli dalla sottocartella
             from southtech_configurator_security import SouthTechConfiguratorSecurity
             from southtech_configurator_yaml import SouthTechConfiguratorYaml
-            # Corrected typo: 'soouthtech_configurator_dashboard' to 'southtech_configurator_dashboard'
             from southtech_configurator_dashboard import SouthTechConfiguratorDashboard
             from southtech_configurator_communication import SouthTechConfiguratorCommunication
+            from southtech_configurator_devices import DeviceConfigurationParser
             
-            # Inizializza moduli in ordine di dipendenza
+            # Salva la classe DeviceConfigurationParser per uso nei metodi
+            self.DeviceConfigurationParser = DeviceConfigurationParser
+            
             self.log("🔧 Inizializzazione moduli specializzati...")
             
-            # 1. Security (nessuna dipendenza)
-            self.security = SouthTechConfiguratorSecurity(self)
-            self.modules_ready["security"] = True
-            self.log("✅ Modulo Security inizializzato")
+            try:
+                # 1. Security (nessuna dipendenza)
+                self.security = SouthTechConfiguratorSecurity(self)
+                self.modules_ready["security"] = True
+                self.log("✅ Modulo Security inizializzato")
+            except Exception as e:
+                self.error(f"❌ Errore inizializzazione Security: {e}")
+                raise
             
-            # 2. YAML (dipende da security per validazioni)
-            self.yaml = SouthTechConfiguratorYaml(self)
-            self.modules_ready["yaml"] = True
-            self.log("✅ Modulo YAML inizializzato")
+            try:
+                # 2. YAML (dipende da security per validazioni)
+                self.yaml = SouthTechConfiguratorYaml(self)
+                self.modules_ready["yaml"] = True
+                self.log("✅ Modulo YAML inizializzato")
+            except Exception as e:
+                self.error(f"❌ Errore inizializzazione YAML: {e}")
+                raise
             
-            # 3. Dashboard (dipende da yaml per configurazioni)
-            self.dashboard = SouthTechConfiguratorDashboard(self)
-            self.modules_ready["dashboard"] = True
-            self.log("✅ Modulo Dashboard inizializzato")
+            try:
+                # 3. Dashboard (dipende da yaml per configurazioni)
+                self.dashboard = SouthTechConfiguratorDashboard(self)
+                self.modules_ready["dashboard"] = True
+                self.log("✅ Modulo Dashboard inizializzato")
+            except Exception as e:
+                self.error(f"❌ Errore inizializzazione Dashboard: {e}")
+                raise
             
-            # 4. Communication (dipende da tutti gli altri)
-            self.communication = SouthTechConfiguratorCommunication(self)
-            self.modules_ready["communication"] = True
-            self.log("✅ Modulo Communication inizializzato")
+            try:
+                # 4. Communication (dipende da tutti gli altri)
+                self.communication = SouthTechConfiguratorCommunication(self)
+                self.modules_ready["communication"] = True
+                self.log("✅ Modulo Communication inizializzato")
+            except Exception as e:
+                self.error(f"❌ Errore inizializzazione Communication: {e}")
+                raise
             
         except ImportError as e:
             self.error(f"❌ Errore importazione moduli: {e}")
             raise
         except Exception as e:
             self.error(f"❌ Errore inizializzazione moduli: {e}")
-            raise
-        
-        # ===============================================================
+            raise        # ===============================================================
         # INIZIALIZZAZIONE SISTEMA
         # ===============================================================
         
@@ -136,6 +167,11 @@ class SouthTechConfigurator(hass.Hass):
         # Inizializza struttura dashboard
         self.dashboard.initialize_dashboard_structure()
         
+        # Verifica integrità file
+        is_valid, message = self.check_file_integrity()
+        if not is_valid:
+            self.log(f"⚠️ WARNING - Integrità YAML: {message}")
+
         # Test diagnostico all'avvio
         self.run_diagnostic_on_startup()
         
@@ -162,7 +198,7 @@ class SouthTechConfigurator(hass.Hass):
         
         # Monitora richieste via sensori ogni 5 secondi (sistema fallback)
         self.run_every(self.communication.monitor_sensor_requests, "now+5", 5)
-        
+
         # Monitora richieste via file ogni 3 secondi (sistema fallback)
         self.run_every(self.communication.monitor_file_requests, "now+3", 3)
         
@@ -316,6 +352,7 @@ class SouthTechConfigurator(hass.Hass):
                     "api_path": self.api_path,
                     "backup_path": self.backup_path,
                     "dashboard_path": self.dashboard_path,
+                    "esphome_hardware_path": self.esphome_hardware_path,
                     "templates_file": self.templates_file
                 },
                 "files": {
@@ -351,6 +388,7 @@ class SouthTechConfigurator(hass.Hass):
                 self.backup_path, 
                 self.api_path,
                 self.dashboard_path,
+                self.esphome_hardware_path,
                 self.lights_config_path,
                 os.path.dirname(self.templates_file)
             ]
@@ -415,7 +453,8 @@ class SouthTechConfigurator(hass.Hass):
                 self.backup_path, 
                 self.api_path,
                 self.dashboard_path,
-                self.lights_config_path
+                self.lights_config_path,
+                self.esphome_hardware_path
             ]
             
             for directory in gitkeep_dirs:
@@ -438,7 +477,8 @@ class SouthTechConfigurator(hass.Hass):
                 self.backup_path, 
                 self.api_path,
                 self.dashboard_path,
-                self.lights_config_path
+                self.lights_config_path,
+                self.esphome_hardware_path
             ]
             
             for directory in test_dirs:
@@ -536,6 +576,7 @@ class SouthTechConfigurator(hass.Hass):
             "backup_count": len([f for f in os.listdir(self.backup_path) 
                                if f.startswith("backup_")]) if os.path.exists(self.backup_path) else 0,
             "active_sessions": len(self.active_tokens),
+            "esphome_devices": len([f for f in os.listdir(self.esphome_hardware_path) if f.endswith('.yaml')]) if os.path.exists(self.esphome_hardware_path) else 0,
             "version": "4.0.0",
             "architecture": "modular",
             "modules_ready": self.modules_ready,
@@ -698,6 +739,96 @@ class SouthTechConfigurator(hass.Hass):
         except Exception as e:
             self.error(f"Errore get_entity_friendly_name per {entity_id}: {e}")
             return fallback if fallback else "Unknown Entity"
+
+    def _get_available_device_numbers(self, request_data):
+        """Scansiona la cartella hardware di ESPHome e restituisce i numeri disponibili."""
+        try:
+            if not os.path.exists(self.esphome_hardware_path):
+                os.makedirs(self.esphome_hardware_path)
+                self.log(f"Creata directory hardware ESPHome: {self.esphome_hardware_path}")
+            
+            pattern = re.compile(r'AION_A8R_(\d{2})\.yaml$')
+            
+            used_numbers = set()
+            for filename in os.listdir(self.esphome_hardware_path):
+                match = pattern.search(filename)
+                if match:
+                    used_numbers.add(int(match.group(1)))
+            
+            all_numbers = set(range(1, 100))
+            available_numbers = sorted(list(all_numbers - used_numbers))
+            
+            next_number = "01"
+            if available_numbers:
+                next_number = f"{available_numbers[0]:02d}"
+
+            available_numbers_str = [f"{n:02d}" for n in available_numbers]
+
+            return {
+                "success": True, 
+                "available_numbers": available_numbers_str, 
+                "next_number": next_number,
+                "request_id": request_data.get("request_id")
+            }
+        except Exception as e:
+            self.error(f"Errore nel calcolare i numeri di dispositivo disponibili: {e}")
+            return {"success": False, "error": str(e), "request_id": request_data.get("request_id")}
+
+
+
+    def _get_existing_devices(self, request_data):
+        """Scansiona la cartella hardware di ESPHome e restituisce i dispositivi esistenti."""
+        try:
+            if not os.path.exists(self.esphome_hardware_path):
+                self.log(f"Directory hardware ESPHome non trovata: {self.esphome_hardware_path}", level="WARNING")
+                return {"success": True, "devices": [], "request_id": request_data.get("request_id")}
+
+            # Usa il parser di configurazione dispositivi
+            parser = self.DeviceConfigurationParser(self.esphome_hardware_path)
+            devices = parser.get_all_devices()
+
+            # Converte gli oggetti DeviceConfig in dizionari per JSON
+            devices_json = []
+            for device in devices:
+                devices_json.append({
+                    "model": device.model,
+                    "number": device.number,
+                    "filename": device.filename,
+                    "friendly_name": device.friendly_name,
+                    "configuration": device.configuration
+                })
+
+            return {"success": True, "devices": devices_json, "request_id": request_data.get("request_id")}
+        except Exception as e:
+            self.error(f"Errore nel leggere i dispositivi esistenti: {e}")
+            return {"success": False, "error": str(e), "request_id": request_data.get("request_id")}
+
+    def _save_esphome_device(self, request_data):
+        """Salva un nuovo file di configurazione del dispositivo ESPHome."""
+        try:
+            filename = request_data.get("filename")
+            content = request_data.get("content")
+            
+            if not filename or not content:
+                return {"success": False, "error": "Nome file o contenuto mancante.", "request_id": request_data.get("request_id")}
+                
+            if not re.match(r'^AION_A8R_\d{2}\.yaml$', filename):
+                return {"success": False, "error": "Nome file non valido.", "request_id": request_data.get("request_id")}
+                
+            file_path = os.path.join(self.esphome_hardware_path, filename)
+            
+            if os.path.exists(file_path):
+                self.log(f"Sovrascrittura del file esistente: {filename}", level="WARNING")
+
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+                
+            self.log(f"File dispositivo ESPHome salvato: {file_path}")
+            return {"success": True, "message": f"File {filename} salvato con successo.", "request_id": request_data.get("request_id")}
+            
+        except Exception as e:
+            self.error(f"Errore nel salvataggio del file dispositivo ESPHome: {e}")
+            return {"success": False, "error": str(e), "request_id": request_data.get("request_id")}
 
     # ===============================================================
     # SISTEMA BACKUP STRUTTURATO

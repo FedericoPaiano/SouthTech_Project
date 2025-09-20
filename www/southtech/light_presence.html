@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SouthTech - Automatismo Luci</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --success-color: #27ae60;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --light-bg: #ecf0f1;
+            --dark-bg: #34495e;
+        }
+        
+        body {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--dark-bg) 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background-color: var(--light-bg);
+            padding: 20px;
+        }
+        
+        .header-card {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+        }
+        
+        .header-title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .header-subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 20px;
+            border: none;
+        }
+        
+        .config-section {
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 2px solid #e9ecef;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .config-section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        
+        .config-header {
+            background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 25px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(52, 152, 219, 0.4);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, var(--success-color) 0%, #229954 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 15px 30px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(39, 174, 96, 0.4);
+        }
+        
+        .add-button {
+            background: linear-gradient(135deg, var(--success-color) 0%, #229954 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(39, 174, 96, 0.3);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .add-button:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 12px 30px rgba(39, 174, 96, 0.4);
+        }
+        
+        .remove-button {
+            background: linear-gradient(135deg, var(--danger-color) 0%, #c0392b 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .remove-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+        }
+        
+        .form-select, .form-control {
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            padding: 12px 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .form-select:focus, .form-control:focus {
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+        }
+        
+        .status-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+            min-width: 300px;
+        }
+        
+        .yaml-output {
+            background: #2d3748;
+            color: #e2e8f0;
+            border-radius: 15px;
+            padding: 25px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .navigation-menu {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1040;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .status-api { background-color: #d4edda; color: #155724; }
+        .status-file { background-color: #fff3cd; color: #856404; }
+        .status-error { background-color: #f8d7da; color: #721c24; }
+        
+        .auth-error {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .auth-error-icon {
+            font-size: 4rem;
+            color: var(--danger-color);
+            margin-bottom: 20px;
+        }
+
+        .filter-status {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border: 2px solid #2196f3;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .filter-status.disabled {
+            background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+            border-color: #9e9e9e;
+            color: #616161;
+        }
+
+        /* Stile per le aree nelle dropdown */
+        .entity-area {
+            color: #6c757d;
+            font-style: italic;
+            font-size: 0.9em;
+        }
+
+        .modal-content {
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            border-bottom: none;
+        }
+
+        .modal-footer {
+            border-top: none;
+        }
+
+        .btn {
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-success:hover {
+            box-shadow: 0 8px 20px rgba(39, 174, 96, 0.4);
+        }
+
+        .btn-outline-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- Errore Autenticazione -->
+    <div id="authError" class="container auth-error" style="display: none;">
+        <div class="auth-error-icon">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h2>Accesso Negato</h2>
+        <p class="text-muted mb-4">Non sei autorizzato ad accedere a questa pagina. Effettua il login dal menu principale.</p>
+        <button class="btn btn-primary" onclick="redirectToMain()">
+            <i class="fas fa-home"></i> Torna al Menu Principale
+        </button>
+    </div>
+    
+    <!-- Contenuto Principale -->
+    <div id="mainContent" style="display: none;">
+        <!-- Menu Navigazione -->
+        <div class="navigation-menu">
+          <div class="dropdown">
+              <button class="btn btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                  <i class="fas fa-bars"></i> Menu
+              </button>
+              <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="#" onclick="SouthTechCore.goToMainMenu()">
+                    <i class="fas fa-home"></i> Menu Principale
+                  </a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="#" onclick="syncConfigurations()">
+                      <i class="fas fa-sync"></i> Ricarica Configurazioni
+                  </a></li>
+                  <li><a class="dropdown-item" href="#" onclick="validateConfiguration()">
+                      <i class="fas fa-check-circle"></i> Valida
+                  </a></li>
+                  <!-- Il submenu filtri viene aggiunto dinamicamente da initializeFiltersSubmenu() -->
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="#" onclick="SouthTechCore.performLogout()">
+                      <i class="fas fa-sign-out-alt"></i> Logout
+                  </a></li>
+              </ul>
+          </div>
+        </div>
+        
+        <!-- Header -->
+        <div class="header-card">
+            <h1 class="header-title">
+                <i class="fas fa-lightbulb"></i> Automatismo Luci
+            </h1>
+            <p class="header-subtitle">Configurazione avanzata accensione/spegnimento automatico</p>
+        </div>
+        
+        <!-- Stato Connessione e Filtro -->
+        <div id="connectionStatus" class="card">
+            <div class="d-flex align-items-center">
+                <div class="loading-spinner me-3"></div>
+                <span>Connessione in corso...</span>
+            </div>
+        </div>
+
+        <!-- Stato Sistema e Filtro Unificato -->
+        <div id="systemFilterStatus" class="filter-status" style="display: none;">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <div id="systemStatusContent">
+                        <i class="fas fa-spinner fa-spin me-2"></i>
+                        <strong>Sistema: Caricamento...</strong>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div id="filterStatusContent">
+                        <i class="fas fa-spinner fa-spin me-2"></i>
+                        <strong>Filtro Area: Inizializzazione...</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="small mt-2 text-center" id="filterStatusDetails">Inizializzazione in corso...</div>
+        </div>
+        
+        <!-- Configurazioni -->
+        <div id="configurationsContainer" class="card" style="display: none;">
+            <h3 class="mb-4">
+                <i class="fas fa-cog"></i> Configurazione Automatismi
+            </h3>
+            
+            <div id="configsList"></div>
+            
+            <div class="text-center mt-4">
+                <button class="add-button" onclick="addConfiguration()" title="Aggiungi configurazione">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+            
+            <div class="text-center mt-4">
+                <button class="btn btn-success btn-lg" onclick="generateYAMLAndDashboard()">
+                    <i class="fas fa-magic"></i> Genera Apps.yaml + Dashboard + Templates
+                </button>
+                <div class="small text-muted mt-2">
+                    ✨ Crea la configurazione completa: Apps.yaml, Dashboard Lovelace e Template Sensors
+                </div>
+            </div>
+        </div>
+        
+        <!-- Output YAML -->
+        <div id="yamlOutput" class="card" style="display: none;">
+          <h4 class="mb-3">
+              <i class="fas fa-file-code"></i> Configurazione Generata
+          </h4>
+          
+        <!-- Tab Navigation -->
+        <ul class="nav nav-tabs" id="outputTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="yaml-tab" data-bs-toggle="tab" data-bs-target="#yaml-content" type="button" role="tab">
+                    <i class="fas fa-cog"></i> Apps.yaml
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="templates-yaml-tab" data-bs-toggle="tab" data-bs-target="#templates-yaml-content" type="button" role="tab">
+                    <i class="fas fa-puzzle-piece"></i> Templates.yaml
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="configuration-yaml-tab" data-bs-toggle="tab" data-bs-target="#configuration-yaml-content" type="button" role="tab">
+                    <i class="fas fa-file-alt"></i> Configuration.yaml
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="dashboard-yaml-tab" data-bs-toggle="tab" data-bs-target="#dashboard-yaml-content" type="button" role="tab">
+                    <i class="fas fa-file-code"></i> Dashboard.yaml
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="dashboard-preview-tab" data-bs-toggle="tab" data-bs-target="#dashboard-preview" type="button" role="tab">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard Preview
+                </button>
+            </li>
+        </ul>
+        <!-- Tab Content -->
+        <div class="tab-content" id="outputTabsContent">
+
+            <!-- Apps.yaml Tab -->
+            <div class="tab-pane fade show active" id="yaml-content" role="tabpanel">
+                <div class="yaml-output" id="yamlCode"></div>
+                <div class="yaml-stats" id="yamlStats"></div>
+                <div class="mt-3">
+                    <button class="btn btn-primary btn-lg me-2" style="height: 48px;" onclick="copyAppsYAML()">
+                        <i class="fas fa-copy"></i> Copia Apps.yaml
+                    </button>
+                    <button class="btn btn-warning btn-lg me-2" style="height: 48px;" onclick="downloadAppsYAML()">
+                        <i class="fas fa-download"></i> Scarica apps.yaml
+                    </button>
+                    <button class="btn btn-info btn-lg me-2" style="height: 48px;" onclick="showSpecificSaveConfirmation('apps')">
+                        <i class="fas fa-file-upload"></i> Salva Configurazione Apps.yaml
+                    </button>
+                    <button class="btn btn-success btn-lg" style="height: 48px;" onclick="saveCompleteConfiguration()">
+                        <i class="fas fa-save"></i> Salva Configurazione Completa
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Templates YAML Tab -->
+            <div class="tab-pane fade" id="templates-yaml-content" role="tabpanel">
+              <div class="yaml-output" id="templatesYamlCode"></div>
+              <div class="yaml-stats" id="templatesYamlStats"></div>
+              <div class="mt-3">
+                  <button class="btn btn-primary btn-lg me-2" style="height: 48px;" onclick="copyTemplatesYAML()">
+                      <i class="fas fa-copy"></i> Copia Templates.yaml
+                  </button>
+                  <button class="btn btn-warning btn-lg me-2" style="height: 48px;" onclick="downloadTemplatesYAML()">
+                      <i class="fas fa-download"></i> Scarica templates.yaml
+                  </button>
+                  <button class="btn btn-info btn-lg me-2" style="height: 48px;" onclick="showSpecificSaveConfirmation('templates')">
+                      <i class="fas fa-file-upload"></i> Salva Configurazione Templates.yaml
+                  </button>
+                  <button class="btn btn-success btn-lg" style="height: 48px;" onclick="saveCompleteConfiguration()">
+                      <i class="fas fa-save"></i> Salva Configurazione Completa
+                  </button>
+              </div>
+          </div>
+          
+          <!-- Configuration YAML Tab -->
+          <div class="tab-pane fade" id="configuration-yaml-content" role="tabpanel">
+              <div class="yaml-output" id="configurationYamlCode"></div>
+              <div class="yaml-stats" id="configurationYamlStats"></div>
+              <div class="alert alert-info mt-3">
+                  <i class="fas fa-info-circle me-2"></i>
+                  <strong>Nota:</strong> Questo blocco di codice va aggiunto una sola volta al tuo file <code>configuration.yaml</code>.
+              </div>
+              <div class="mt-3">
+                  <button class="btn btn-primary btn-lg me-2" style="height: 48px;" onclick="copyConfigurationYAML()">
+                      <i class="fas fa-copy"></i> Copia Configuration.yaml
+                  </button>
+                  <button class="btn btn-warning btn-lg me-2" style="height: 48px;" onclick="downloadConfigurationYAML()">
+                      <i class="fas fa-download"></i> Scarica configuration.yaml
+                  </button>
+                  <button class="btn btn-info btn-lg me-2" style="height: 48px;" onclick="showSpecificSaveConfirmation('configuration')">
+                      <i class="fas fa-file-upload"></i> Salva Configurazione Configuration.yaml
+                  </button>
+                  <button class="btn btn-success btn-lg" style="height: 48px;" onclick="saveCompleteConfiguration()">
+                      <i class="fas fa-save"></i> Salva Configurazione Completa
+                  </button>
+              </div>
+          </div>
+
+          <!-- Dashboard YAML Tab -->
+          <div class="tab-pane fade" id="dashboard-yaml-content" role="tabpanel">
+              <div class="yaml-output" id="dashboardYamlCode"></div>
+                <div class="yaml-stats" id="dashboardYamlStats"></div>
+                <div class="mt-3">
+                    <button class="btn btn-primary btn-lg me-2" style="height: 48px;" onclick="copyDashboardYAML()">
+                        <i class="fas fa-copy"></i> Copia Dashboard.yaml
+                    </button>
+                    <button class="btn btn-warning btn-lg me-2" style="height: 48px;" onclick="downloadDashboardYAML()">
+                        <i class="fas fa-download"></i> Scarica ui-lovelace-light-presence.yaml
+                    </button>
+                    <button class="btn btn-info btn-lg me-2" style="height: 48px;" onclick="showSpecificSaveConfirmation('dashboard')">
+                        <i class="fas fa-file-upload"></i> Salva Configurazione Dashboard.yaml
+                    </button>
+                    <button class="btn btn-success btn-lg" style="height: 48px;" onclick="saveCompleteConfiguration()">
+                        <i class="fas fa-save"></i> Salva Configurazione Completa
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Dashboard Preview Tab -->
+            <div class="tab-pane fade" id="dashboard-preview" role="tabpanel">
+                <div class="p-3">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Dashboard Lovelace:</strong> Anteprima della dashboard che verrà creata con configurazioni individuali per ogni luce.
+                    </div>
+                    <div id="dashboardInfo"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Indicatore di Stato -->
+    <div id="statusIndicator" class="status-indicator"></div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="southtech_secure.js"></script>         <!-- 1° -->
+    <script src="southtech_core.js"></script>          <!-- 2° -->
+    <script src="southtech_ui.js"></script>            <!-- 3° -->
+    <script src="southtech_timeout.js"></script>       <!-- 4° -->
+    <script src="southtech_session_guard.js"></script> <!-- 5° ULTIMO -->
+    <script src="light_presence_logic.js"></script>    <!-- 6° -->
+    <script src="light_presence_init.js"></script>     <!-- 7° ULTIMO -->
+</body></html>
