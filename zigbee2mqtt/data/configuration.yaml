@@ -1,0 +1,23 @@
+version: 4
+mqtt:
+  base_topic: zigbee2mqtt
+  server: mqtt://mosquitto:1883
+serial: {}
+advanced:
+  log_level: info
+  channel: 11
+  network_key: GENERATE
+  pan_id: GENERATE
+  ext_pan_id: GENERATE
+frontend:
+  enabled: true
+  port: 8080
+homeassistant:
+  enabled: true
+  legacy_entity_attributes: false
+  legacy_triggers: false
+  discovery_topic: homeassistant
+  status_topic: homeassistant/status
+  url: http://nginx-proxy:8125
+  token: !secret zigbee2mqtt_token
+onboarding: false

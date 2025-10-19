@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "minor_version": 8,
+  "key": "core.area_registry",
+  "data": {
+    "areas": [
+      {
+        "aliases": [],
+        "floor_id": "casa",
+        "humidity_entity_id": null,
+        "icon": null,
+        "id": "soggiorno",
+        "labels": [],
+        "name": "Soggiorno",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-10-07T16:10:01.546935+00:00",
+        "modified_at": "2025-10-12T15:10:38.133430+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": "casa",
+        "humidity_entity_id": null,
+        "icon": null,
+        "id": "cucina",
+        "labels": [],
+        "name": "Cucina",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-10-07T16:10:01.547001+00:00",
+        "modified_at": "2025-10-12T15:10:38.133294+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": "casa",
+        "humidity_entity_id": null,
+        "icon": null,
+        "id": "camera_da_letto",
+        "labels": [],
+        "name": "Camera da letto",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-10-07T16:10:01.547027+00:00",
+        "modified_at": "2025-10-12T15:10:38.132961+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": "casa",
+        "humidity_entity_id": null,
+        "icon": null,
+        "id": "sala_da_pranzo",
+        "labels": [],
+        "name": "Sala da Pranzo",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-10-12T15:10:41.349562+00:00",
+        "modified_at": "2025-10-12T15:10:41.349565+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "humidity_entity_id": null,
+        "icon": null,
+        "id": "ingresso",
+        "labels": [],
+        "name": "Ingresso",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-10-13T15:34:50.342153+00:00",
+        "modified_at": "2025-10-13T15:34:50.342156+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "humidity_entity_id": null,
+        "icon": null,
+        "id": "corridoio",
+        "labels": [],
+        "name": "Corridoio",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-10-13T15:39:17.836695+00:00",
+        "modified_at": "2025-10-13T15:39:17.836699+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "humidity_entity_id": null,
+        "icon": null,
+        "id": "camera_anna_valery",
+        "labels": [],
+        "name": "Camera Anna Valery",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-10-13T17:20:13.556603+00:00",
+        "modified_at": "2025-10-13T17:20:13.556606+00:00"
+      },
+      {
+        "aliases": [],
+        "floor_id": null,
+        "humidity_entity_id": null,
+        "icon": null,
+        "id": "camera_alessia",
+        "labels": [],
+        "name": "Camera Alessia",
+        "picture": null,
+        "temperature_entity_id": null,
+        "created_at": "2025-10-13T17:20:52.517432+00:00",
+        "modified_at": "2025-10-13T17:20:52.517435+00:00"
+      }
+    ]
+  }
+}

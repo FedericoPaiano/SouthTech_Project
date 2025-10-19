@@ -1,0 +1,407 @@
+{
+  "version": 1,
+  "minor_version": 1,
+  "key": "esphome.01K7F584VWA5EV3R9ARJ5S1SNS",
+  "data": {
+    "device_info": {
+      "uses_password": false,
+      "name": "board-01",
+      "friendly_name": "Scheda 01",
+      "mac_address": "40:91:51:B6:CC:B0",
+      "compilation_time": "Oct 13 2025, 17:54:02",
+      "model": "esp32dev",
+      "manufacturer": "Espressif",
+      "has_deep_sleep": false,
+      "esphome_version": "2025.9.3",
+      "project_name": "",
+      "project_version": "",
+      "webserver_port": 80,
+      "legacy_voice_assistant_version": 0,
+      "voice_assistant_feature_flags": 0,
+      "legacy_bluetooth_proxy_version": 0,
+      "bluetooth_proxy_feature_flags": 0,
+      "zwave_proxy_feature_flags": 0,
+      "zwave_home_id": 0,
+      "suggested_area": "",
+      "bluetooth_mac_address": "",
+      "api_encryption_supported": true,
+      "devices": [],
+      "areas": [],
+      "area": {
+        "area_id": 0,
+        "name": ""
+      }
+    },
+    "services": [],
+    "api_version": {
+      "major": 1,
+      "minor": 12
+    },
+    "button": [
+      {
+        "object_id": "factory_reset",
+        "key": 3740619177,
+        "name": "Factory Reset",
+        "disabled_by_default": false,
+        "icon": "mdi:restart-alert",
+        "entity_category": 1,
+        "device_id": 0,
+        "device_class": "restart"
+      }
+    ],
+    "climate": [
+      {
+        "object_id": "relay_06",
+        "key": 1196981709,
+        "name": "Relay 06",
+        "disabled_by_default": false,
+        "icon": "mdi:thermometer",
+        "entity_category": 0,
+        "device_id": 0,
+        "supports_current_temperature": true,
+        "supports_two_point_target_temperature": false,
+        "supported_modes": [
+          0,
+          3
+        ],
+        "visual_min_temperature": 10.0,
+        "visual_max_temperature": 30.0,
+        "visual_target_temperature_step": 0.1,
+        "visual_current_temperature_step": 0.1,
+        "legacy_supports_away": false,
+        "supports_action": true,
+        "supported_fan_modes": [],
+        "supported_swing_modes": [],
+        "supported_custom_fan_modes": [],
+        "supported_presets": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "supported_custom_presets": [],
+        "supports_current_humidity": false,
+        "supports_target_humidity": false,
+        "visual_min_humidity": 30.0,
+        "visual_max_humidity": 99.0
+      }
+    ],
+    "sensor": [
+      {
+        "object_id": "temperature_01",
+        "key": 121303589,
+        "name": "Temperature 01",
+        "disabled_by_default": false,
+        "icon": "",
+        "entity_category": 0,
+        "device_id": 0,
+        "device_class": "temperature",
+        "unit_of_measurement": "°C",
+        "accuracy_decimals": 1,
+        "force_update": false,
+        "state_class": 1,
+        "legacy_last_reset_type": 0
+      },
+      {
+        "object_id": "humidity_01",
+        "key": 2899449004,
+        "name": "Humidity 01",
+        "disabled_by_default": false,
+        "icon": "",
+        "entity_category": 0,
+        "device_id": 0,
+        "device_class": "humidity",
+        "unit_of_measurement": "%",
+        "accuracy_decimals": 1,
+        "force_update": false,
+        "state_class": 1,
+        "legacy_last_reset_type": 0
+      },
+      {
+        "object_id": "temperature_02",
+        "key": 121303590,
+        "name": "Temperature 02",
+        "disabled_by_default": false,
+        "icon": "",
+        "entity_category": 0,
+        "device_id": 0,
+        "device_class": "temperature",
+        "unit_of_measurement": "°C",
+        "accuracy_decimals": 1,
+        "force_update": false,
+        "state_class": 1,
+        "legacy_last_reset_type": 0
+      },
+      {
+        "object_id": "humidity_02",
+        "key": 2899449007,
+        "name": "Humidity 02",
+        "disabled_by_default": false,
+        "icon": "",
+        "entity_category": 0,
+        "device_id": 0,
+        "device_class": "humidity",
+        "unit_of_measurement": "%",
+        "accuracy_decimals": 1,
+        "force_update": false,
+        "state_class": 1,
+        "legacy_last_reset_type": 0
+      }
+    ],
+    "text_sensor": [
+      {
+        "object_id": "residue_time_relay_01",
+        "key": 3820450056,
+        "name": "Residue Time Relay 01",
+        "disabled_by_default": false,
+        "icon": "mdi:timer-outline",
+        "entity_category": 0,
+        "device_id": 0,
+        "device_class": ""
+      },
+      {
+        "object_id": "residue_time_relay_02",
+        "key": 3820450059,
+        "name": "Residue Time Relay 02",
+        "disabled_by_default": false,
+        "icon": "mdi:timer-outline",
+        "entity_category": 0,
+        "device_id": 0,
+        "device_class": ""
+      },
+      {
+        "object_id": "residue_time_relay_05",
+        "key": 3820450060,
+        "name": "Residue Time Relay 05",
+        "disabled_by_default": false,
+        "icon": "mdi:timer-outline",
+        "entity_category": 0,
+        "device_id": 0,
+        "device_class": ""
+      }
+    ],
+    "binary_sensor": [
+      {
+        "object_id": "pir_01",
+        "key": 2238524956,
+        "name": "PIR 01",
+        "disabled_by_default": false,
+        "icon": "",
+        "entity_category": 0,
+        "device_id": 0,
+        "device_class": "motion",
+        "is_status_binary_sensor": false
+      },
+      {
+        "object_id": "pir_02",
+        "key": 2238524959,
+        "name": "PIR 02",
+        "disabled_by_default": false,
+        "icon": "",
+        "entity_category": 0,
+        "device_id": 0,
+        "device_class": "motion",
+        "is_status_binary_sensor": false
+      }
+    ],
+    "light": [
+      {
+        "object_id": "relay_01",
+        "key": 1196981706,
+        "name": "Relay 01",
+        "disabled_by_default": false,
+        "icon": "mdi:lightbulb-outline",
+        "entity_category": 0,
+        "device_id": 0,
+        "supported_color_modes": [
+          1
+        ],
+        "min_mireds": 0.0,
+        "max_mireds": 0.0,
+        "effects": [],
+        "legacy_supports_brightness": false,
+        "legacy_supports_rgb": false,
+        "legacy_supports_white_value": false,
+        "legacy_supports_color_temperature": false
+      },
+      {
+        "object_id": "relay_02",
+        "key": 1196981705,
+        "name": "Relay 02",
+        "disabled_by_default": false,
+        "icon": "mdi:lightbulb-outline",
+        "entity_category": 0,
+        "device_id": 0,
+        "supported_color_modes": [
+          1
+        ],
+        "min_mireds": 0.0,
+        "max_mireds": 0.0,
+        "effects": [],
+        "legacy_supports_brightness": false,
+        "legacy_supports_rgb": false,
+        "legacy_supports_white_value": false,
+        "legacy_supports_color_temperature": false
+      },
+      {
+        "object_id": "relay_05",
+        "key": 1196981710,
+        "name": "Relay 05",
+        "disabled_by_default": false,
+        "icon": "mdi:lightbulb-outline",
+        "entity_category": 0,
+        "device_id": 0,
+        "supported_color_modes": [
+          1
+        ],
+        "min_mireds": 0.0,
+        "max_mireds": 0.0,
+        "effects": [],
+        "legacy_supports_brightness": false,
+        "legacy_supports_rgb": false,
+        "legacy_supports_white_value": false,
+        "legacy_supports_color_temperature": false
+      },
+      {
+        "object_id": "led_01",
+        "key": 1430993366,
+        "name": "Led 01",
+        "disabled_by_default": false,
+        "icon": "mdi:led-strip-variant",
+        "entity_category": 0,
+        "device_id": 0,
+        "supported_color_modes": [
+          39
+        ],
+        "min_mireds": 0.0,
+        "max_mireds": 0.0,
+        "effects": [
+          "None",
+          "Pulse",
+          "Random",
+          "Strobe",
+          "Flicker",
+          "Rainbow",
+          "Color Wipe",
+          "Scan",
+          "Twinkle",
+          "Random Twinkle",
+          "Fireworks",
+          "Addressable Flicker"
+        ],
+        "legacy_supports_brightness": false,
+        "legacy_supports_rgb": false,
+        "legacy_supports_white_value": false,
+        "legacy_supports_color_temperature": false
+      },
+      {
+        "object_id": "led_02",
+        "key": 1430993365,
+        "name": "Led 02",
+        "disabled_by_default": false,
+        "icon": "mdi:led-strip-variant",
+        "entity_category": 0,
+        "device_id": 0,
+        "supported_color_modes": [
+          39
+        ],
+        "min_mireds": 0.0,
+        "max_mireds": 0.0,
+        "effects": [
+          "None",
+          "Pulse",
+          "Random",
+          "Strobe",
+          "Flicker",
+          "Rainbow",
+          "Color Wipe",
+          "Scan",
+          "Twinkle",
+          "Random Twinkle",
+          "Fireworks",
+          "Addressable Flicker"
+        ],
+        "legacy_supports_brightness": false,
+        "legacy_supports_rgb": false,
+        "legacy_supports_white_value": false,
+        "legacy_supports_color_temperature": false
+      }
+    ],
+    "cover": [
+      {
+        "object_id": "relay_03_04",
+        "key": 1640448475,
+        "name": "Relay 03 04",
+        "disabled_by_default": false,
+        "icon": "",
+        "entity_category": 0,
+        "device_id": 0,
+        "assumed_state": true,
+        "supports_stop": true,
+        "supports_position": true,
+        "supports_tilt": false,
+        "device_class": ""
+      },
+      {
+        "object_id": "relay_07_08",
+        "key": 251789179,
+        "name": "Relay 07 08",
+        "disabled_by_default": false,
+        "icon": "",
+        "entity_category": 0,
+        "device_id": 0,
+        "assumed_state": true,
+        "supports_stop": true,
+        "supports_position": true,
+        "supports_tilt": false,
+        "device_class": ""
+      }
+    ],
+    "switch": [
+      {
+        "object_id": "timer_relay_01",
+        "key": 1176262160,
+        "name": "Timer Relay 01",
+        "disabled_by_default": false,
+        "icon": "",
+        "entity_category": 0,
+        "device_id": 0,
+        "assumed_state": false,
+        "device_class": ""
+      },
+      {
+        "object_id": "timer_relay_02",
+        "key": 1176262163,
+        "name": "Timer Relay 02",
+        "disabled_by_default": false,
+        "icon": "",
+        "entity_category": 0,
+        "device_id": 0,
+        "assumed_state": false,
+        "device_class": ""
+      },
+      {
+        "object_id": "timer_relay_05",
+        "key": 1176262164,
+        "name": "Timer Relay 05",
+        "disabled_by_default": false,
+        "icon": "",
+        "entity_category": 0,
+        "device_id": 0,
+        "assumed_state": false,
+        "device_class": ""
+      },
+      {
+        "object_id": "restart",
+        "key": 1203400786,
+        "name": "Restart",
+        "disabled_by_default": false,
+        "icon": "mdi:restart",
+        "entity_category": 1,
+        "device_id": 0,
+        "assumed_state": false,
+        "device_class": ""
+      }
+    ]
+  }
+}

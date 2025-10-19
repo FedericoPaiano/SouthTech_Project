@@ -1,0 +1,25 @@
+# File di log
+*.log
+*.log.*
+
+# Dati di runtime dei container
+matter-server/data/*.json
+matter-server/data/*.json.backup
+matter-server/data/*.ini
+matter-server/data/credentials/
+
+# Dati sensibili
+**/secrets.yaml
+
+# Database e cache
+**/__pycache__/
+**/deps/
+
+# File temporanei
+**/tts/
+**/log/
+mosquitto/data/
+mosquitto/log/
+
+# Credenziali e configurazioni locali
+home-assistant/config/home-assistant.log*

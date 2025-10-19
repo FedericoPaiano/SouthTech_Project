@@ -1,0 +1,196 @@
+version: "3.8"
+
+networks:
+  bridge:
+    name: home_assistant_network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+
+services:
+  homeassistant:
+    image: lscr.io/linuxserver/homeassistant:latest
+    container_name: homeassistant
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Berlin
+    volumes:
+      - ${DOCKER_DATA_PATH}/home-assistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+    network_mode: host
+    privileged: true
+
+  appdaemon:
+    image: acockburn/appdaemon:latest
+    container_name: appdaemon
+    environment:
+      HASS_URL: http://nginx-proxy:8125
+      TZ: ${TZ}
+    volumes:
+      - ${DOCKER_DATA_PATH}/appdaemon/conf:/conf
+      - ${DOCKER_DATA_PATH}/home-assistant/config:/homeassistant:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - ${APPDAEMON_PORT}:5050
+    networks:
+      bridge:
+        ipv4_address: 172.20.0.12
+    depends_on:
+      - homeassistant
+      - nginx
+    user: "${LOCAL_USER}:${LOCAL_USER}"
+
+  nodered:
+    image: nodered/node-red:latest
+    container_name: nodered
+    environment:
+      TZ: ${TZ}
+      PUID: 1000
+      PGID: 1000
+    volumes:
+      - ${DOCKER_DATA_PATH}/node-red/data:/data
+      - ${DOCKER_DATA_PATH}/home-assistant/config:/homeassistant_config:ro
+    ports:
+      - ${NODERED_PORT}:1880
+    networks:
+      bridge:
+        ipv4_address: 172.20.0.13
+    depends_on:
+      - homeassistant
+    user: "${LOCAL_USER}:${LOCAL_USER}"
+
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto
+    volumes:
+      - ${DOCKER_DATA_PATH}/mosquitto/config:/mosquitto/config
+      - ${DOCKER_DATA_PATH}/mosquitto/data:/mosquitto/data
+      - ${DOCKER_DATA_PATH}/mosquitto/log:/mosquitto/log
+    ports:
+      - ${MQTT_PORT}:1883
+      - ${MQTT_WS_PORT}:9001
+    networks:
+      bridge:
+        ipv4_address: 172.20.0.14
+    user: "1883:1883"
+    command: mosquitto -c /mosquitto/config/mosquitto.conf
+
+  zigbee2mqtt:
+    image: koenkk/zigbee2mqtt:latest
+    container_name: zigbee2mqtt
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      ZIGBEE2MQTT_CONFIG_FRONTEND_PORT: 8080
+    volumes:
+      - ${DOCKER_DATA_PATH}/zigbee2mqtt/data:/app/data
+      - ${DOCKER_DATA_PATH}/home-assistant/config:/app/homeassistant_config:ro
+      - /run/udev:/run/udev:ro
+    ports:
+      - 8080:8080
+    networks:
+      bridge:
+        ipv4_address: 172.20.0.15
+
+  matter-hub:
+      image: ghcr.io/t0bst4r/home-assistant-matter-hub:latest
+      container_name: matter-hub
+      restart: unless-stopped
+      environment:
+        TZ: ${TZ}
+      volumes:
+        - ${DOCKER_DATA_PATH}/matter-hub/data:/data
+        - ${DOCKER_DATA_PATH}/matter-hub/start.sh:/start.sh:ro
+        - ${DOCKER_DATA_PATH}/home-assistant/config:/secrets:ro
+        - /etc/localtime:/etc/localtime:ro
+      networks:
+        bridge:
+          ipv4_address: 172.20.0.20
+      extra_hosts:
+        - "host.docker.internal:host-gateway"
+      depends_on:
+        - homeassistant
+      privileged: true
+      user: "${LOCAL_USER}:${LOCAL_USER}"
+      entrypoint: /bin/sh
+      command: ["/start.sh"]
+
+  matter-server:
+    image: ghcr.io/home-assistant-libs/python-matter-server:stable
+    container_name: matter-server
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /home/federico/Scrivania/Docker/matter-server/data:/data
+      - /run/dbus:/run/dbus:ro
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      bridge:
+        ipv4_address: 172.20.0.21
+    user: "${LOCAL_USER}:${LOCAL_USER}"
+
+  esphome:
+    image: esphome/esphome
+    container_name: esphome
+    ports:
+      - ${ESPHOME_PORT}:6052
+    volumes:
+      - ${DOCKER_DATA_PATH}/esphome:/config
+      - ${DOCKER_DATA_PATH}/home-assistant/config/secrets.yaml:/config/secrets.yaml:ro
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      bridge:
+        ipv4_address: 172.20.0.16
+    environment:
+      - TZ=Europe/Berlin
+    user: "${LOCAL_USER}:${LOCAL_USER}"
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-proxy
+    volumes:
+      - /home/federico/Scrivania/Docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - 8125:8125  # Proxy interno Home Assistant su LAN
+      # - 443:443  # (quando vorrai HTTPS con DuckDNS)
+    networks:
+      bridge:
+        ipv4_address: 172.20.0.17
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  vscode:
+    image: codercom/code-server:latest
+    container_name: vscode
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Berlin
+    volumes:
+      - /home/federico/Scrivania/Docker:/home/coder/project
+    ports:
+      - 8443:8080
+    networks:
+      bridge:
+        ipv4_address: 172.20.0.18
+    command: code-server --auth none --disable-telemetry /home/coder/project
+    user: "1000:1000"
+
+  yacht:
+    image: selfhostedpro/yacht:latest
+    container_name: yacht
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+    ports:
+      - ${YACHT_PORT}:8000   # Porta web per accedere alla dashboard Yacht
+    volumes:
+      - ${DOCKER_DATA_PATH}/yacht:/config
+      - /var/run/docker.sock:/var/run/docker.sock   # Permette a Yacht di gestire i container
+    networks:
+      bridge:
+        ipv4_address: 172.20.0.19

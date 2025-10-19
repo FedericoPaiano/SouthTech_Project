@@ -1,0 +1,8 @@
+{
+  "logLevel": "info",
+  "disableLogColors": false,
+  "storageLocation": "/data",
+  "httpPort": 8482,
+  "homeAssistantUrl": "http://nginx-proxy:8125",
+  "homeAssistantRefreshInterval": 30
+}

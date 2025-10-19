@@ -1,0 +1,29 @@
+
+# Basic configuration
+homeassistant:
+  name: Home
+  latitude: !secret latitude_home
+  longitude: !secret longitude_home
+  elevation: !secret elevation
+  unit_system: metric
+  time_zone: !secret time_zone
+
+# HTTP configuration for reverse proxy
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 172.20.0.17    # nginx-proxy container IP
+    - 172.20.0.0/24  # Docker bridge network subnet
+    - 127.0.0.1      # localhost
+
+# Load default integrations
+default_config:
+
+# Group integration
+group:
+
+# Include files
+automation: !include automations.yaml
+scene: !include scenes.yaml
+script: !include scripts.yaml
+

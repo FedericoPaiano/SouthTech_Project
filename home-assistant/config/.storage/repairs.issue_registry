@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "minor_version": 2,
+  "key": "repairs.issue_registry",
+  "data": {
+    "issues": [
+      {
+        "created": "2025-10-13T15:24:44.132090+00:00",
+        "dismissed_version": null,
+        "domain": "shelly",
+        "is_persistent": false,
+        "issue_id": "push_update_40F520052DA9"
+      }
+    ]
+  }
+}
