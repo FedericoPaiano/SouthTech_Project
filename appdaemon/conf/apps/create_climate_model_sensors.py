@@ -62,26 +62,19 @@ class CreateClimateModelSensors(hass.Hass):
         """
         Trova il sensore di temperatura per una specifica area.
         Priorità:
-        1. Sensore aggregato medio creato da create_environment_sensors (_avg)
-        2. Sensore aggregato singolo (se c'è un solo sensore nell'area)
-        3. Primo sensore fisico disponibile (fallback)
+        1. Sensore aggregato creato da create_environment_sensors (sensor.<area>_temperature)
+        2. Primo sensore fisico disponibile (fallback)
         Restituisce una lista di entity_id dei sensori di temperatura
         """
         self.log(f"Ricerca sensori di temperatura per area: {area_name}", level="DEBUG")
         
         safe_area_name = area_name.lower().replace(' ', '_').replace('-', '_')
         
-        # PRIORITÀ 1: Cerca il sensore medio aggregato (più sensori nell'area)
-        aggregated_avg_sensor = f"sensor.{safe_area_name}_temperature_avg"
-        if self.entity_exists(aggregated_avg_sensor):
-            self.log(f"✅ Trovato sensore aggregato medio: {aggregated_avg_sensor}", level="INFO")
-            return [aggregated_avg_sensor]
-        
-        # PRIORITÀ 2: Cerca il sensore singolo aggregato (un solo sensore nell'area)
-        aggregated_single_sensor = f"sensor.{safe_area_name}_temperature"
-        if self.entity_exists(aggregated_single_sensor):
-            self.log(f"✅ Trovato sensore aggregato singolo: {aggregated_single_sensor}", level="INFO")
-            return [aggregated_single_sensor]
+        # PRIORITÀ 1: Cerca il sensore aggregato (sia medio che singolo hanno lo stesso nome)
+        aggregated_sensor = f"sensor.{safe_area_name}_temperature"
+        if self.entity_exists(aggregated_sensor):
+            self.log(f"✅ Trovato sensore aggregato: {aggregated_sensor}", level="INFO")
+            return [aggregated_sensor]
         
         # PRIORITÀ 3: Fallback ai sensori fisici (se non esistono aggregati)
         self.log(f"⚠️ Nessun sensore aggregato trovato, cerco sensori fisici...", level="WARNING")
@@ -128,7 +121,7 @@ class CreateClimateModelSensors(hass.Hass):
 
             # Per ogni area con entità climate
             for area_name, climate_entities in area_climate_entities.items():
-                self.log(f"Processando area: {area_name} con {len(climate_entities)} entità climate", level="DEBUG")
+                self.log(f"🏠 Processando area: {area_name} con {len(climate_entities)} entità climate: {climate_entities}", level="INFO")
                 
                 # Trova il sensore di temperatura (priorità agli aggregati)
                 temperature_sensors = self.find_temperature_sensors_for_area(area_name)
@@ -142,24 +135,35 @@ class CreateClimateModelSensors(hass.Hass):
                 
                 self.log(f"📍 Sensore temperatura selezionato per '{area_name}': {primary_temp_sensor}", level="INFO")
                 
-                # Usa la prima entità climate nell'area per generare sia l'ID che il nome
-                first_climate_entity = climate_entities[0]
-                digits = re.findall(r'\d+', first_climate_entity)
+                # Cerca l'entità climate con numeri nell'ID (ignora wrapper senza numeri)
+                climate_with_numbers = None
+                for climate_entity in climate_entities:
+                    digits = re.findall(r'\d+', climate_entity)
+                    if digits:
+                        climate_with_numbers = climate_entity
+                        self.log(f"🔢 Trovata entità climate con numeri: {climate_entity} (numeri: {digits})", level="DEBUG")
+                        break
+                    else:
+                        self.log(f"⏭️ Saltata entità senza numeri: {climate_entity}", level="DEBUG")
                 
-                if not digits:
-                    self.log(f"Nessun numero trovato nell'ID dell'entità {first_climate_entity}. Impossibile creare il sensore. Saltando...", level="WARNING")
+                # Se nessuna entità ha numeri, salta questa area
+                if not climate_with_numbers:
+                    self.log(f"⚠️ Nessuna entità climate con numeri trovata in '{area_name}'. Entità presenti: {climate_entities}", level="WARNING")
                     continue
-
-                # --- NUOVA LOGICA PER ID E NOME ---
+                
+                # Estrai i numeri dall'entità climate
+                digits = re.findall(r'\d+', climate_with_numbers)
+                
+                # --- LOGICA PER ID E NOME ---
                 # ID del sensore: es. "sensor.temperature_01_06"
                 climate_sensor_id = f"sensor.temperature_{'_'.join(digits)}"
 
                 # Nome del sensore: recupera il friendly_name dell'entità climate e aggiunge l'area
-                # es. "Temperatura Termostato in Ingresso"
-                climate_friendly_name = self.friendly_name(first_climate_entity)
+                # es. "Temperatura Relay 06 in Ingresso"
+                climate_friendly_name = self.friendly_name(climate_with_numbers)
                 sensor_name = f"Temperatura {climate_friendly_name} in {area_name}"
                 
-                # --- FINE NUOVA LOGICA ---
+                # --- FINE LOGICA ---
 
                 temperature_state = self.get_validated_temperature(primary_temp_sensor)
 

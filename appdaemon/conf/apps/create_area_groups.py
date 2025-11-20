@@ -71,7 +71,7 @@ class CreateAreaGroups(hass.Hass):
         """
         self.log("Recupero entità per area e dominio...", level="DEBUG")
         
-        all_entities = self.get_state()
+        all_entities = self.get_state(namespace='default')
         area_domain_entities = {}
         NO_AREA_KEY = "__SenzaArea__"
         
@@ -96,13 +96,22 @@ class CreateAreaGroups(hass.Hass):
                 
                 # Classificazione dei sensori in base a device_class o unità di misura
                 if domain == 'sensor':
-                    entity_state = self.get_state(entity_id, attribute="all")
+                    # ESCLUDI i sensori virtuali creati da altre app AppDaemon
+                    # Pattern: sensor.<area>_temperature, sensor.<area>_humidity, sensor.<area>_illuminance
+                    # Pattern: sensor.<area>_temperature_min/max
+                    # Pattern: sensor.temperature_<numero>_<numero>
+                    if (re.match(r'^sensor\.[a-z_]+_(temperature|humidity|illuminance)(_min|_max)?$', entity_id) or
+                        re.match(r'^sensor\.temperature_\d+_\d+$', entity_id)):
+                        self.log(f"Escluso sensore virtuale: {entity_id}", level="DEBUG")
+                        continue
+                    
+                    entity_state = self.get_state(entity_id, attribute="all", namespace='default')
                     if entity_state and 'attributes' in entity_state:
                         attrs = entity_state['attributes']
                         device_class = attrs.get('device_class', '')
                         unit = attrs.get('unit_of_measurement', '')
                         
-                        if device_class == 'temperature' or '°' in unit:
+                        if device_class == 'temperature' or unit in ['°C', '°F']:
                             entity_type = 'temperature'
                         elif device_class == 'humidity' or '%' in unit:
                             entity_type = 'humidity'
@@ -111,7 +120,7 @@ class CreateAreaGroups(hass.Hass):
                 
                 # Classificazione dei binary_sensor in base a device_class o nome
                 elif domain == 'binary_sensor':
-                    entity_state = self.get_state(entity_id, attribute="all")
+                    entity_state = self.get_state(entity_id, attribute="all", namespace='default')
                     if entity_state and 'attributes' in entity_state:
                         attrs = entity_state['attributes']
                         device_class = attrs.get('device_class', '')

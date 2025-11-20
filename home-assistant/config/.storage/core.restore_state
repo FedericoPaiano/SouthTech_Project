@@ -4,124 +4,37 @@
   "key": "core.restore_state",
   "data": [
     {
-      "state": {"entity_id":"conversation.home_assistant","state":"unknown","attributes":{"friendly_name":"Home Assistant","supported_features":1},"last_changed":"2025-10-16T15:21:07.218996+00:00","last_reported":"2025-10-16T15:21:07.218996+00:00","last_updated":"2025-10-16T15:21:07.218996+00:00","context":{"id":"01K7PSRJWJG99ESMYH5JPWX24S","parent_id":null,"user_id":null}},
+      "state": {"entity_id":"conversation.home_assistant","state":"unknown","attributes":{"friendly_name":"Home Assistant","supported_features":1},"last_changed":"2025-11-01T22:46:31.846385+00:00","last_reported":"2025-11-01T22:46:31.846385+00:00","last_updated":"2025-11-01T22:46:31.846385+00:00","context":{"id":"01K90SKN566HHFA46G07DXVK96","parent_id":null,"user_id":null}},
       "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
+      "last_seen": "2025-11-01T22:58:35.161256+00:00"
     },
     {
-      "state": {"entity_id":"event.backup_backup_automatico","state":"unknown","attributes":{"event_types":["completed","failed","in_progress"],"event_type":null,"friendly_name":"Backup Backup automatico"},"last_changed":"2025-10-16T15:21:07.273006+00:00","last_reported":"2025-10-16T15:21:07.273006+00:00","last_updated":"2025-10-16T15:21:07.273006+00:00","context":{"id":"01K7PSRJY9GK1BNZTYC1KRBYQG","parent_id":null,"user_id":null}},
+      "state": {"entity_id":"event.backup_backup_automatico","state":"unknown","attributes":{"event_types":["completed","failed","in_progress"],"event_type":null,"friendly_name":"Backup Backup automatico"},"last_changed":"2025-11-01T22:46:31.907709+00:00","last_reported":"2025-11-01T22:46:31.907709+00:00","last_updated":"2025-11-01T22:46:31.907709+00:00","context":{"id":"01K90SKN73S2NB9PWHZPC36CP7","parent_id":null,"user_id":null}},
       "extra_data": {
         "last_event_type": null,
         "last_event_attributes": null
       },
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
+      "last_seen": "2025-11-01T22:58:35.161256+00:00"
     },
     {
-      "state": {"entity_id":"tts.google_translate_en_com","state":"2025-10-16T15:12:30.094150+00:00","attributes":{"friendly_name":"Google Translate en com"},"last_changed":"2025-10-16T15:21:07.979629+00:00","last_reported":"2025-10-16T15:21:07.979629+00:00","last_updated":"2025-10-16T15:21:07.979629+00:00","context":{"id":"01K7PSRKMBGC113CKA45C63D9V","parent_id":null,"user_id":null}},
+      "state": {"entity_id":"tts.google_translate_en_com","state":"2025-10-16T15:12:30.094150+00:00","attributes":{"friendly_name":"Google Translate en com"},"last_changed":"2025-11-01T22:46:33.116626+00:00","last_reported":"2025-11-01T22:46:33.116626+00:00","last_updated":"2025-11-01T22:46:33.116626+00:00","context":{"id":"01K90SKPCWG9XQCE50QY0MCBJ2","parent_id":null,"user_id":null}},
       "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
+      "last_seen": "2025-11-01T22:58:35.161256+00:00"
     },
     {
-      "state": {"entity_id":"button.board_01_factory_reset","state":"unknown","attributes":{"device_class":"restart","icon":"mdi:restart-alert","friendly_name":"Scheda 01 Factory Reset"},"last_changed":"2025-10-16T15:21:08.310289+00:00","last_reported":"2025-10-16T15:21:08.310289+00:00","last_updated":"2025-10-16T15:21:08.310289+00:00","context":{"id":"01K7PSRKYPD4MM1NZAE841SZQB","parent_id":null,"user_id":null}},
+      "state": {"entity_id":"button.board_01_factory_reset","state":"unavailable","attributes":{"device_class":"restart","icon":"mdi:restart-alert","friendly_name":"Scheda 01 Factory Reset"},"last_changed":"2025-11-01T22:46:33.144825+00:00","last_reported":"2025-11-01T22:46:33.144825+00:00","last_updated":"2025-11-01T22:46:33.144825+00:00","context":{"id":"01K90SKPDRCSHHREDKB70XQTVQ","parent_id":null,"user_id":null}},
       "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
+      "last_seen": "2025-11-01T22:58:35.161256+00:00"
     },
     {
-      "state": {"entity_id":"button.shelly1_40f520052da9_reboot","state":"unknown","attributes":{"device_class":"restart","friendly_name":"shelly1-40F520052DA9 Reboot"},"last_changed":"2025-10-16T15:28:21.359683+00:00","last_reported":"2025-10-16T15:28:21.359683+00:00","last_updated":"2025-10-16T15:28:21.359683+00:00","context":{"id":"01K7PT5TVF93T2GTKGPQG2NNAZ","parent_id":null,"user_id":null}},
+      "state": {"entity_id":"button.bot_0b","state":"unknown","attributes":{"friendly_name":"Bot 0B"},"last_changed":"2025-11-01T22:46:33.437641+00:00","last_reported":"2025-11-01T22:46:33.437641+00:00","last_updated":"2025-11-01T22:46:33.437641+00:00","context":{"id":"01K90SKPPX5RDWAKWHV17AD0DY","parent_id":null,"user_id":null}},
       "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
+      "last_seen": "2025-11-01T22:58:35.161256+00:00"
     },
     {
-      "state": {"entity_id":"button.shellyplus1pm_80646fe2e344_reboot","state":"unknown","attributes":{"device_class":"restart","friendly_name":"shellyplus1pm-80646fe2e344 Reboot"},"last_changed":"2025-10-16T15:21:08.320817+00:00","last_reported":"2025-10-16T15:21:08.320817+00:00","last_updated":"2025-10-16T15:21:08.320817+00:00","context":{"id":"01K7PSRKZ0RD2W774FMX6E537C","parent_id":null,"user_id":null}},
+      "state": {"entity_id":"climate.condizionatore","state":"fan_only","attributes":{"hvac_modes":["heat_cool","cool","dry","fan_only","heat","off"],"min_temp":7,"max_temp":35,"target_temp_step":1,"fan_modes":["auto","low","medium","high"],"current_temperature":null,"temperature":21,"fan_mode":"auto","assumed_state":true,"friendly_name":"Condizionatore","supported_features":9},"last_changed":"2025-11-01T22:46:33.438038+00:00","last_reported":"2025-11-01T22:46:33.438038+00:00","last_updated":"2025-11-01T22:46:33.438038+00:00","context":{"id":"01K90SKPPY8R5D7J8R53F4YVEG","parent_id":null,"user_id":null}},
       "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"event.shellyplus1pm_80646fe2e344_input_0","state":"2025-10-13T18:23:46.423+00:00","attributes":{"event_types":["btn_down","btn_up","double_push","long_push","single_push","triple_push"],"event_type":"single_push","device_class":"button","friendly_name":"shellyplus1pm-80646fe2e344 Input 0"},"last_changed":"2025-10-16T15:21:08.322428+00:00","last_reported":"2025-10-16T15:21:08.322428+00:00","last_updated":"2025-10-16T15:21:08.322428+00:00","context":{"id":"01K7PSRKZ226APPHKKC2KYTMQD","parent_id":null,"user_id":null}},
-      "extra_data": {
-        "last_event_type": "single_push",
-        "last_event_attributes": null
-      },
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"update.shellyplus1pm_80646fe2e344_firmware","state":"off","attributes":{"auto_update":false,"display_precision":0,"installed_version":"1.7.1","in_progress":false,"latest_version":"1.7.1","release_summary":null,"release_url":"https://shelly-api-docs.shelly.cloud/gen2/changelog/","skipped_version":null,"title":null,"update_percentage":null,"device_class":"firmware","entity_picture":"https://brands.home-assistant.io/_/shelly/icon.png","friendly_name":"shellyplus1pm-80646fe2e344 Firmware","supported_features":5},"last_changed":"2025-10-16T15:21:08.327303+00:00","last_reported":"2025-10-16T15:21:08.327303+00:00","last_updated":"2025-10-16T15:21:08.327303+00:00","context":{"id":"01K7PSRKZ73TK5FM2303QZKGHN","parent_id":null,"user_id":null}},
-      "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"button.shellyplus1pm_80646fe3563c_reboot","state":"unknown","attributes":{"device_class":"restart","friendly_name":"shellyplus1pm-80646fe3563c Reboot"},"last_changed":"2025-10-16T15:21:08.329874+00:00","last_reported":"2025-10-16T15:21:08.329874+00:00","last_updated":"2025-10-16T15:21:08.329874+00:00","context":{"id":"01K7PSRKZ97E295V46YN9DCVG5","parent_id":null,"user_id":null}},
-      "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"event.shellyplus1pm_80646fe3563c_input_0","state":"unknown","attributes":{"event_types":["btn_down","btn_up","double_push","long_push","single_push","triple_push"],"event_type":null,"device_class":"button","friendly_name":"shellyplus1pm-80646fe3563c Input 0"},"last_changed":"2025-10-16T15:21:08.331150+00:00","last_reported":"2025-10-16T15:21:08.331150+00:00","last_updated":"2025-10-16T15:21:08.331150+00:00","context":{"id":"01K7PSRKZBHVSNX2E4DCYEVXQR","parent_id":null,"user_id":null}},
-      "extra_data": {
-        "last_event_type": null,
-        "last_event_attributes": null
-      },
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"update.shellyplus1pm_80646fe3563c_firmware","state":"off","attributes":{"auto_update":false,"display_precision":0,"installed_version":"1.7.1","in_progress":false,"latest_version":"1.7.1","release_summary":null,"release_url":"https://shelly-api-docs.shelly.cloud/gen2/changelog/","skipped_version":null,"title":null,"update_percentage":null,"device_class":"firmware","entity_picture":"https://brands.home-assistant.io/_/shelly/icon.png","friendly_name":"shellyplus1pm-80646fe3563c Firmware","supported_features":5},"last_changed":"2025-10-16T15:21:08.339295+00:00","last_reported":"2025-10-16T15:21:08.339295+00:00","last_updated":"2025-10-16T15:21:08.339295+00:00","context":{"id":"01K7PSRKZKQCTXDZ5KC4N9NWKT","parent_id":null,"user_id":null}},
-      "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"button.bot_0b","state":"unknown","attributes":{"friendly_name":"Bot 0B"},"last_changed":"2025-10-16T15:21:08.523835+00:00","last_reported":"2025-10-16T15:21:08.523835+00:00","last_updated":"2025-10-16T15:21:08.523835+00:00","context":{"id":"01K7PSRM5BE7Z7HA5VSAYE3C0B","parent_id":null,"user_id":null}},
-      "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"climate.condizionatore","state":"fan_only","attributes":{"hvac_modes":["heat_cool","cool","dry","fan_only","heat","off"],"min_temp":7,"max_temp":35,"target_temp_step":1,"fan_modes":["auto","low","medium","high"],"current_temperature":null,"temperature":21,"fan_mode":"auto","assumed_state":true,"friendly_name":"Condizionatore","supported_features":9},"last_changed":"2025-10-16T15:21:08.524243+00:00","last_reported":"2025-10-16T15:21:08.524243+00:00","last_updated":"2025-10-16T15:21:08.524243+00:00","context":{"id":"01K7PSRM5C4JPWDX2B0E534620","parent_id":null,"user_id":null}},
-      "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"button.shellyplus2pm_2043a80a4e00_reboot","state":"unknown","attributes":{"device_class":"restart","friendly_name":"shellyplus2pm-2043a80a4e00 Reboot"},"last_changed":"2025-10-16T15:21:08.533750+00:00","last_reported":"2025-10-16T15:21:08.533750+00:00","last_updated":"2025-10-16T15:21:08.533750+00:00","context":{"id":"01K7PSRM5NW8BMMECGXD9BN8EZ","parent_id":null,"user_id":null}},
-      "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"event.shellyplus2pm_2043a80a4e00_input_0","state":"2025-10-13T18:28:12.771+00:00","attributes":{"event_types":["btn_down","btn_up","double_push","long_push","single_push","triple_push"],"event_type":"triple_push","device_class":"button","friendly_name":"shellyplus2pm-2043a80a4e00 Input 0"},"last_changed":"2025-10-16T15:21:08.534303+00:00","last_reported":"2025-10-16T15:21:08.534303+00:00","last_updated":"2025-10-16T15:21:08.534303+00:00","context":{"id":"01K7PSRM5PBV429J4C7D8057B5","parent_id":null,"user_id":null}},
-      "extra_data": {
-        "last_event_type": "triple_push",
-        "last_event_attributes": null
-      },
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"update.shellyplus2pm_2043a80a4e00_firmware","state":"off","attributes":{"auto_update":false,"display_precision":0,"installed_version":"1.7.1","in_progress":false,"latest_version":"1.7.1","release_summary":null,"release_url":"https://shelly-api-docs.shelly.cloud/gen2/changelog/","skipped_version":null,"title":null,"update_percentage":null,"device_class":"firmware","entity_picture":"https://brands.home-assistant.io/_/shelly/icon.png","friendly_name":"shellyplus2pm-2043a80a4e00 Firmware","supported_features":5},"last_changed":"2025-10-16T15:21:08.538392+00:00","last_reported":"2025-10-16T15:21:08.538392+00:00","last_updated":"2025-10-16T15:21:08.538392+00:00","context":{"id":"01K7PSRM5TGYMNWDF47CBCH7JW","parent_id":null,"user_id":null}},
-      "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"button.shellyplus2pm_8813bfd0a3a4_reboot","state":"unknown","attributes":{"device_class":"restart","friendly_name":"shellyplus2pm-8813bfd0a3a4 Reboot"},"last_changed":"2025-10-16T15:21:08.555544+00:00","last_reported":"2025-10-16T15:21:08.555544+00:00","last_updated":"2025-10-16T15:21:08.555544+00:00","context":{"id":"01K7PSRM6BCV1PP6C8M5AR414H","parent_id":null,"user_id":null}},
-      "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"event.shellyplus2pm_8813bfd0a3a4_input_0","state":"2025-10-13T18:24:56.360+00:00","attributes":{"event_types":["btn_down","btn_up","double_push","long_push","single_push","triple_push"],"event_type":"triple_push","device_class":"button","friendly_name":"shellyplus2pm-8813bfd0a3a4 Input 0"},"last_changed":"2025-10-16T15:21:08.556086+00:00","last_reported":"2025-10-16T15:21:08.556086+00:00","last_updated":"2025-10-16T15:21:08.556086+00:00","context":{"id":"01K7PSRM6CS6ZG8M8JFXQG794E","parent_id":null,"user_id":null}},
-      "extra_data": {
-        "last_event_type": "triple_push",
-        "last_event_attributes": null
-      },
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"update.shellyplus2pm_8813bfd0a3a4_firmware","state":"off","attributes":{"auto_update":false,"display_precision":0,"installed_version":"1.7.1","in_progress":false,"latest_version":"1.7.1","release_summary":null,"release_url":"https://shelly-api-docs.shelly.cloud/gen2/changelog/","skipped_version":null,"title":null,"update_percentage":null,"device_class":"firmware","entity_picture":"https://brands.home-assistant.io/_/shelly/icon.png","friendly_name":"shellyplus2pm-8813bfd0a3a4 Firmware","supported_features":5},"last_changed":"2025-10-16T15:21:08.559842+00:00","last_reported":"2025-10-16T15:21:08.559842+00:00","last_updated":"2025-10-16T15:21:08.559842+00:00","context":{"id":"01K7PSRM6F21BM5X3AS0JS6PQK","parent_id":null,"user_id":null}},
-      "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"button.shellyplus1_a8032aba3e14_reboot","state":"unknown","attributes":{"device_class":"restart","friendly_name":"shellyplus1-a8032aba3e14 Reboot"},"last_changed":"2025-10-16T15:21:08.686764+00:00","last_reported":"2025-10-16T15:21:08.686764+00:00","last_updated":"2025-10-16T15:21:08.686764+00:00","context":{"id":"01K7PSRMAEJR46RSXHKWW6WD6S","parent_id":null,"user_id":null}},
-      "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
-    },
-    {
-      "state": {"entity_id":"update.shellyplus1_a8032aba3e14_firmware","state":"off","attributes":{"auto_update":false,"display_precision":0,"installed_version":"1.7.1","in_progress":false,"latest_version":"1.7.1","release_summary":null,"release_url":"https://shelly-api-docs.shelly.cloud/gen2/changelog/","skipped_version":null,"title":null,"update_percentage":null,"device_class":"firmware","entity_picture":"https://brands.home-assistant.io/_/shelly/icon.png","friendly_name":"shellyplus1-a8032aba3e14 Firmware","supported_features":5},"last_changed":"2025-10-16T15:21:08.688801+00:00","last_reported":"2025-10-16T15:21:08.688801+00:00","last_updated":"2025-10-16T15:21:08.688801+00:00","context":{"id":"01K7PSRMAGH05RDTJC7TDB0ZYS","parent_id":null,"user_id":null}},
-      "extra_data": null,
-      "last_seen": "2025-10-16T15:30:24.597369+00:00"
+      "last_seen": "2025-11-01T22:58:35.161256+00:00"
     }
   ]
 }
